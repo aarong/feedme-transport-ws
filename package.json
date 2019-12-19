@@ -1,0 +1,61 @@
+{
+  "name": "feedme-transport-ws",
+  "version": "1.0.0",
+  "description": "Feedme WebSocket transport for Node.js",
+  "main": "index.js",
+  "scripts": {
+    "build": "npm run test-src && gulp build && npm run test-build-node",
+    "lint-src": "eslint src/**",
+    "lint-build-tests": "eslint tests/**",
+    "test": "npm run test-src",
+    "test-src": "npm run lint-src && jest",
+    "test-build-node": "npm run lint-build-tests && jest /tests"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.2.3",
+    "@babel/core": "^7.3.4",
+    "@babel/preset-env": "^7.3.4",
+    "@babel/register": "^7.0.0",
+    "babel-core": "^7.0.0-bridge.0",
+    "babel-plugin-add-module-exports": "^1.0.0",
+    "babelify": "^10.0.0",
+    "browserify": "^16.2.3",
+    "del": "^4.0.0",
+    "eslint": "^5.12.0",
+    "eslint-config-airbnb-base": "^13.1.0",
+    "eslint-config-prettier": "^3.1.0",
+    "eslint-plugin-import": "^2.14.0",
+    "eslint-plugin-prettier": "^3.0.1",
+    "ghooks": "^2.0.4",
+    "gulp": "^4.0.0",
+    "gulp-babel": "^8.0.0",
+    "gulp-cli": "^2.0.1",
+    "gulp-rename": "^1.4.0",
+    "gulp-replace": "^1.0.0",
+    "gulp-sourcemaps": "^2.6.5",
+    "gulp-uglify": "^3.0.2",
+    "prettier": "^1.14.3",
+    "jest": "^23.6.0",
+    "jest-cli": "^23.6.0",
+    "vinyl-buffer": "^1.0.1",
+    "vinyl-source-stream": "^2.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aarong/feedme-transport-ws.git"
+  },
+  "keywords": [
+    "feedme"
+  ],
+  "author": "Aaron G",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/aarong/feedme-transport-ws/issues"
+  },
+  "homepage": "https://github.com/aarong/feedme-transport-ws#readme",
+  "config": {
+    "ghooks": {
+      "pre-commit": "npm run build"
+    }
+  }
+}
