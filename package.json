@@ -8,7 +8,7 @@
     "lint-src": "eslint src/**",
     "lint-build-tests": "eslint tests/**",
     "test": "npm run test-src",
-    "test-src": "npm run lint-src && jest",
+    "test-src": "npm run lint-src && jest /src",
     "test-build-node": "npm run lint-build-tests && jest /tests"
   },
   "devDependencies": {
@@ -57,5 +57,13 @@
     "ghooks": {
       "pre-commit": "npm run build"
     }
+  },
+  "jest": {
+    "collectCoverageFrom": [
+      "src/**/*.{js}"
+    ],
+    "testMatch": [
+      "**/*.test.js"
+    ]
   }
 }
