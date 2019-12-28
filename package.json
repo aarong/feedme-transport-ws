@@ -9,7 +9,9 @@
     "lint-build-tests": "eslint tests/**",
     "test": "npm run test-src",
     "test-src": "npm run lint-src && jest /src",
-    "test-build-node": "npm run lint-build-tests && jest /tests"
+    "test-build-node": "npm run lint-build-tests && jest /tests",
+    "coverage": "jest --coverage",
+    "coveralls": "jest --coverage --coverageReporters=text-lcov | coveralls"
   },
   "devDependencies": {
     "@babel/cli": "^7.2.3",
