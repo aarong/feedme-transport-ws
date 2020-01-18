@@ -55,21 +55,21 @@ const nodeTranspile = () =>
     .pipe(sourcemaps.write("."))
     .pipe(gulp.dest("build/"));
 
-// const copy1 = () =>
-//   gulp
-//     .src("./index.build.js")
-//     .pipe(rename("index.js"))
-//     .pipe(gulp.dest("build/"));
+const copy1 = () =>
+  gulp
+    .src("./index.build.js")
+    .pipe(rename("index.js"))
+    .pipe(gulp.dest("build/"));
 
-// const copy2 = () =>
-//   gulp.src("./{package.json,LICENSE,README.md}").pipe(gulp.dest("build/"));
+const copy2 = () =>
+  gulp.src("./{package.json,LICENSE,README.md}").pipe(gulp.dest("build/"));
 
 export const build = gulp.series(
   // eslint-disable-line import/prefer-default-export
   clean,
   // browserBundleWithmaps,
   // browserBundleNomaps,
-  nodeTranspile
-  // copy1,
-  // copy2
+  nodeTranspile,
+  copy1,
+  copy2
 );
