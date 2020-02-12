@@ -1,11 +1,8 @@
 {
-  "extends": ["airbnb-base", "prettier"],
-  "plugins": ["prettier"],
+  "extends": ["prettier", "plugin:es5/no-es2015"],
+  "plugins": ["prettier", "es5"],
   "rules": {
     "prettier/prettier": "error",
     "no-underscore-dangle": "off"
-  },
-  "env": {
-    "jest": true
   }
 }

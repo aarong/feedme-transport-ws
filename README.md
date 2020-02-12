@@ -10,3 +10,7 @@ Client and server Feedme transport.
 Works with:
 
 aarong/feedme-client aarong/feedme-server-core
+
+In Node, it's: FeedmeTransportWsClient(address, protocols, options)
+
+In the browser it's: FeedmeTransportClient(address, protocols) // no options

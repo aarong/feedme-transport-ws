@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Jasmine Spec Runner v3.3.0</title>
+
+    <link
+      rel="shortcut icon"
+      type="image/png"
+      href="lib/jasmine-3.3.0/jasmine_favicon.png"
+    />
+    <link rel="stylesheet" href="lib/jasmine-3.3.0/jasmine.css" />
+
+    <script src="lib/jasmine-3.3.0/jasmine.js"></script>
+    <script src="lib/jasmine-3.3.0/jasmine-html.js"></script>
+    <script src="lib/jasmine-3.3.0/boot.js"></script>
+
+    <!-- include source files here... -->
+    <script src="client.bundle.withmaps.js"></script>
+
+    <!-- include spec files here... -->
+    <script src="tests.js"></script>
+
+    <!-- make Jasmine results available to Sauce -->
+    <script>
+      // Wait for the tests to complete
+      jasmine.getEnv().addReporter({
+        jasmineDone: function() {
+          var jasmineSpecs = jsApiReporter.specs();
+          var sauceResults = {
+            total: 0,
+            passed: 0,
+            failed: 0,
+            duration: 0, // Jasmine doesn't return duration
+            tests: []
+          };
+          // Custom data may be a maximum of 64k - if limit exceeded, Sauce sets it to null
+          for (var i = 0; i < jasmineSpecs.length; i++) {
+            sauceResults.total += 1;
+            var sauceTest = {
+              name: jasmineSpecs[i].fullName,
+              duration: 0 // Jasmine doesn't return duration
+            };
+
+            if (jasmineSpecs[i].status === "passed") {
+              // The test passed
+              sauceResults.passed += 1;
+              sauceTest.result = true;
+              sauceTest.message = "Passed";
+            } else {
+              // The test failed or was pending
+              // With Jasmine there can be more than one failed expect()
+              var msg = "";
+              for (
+                var j = 0;
+                j < jasmineSpecs[i].failedExpectations.length;
+                j++
+              ) {
+                if (msg.length > 0) {
+                  msg += "\n\n";
+                }
+                msg += jasmineSpecs[i].failedExpectations[j].message + "\n";
+                msg += jasmineSpecs[i].failedExpectations[j].stack;
+              }
+              sauceResults.failed += 1;
+              sauceTest.result = false;
+              sauceTest.message = msg;
+            }
+            if (!sauceTest.result) {
+              // Only return failed test specifics to save space and avoid null custom data
+              sauceResults.tests.push(sauceTest);
+            }
+          }
+
+          window.global_test_results = sauceResults;
+          console.log(window.global_test_results);
+          console.log(JSON.stringify(window.global_test_results).length);
+        }
+      });
+    </script>
+  </head>
+
+  <body></body>
+</html>

@@ -18,33 +18,33 @@ it was rolling up the code. As a result, I use Gulp to pipe the output through
 Babel again and then Uglify it (the latter does not support ES6).
 Works in any path. Gulp.src/dest are always relative to package root (Gulpfile).
 */
-// const browserBundleWithmaps = () => {
-//   const b = browserify({
-//     entries: path.join(__dirname, "src/main.browser.js"),
-//     debug: true,
-//     standalone: "feedmeClient"
-//   });
+const browserBundleWithmaps = () => {
+  const b = browserify({
+    entries: path.join(__dirname, "src/client.browser.js"),
+    debug: true,
+    standalone: "feedmeTransportWsClient"
+  });
 
-//   return b
-//     .transform("babelify", {
-//       presets: [["@babel/preset-env"]] // Uses browserslist config in package.json
-//     })
-//     .bundle()
-//     .pipe(source("bundle.withmaps.js"))
-//     .pipe(buffer())
-//     .pipe(sourcemaps.init({ loadMaps: true })) // Browserify source maps are piped in
-//     .pipe(babel({ plugins: ["add-module-exports"] })) // No feedmeClient.default({})
-//     .pipe(uglify())
-//     .pipe(sourcemaps.write("."))
-//     .pipe(gulp.dest(path.join(__dirname, "build")));
-// };
+  return b
+    .transform("babelify", {
+      presets: [["@babel/preset-env"]] // Uses browserslist config in package.json
+    })
+    .bundle()
+    .pipe(source("client.bundle.withmaps.js"))
+    .pipe(buffer())
+    .pipe(sourcemaps.init({ loadMaps: true })) // Browserify source maps are piped in
+    .pipe(babel({ plugins: ["add-module-exports"] })) // No feedmeTransportWsClient.default({})
+    .pipe(uglify())
+    .pipe(sourcemaps.write("."))
+    .pipe(gulp.dest(path.join(__dirname, "build")));
+};
 
-// const browserBundleNomaps = () =>
-//   gulp
-//     .src("build/bundle.withmaps.js")
-//     .pipe(replace("//# sourceMappingURL=bundle.withmaps.js.map\n", ""))
-//     .pipe(rename("bundle.js"))
-//     .pipe(gulp.dest("build/"));
+const browserBundleNomaps = () =>
+  gulp
+    .src("build/client.bundle.withmaps.js")
+    .pipe(replace("//# sourceMappingURL=client.bundle.withmaps.js.map\n", ""))
+    .pipe(rename("client.bundle.js"))
+    .pipe(gulp.dest("build/"));
 
 const nodeTranspile = () =>
   gulp
@@ -55,11 +55,13 @@ const nodeTranspile = () =>
     .pipe(sourcemaps.write("."))
     .pipe(gulp.dest("build/"));
 
-const copy1 = () =>
-  gulp
-    .src("./index.build.js")
-    .pipe(rename("index.js"))
-    .pipe(gulp.dest("build/"));
+// Maybe make the index return an object with a .client and .server member?
+// Probably best practice to have an index.js
+// const copy1 = () =>
+//   gulp
+//     .src("./index.build.js")
+//     .pipe(rename("index.js"))
+//     .pipe(gulp.dest("build/"));
 
 const copy2 = () =>
   gulp.src("./{package.json,LICENSE,README.md}").pipe(gulp.dest("build/"));
@@ -67,9 +69,9 @@ const copy2 = () =>
 export const build = gulp.series(
   // eslint-disable-line import/prefer-default-export
   clean,
-  // browserBundleWithmaps,
-  // browserBundleNomaps,
+  browserBundleWithmaps,
+  browserBundleNomaps,
   nodeTranspile,
-  copy1,
+  // copy1,
   copy2
 );
