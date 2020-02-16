@@ -211,7 +211,7 @@ async.series(
         var platformPassed =
           platformResult &&
           platformResult.failed === 0 &&
-          platformResult.passed > 100;
+          platformResult.passed > 0;
 
         // Display the platform name and result
         if (platformPassed) {

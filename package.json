@@ -6,11 +6,11 @@
   "scripts": {
     "build": "npm run test-src && gulp build && npm run test-build-node",
     "lint-src": "eslint src/**",
-    "lint-build-tests": "eslint tests/**",
+    "lint-build-tests": "eslint tests/*",
     "test": "npm run test-src",
     "test-src": "npm run lint-src && jest",
-    "test-build-node": "node tests/tests.node.js",
-    "test-build-browsers": "node tests/tests.browsers.js",
+    "test-build-node": "npm run lint-build-tests && node tests/tests.node.js",
+    "test-build-browsers": "npm run lint-build-tests && node tests/tests.browsers.js",
     "coverage": "jest --coverage",
     "coveralls": "jest --coverage --coverageReporters=text-lcov | coveralls"
   },
@@ -36,6 +36,7 @@
     "eslint": "^5.12.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-config-prettier": "^3.1.0",
+    "eslint-plugin-es5": "^1.3.1",
     "eslint-plugin-import": "^2.14.0",
     "eslint-plugin-prettier": "^3.0.1",
     "express": "^4.16.4",

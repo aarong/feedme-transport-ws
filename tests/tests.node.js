@@ -18,7 +18,7 @@ var header =
 prependFile.sync(__dirname + "/node.tmp.js", header);
 
 // Start a transport server
-const transportServer = feedmeTransportWsServer({});
+var transportServer = feedmeTransportWsServer({});
 
 // Run the tests in Jasmine
 var jasmine = new Jasmine();
