@@ -6,7 +6,7 @@
   "scripts": {
     "build": "npm run test-src && gulp build && npm run test-build-node",
     "lint-src": "eslint src/**",
-    "lint-build-tests": "eslint tests/*",
+    "lint-build-tests": "eslint \"tests/*\"",
     "test": "npm run test-src",
     "test-src": "npm run lint-src && jest",
     "test-build-node": "npm run lint-build-tests && node tests/tests.node.js",
