@@ -1,4 +1,6 @@
 sudo: false
+addons:
+  sauce_connect: true
 branches:
   only:
     - master
@@ -11,6 +13,7 @@ jobs:
       node_js: "6"
       script:
         - npm run build # test-src, build, test-build
+        - npm run test-build-browsers # Browser tests only once
         - npm run coveralls
     - stage: Test
       language: node_js
