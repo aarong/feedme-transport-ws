@@ -8,7 +8,7 @@
     "lint-src": "eslint src/**",
     "lint-build-tests": "eslint tests/**",
     "test": "npm run test-src",
-    "test-src": "npm run lint-src && jest /src",
+    "test-src": "npm run lint-src && jest",
     "test-build-node": "node tests/tests.node.js",
     "test-build-browsers": "node tests/tests.browsers.js",
     "coverage": "jest --coverage",
@@ -20,7 +20,7 @@
     "debug": "^4.1.1",
     "source-map-support": "^0.5.11",
     "uuid": "^3.3.2",
-    "ws": "^7.2.1"
+    "ws": "^6.2.1"
   },
   "devDependencies": {
     "@babel/cli": "^7.2.3",
@@ -79,9 +79,6 @@
   "jest": {
     "collectCoverageFrom": [
       "src/**/*.{js}"
-    ],
-    "testMatch": [
-      "**/*.test.js"
     ]
   },
   "browserslist": [
