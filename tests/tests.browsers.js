@@ -3,6 +3,7 @@ var express = require("express");
 var sauceConnectLauncher = require("sauce-connect-launcher");
 var async = require("async");
 var request = require("request");
+var ws = require("ws");
 
 var webserver;
 var sauceConnectProcess;
@@ -32,14 +33,14 @@ saucePlatforms = [
   // though Sauce never knew that the browser was "finished". Same problem on
   // Firefox 60, worked on 50, problem on 55, worked on 52, worked on 53, worked on 54 (hardcoded).
 
-  ["Windows 10", "Firefox", "4"],
+  ////["Windows 10", "Firefox", "11"], // WebSockets introduced in FF 11
   ["Windows 10", "Firefox", "54"], // Was latest (66)
-  ["Windows 10", "Chrome", "26"],
-  ["Windows 10", "Chrome", "latest"],
-  ["Windows 10", "MicrosoftEdge", "13"],
-  ["Windows 10", "MicrosoftEdge", "latest"],
-  ["Windows 10", "Internet Explorer", "11"],
-  ["Windows 8", "Internet Explorer", "10"],
+  ////["Windows 10", "Chrome", "26"],
+  ["Windows 10", "Chrome", "latest"]
+  ////["Windows 10", "MicrosoftEdge", "13"],
+  ////["Windows 10", "MicrosoftEdge", "latest"],
+  ////["Windows 10", "Internet Explorer", "11"],
+  ////["Windows 8", "Internet Explorer", "10"],
 
   // IE 9 does not support Jasmine
   // ["Windows 7", "Internet Explorer", "9"],
@@ -49,9 +50,8 @@ saucePlatforms = [
   // ["macOS 10.14", "Firefox", "latest"],
   // ["macOS 10.14", "Chrome", "latest"],
 
-  ["macOS 10.13", "Firefox", "54"], // Was latest (66)
-  ["macOS 10.13", "Chrome", "latest"],
-
+  ////["macOS 10.13", "Firefox", "54"], // Was latest (66)
+  ////["macOS 10.13", "Chrome", "latest"],
   // Safari tests hang - Jasmine results show in the browser and there are
   // no console errors, but Sauce doesn't return
   // ["macOS 10.13", "Safari", "latest"],
@@ -60,8 +60,8 @@ saucePlatforms = [
 
   // macOS 10.10, 10.11 would not spawn tests (missing and hang like bad combo)
 
-  ["Linux", "Firefox", "latest"],
-  ["Linux", "Chrome", "latest"]
+  ////["Linux", "Firefox", "latest"],
+  ////["Linux", "Chrome", "latest"]
 ];
 
 // Run the tests
@@ -87,9 +87,39 @@ async.series(
       console.log("Starting local webserver to host the tests...");
       var e = express();
       e.use("/", express.static(__dirname + "/webroot"));
+
       webserver = e.listen(port, function() {
         console.log("Local server started on http://localhost:" + port);
         cb();
+      });
+
+      webserver.on("connection", function(socket) {
+        console.log("connection");
+        socket.on("data", function(data) {
+          console.log("data", data.toString("utf8"));
+        });
+      });
+
+      webserver.on("request", function(req) {
+        console.log("request", req.originalUrl);
+      });
+
+      webserver.on("upgrade", function() {
+        console.log("UPGRADE");
+      });
+
+      var wsServer = new ws.Server({
+        server: webserver
+      });
+      wsServer.on("listening", function() {});
+      wsServer.on("close", function() {});
+      wsServer.on("connection", function(socket) {
+        console.log("New connection!");
+        socket.on("message", function(msg) {
+          console.log("Server received: " + msg);
+          socket.send("hi");
+        });
+        socket.on("close", function(code, reason) {});
       });
     },
     function(cb) {
@@ -102,7 +132,13 @@ async.series(
 
       console.log("Starting Sauce Connect proxy...");
       sauceConnectLauncher(
-        { tunnelIdentifier: sauceTunnelId, logFile: null },
+        {
+          tunnelIdentifier: sauceTunnelId,
+          logFile: null,
+          noSslBumpDomains: "localhost,127.0.0.1", // Needed to get WebSockets working: https://wiki.saucelabs.com/display/DOCS/Sauce+Connect+Proxy+and+SSL+Certificate+Bumping
+          noProxyCaching: true, // required?????
+          verbose: true
+        },
         function(err, process) {
           if (err) {
             console.log("Failed to start Sauce Connect proxy.");
@@ -116,6 +152,7 @@ async.series(
       );
     },
     function(cb) {
+      //return;
       // Call the Sauce REST API telling it to run the tests
       console.log("Calling Sauce REST API telling it to run the tests...");
 

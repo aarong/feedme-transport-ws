@@ -164,7 +164,7 @@ proto.connect = function connect() {
   // Create the ws client and listen for events
   // options.url might be an invalid format - test (will ws throw?)
   // Make sure passing extraneous options arg doesn't fail in browsers
-  this._wsClient = new this._ws(this._address, this._protocols, this._options);
+  this._wsClient = new this._ws(this._address); // , this._protocols, this._options);
   this._wsClient.addEventListener("open", this._processWsOpen.bind(this));
   this._wsClient.addEventListener("close", this._processWsClose.bind(this));
   this._wsClient.addEventListener("error", this._processWsError.bind(this));
@@ -231,11 +231,11 @@ proto.disconnect = function disconnect(...args) {
   }
 
   // Remove all ws listeners
-  // You probably need to use removeEventListener and keep listener references
-  this._wsClient.removeAllListeners("open");
-  this._wsClient.removeAllListeners("close");
-  this._wsClient.removeAllListeners("error");
-  this._wsClient.removeAllListeners("message");
+  // For browsers you need to use removeEventListener and keep listener references
+  // this._wsClient.removeAllListeners("open");
+  // this._wsClient.removeAllListeners("close");
+  // this._wsClient.removeAllListeners("error");
+  // this._wsClient.removeAllListeners("message");
 
   // Close the ws connection
   if (this._state === "connecting") {
@@ -286,10 +286,11 @@ proto._processWsClose = function _processWsClose(event) {
   dbg("Observed ws close event");
 
   // Remove all ws listeners
-  this._wsClient.removeAllListeners("open");
-  this._wsClient.removeAllListeners("close");
-  this._wsClient.removeAllListeners("error");
-  this._wsClient.removeAllListeners("message");
+  // FIX
+  // this._wsClient.removeAllListeners("open");
+  // this._wsClient.removeAllListeners("close");
+  // this._wsClient.removeAllListeners("error");
+  // this._wsClient.removeAllListeners("message");
 
   // Update state
   this._state = "disconnected";
