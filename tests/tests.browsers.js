@@ -34,9 +34,9 @@ saucePlatforms = [
   // Firefox 60, worked on 50, problem on 55, worked on 52, worked on 53, worked on 54 (hardcoded).
 
   ////["Windows 10", "Firefox", "11"], // WebSockets introduced in FF 11
-  ["Windows 10", "Firefox", "54"], // Was latest (66)
+  ["Windows 10", "Firefox", "54"] // Was latest (66)
   ////["Windows 10", "Chrome", "26"],
-  ["Windows 10", "Chrome", "latest"]
+  ////["Windows 10", "Chrome", "latest"]
   ////["Windows 10", "MicrosoftEdge", "13"],
   ////["Windows 10", "MicrosoftEdge", "latest"],
   ////["Windows 10", "Internet Explorer", "11"],
