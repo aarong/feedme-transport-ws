@@ -22,7 +22,9 @@ describe("Server test", function() {
       expect("message").toBe("message");
       done();
     });
-    c.on("disconnect", function(err) {});
+    c.on("disconnect", function(err) {
+      expect(err).toBe(1);
+    });
     c.connect();
   });
 });

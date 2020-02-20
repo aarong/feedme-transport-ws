@@ -12,12 +12,11 @@ var sauceResults;
 
 // Config
 var port = 3000;
-var sauceTunnelId = process.env.TRAVIS_JOB_NUMBER || "feedme-client-tunnel"; // Travis sets tunnel id to job number
+var sauceTunnelId =
+  process.env.TRAVIS_JOB_NUMBER || "feedme-transport-ws-tunnel"; // Travis sets tunnel id to job number
 var pollInterval = 10000;
 saucePlatforms = [
   // Available Sauce platforms: https://saucelabs.com/platforms
-  // Ideally you would test everything in browserslist, but many of those
-  // platforms aren't available on Sauce -- instead, test maximally on Sauce platforms
   // General approach is to tests earliest and latest browser versions available on all platforms
 
   // If you include a bad platform-browser combination, Sauce never returns results even when
@@ -33,14 +32,14 @@ saucePlatforms = [
   // though Sauce never knew that the browser was "finished". Same problem on
   // Firefox 60, worked on 50, problem on 55, worked on 52, worked on 53, worked on 54 (hardcoded).
 
-  ////["Windows 10", "Firefox", "11"], // WebSockets introduced in FF 11
-  ["Windows 10", "Firefox", "54"] // Was latest (66)
-  ////["Windows 10", "Chrome", "26"],
-  ////["Windows 10", "Chrome", "latest"]
-  ////["Windows 10", "MicrosoftEdge", "13"],
-  ////["Windows 10", "MicrosoftEdge", "latest"],
-  ////["Windows 10", "Internet Explorer", "11"],
-  ////["Windows 8", "Internet Explorer", "10"],
+  ////// ["Windows 10", "Firefox", "11"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
+  ["Windows 10", "Firefox", "54"], // Hangs on 55+ (Jasmine, I think), 1006 on 65+
+  ["Windows 10", "Chrome", "26"],
+  ////// ["Windows 10", "Chrome", "latest"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
+  ////// ["Windows 10", "MicrosoftEdge", "13"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
+  ////// ["Windows 10", "MicrosoftEdge", "latest"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
+  ["Windows 10", "Internet Explorer", "11"],
+  ["Windows 8", "Internet Explorer", "10"],
 
   // IE 9 does not support Jasmine
   // ["Windows 7", "Internet Explorer", "9"],
@@ -49,9 +48,8 @@ saucePlatforms = [
   // ["macOS 10.14", "Safari", "latest"],
   // ["macOS 10.14", "Firefox", "latest"],
   // ["macOS 10.14", "Chrome", "latest"],
-
-  ////["macOS 10.13", "Firefox", "54"], // Was latest (66)
-  ////["macOS 10.13", "Chrome", "latest"],
+  ["macOS 10.13", "Firefox", "54"], // Hangs on 55+ (Jasmine, I think), 1006 on 65+
+  ////// ["macOS 10.13", "Chrome", "latest"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
   // Safari tests hang - Jasmine results show in the browser and there are
   // no console errors, but Sauce doesn't return
   // ["macOS 10.13", "Safari", "latest"],
@@ -60,8 +58,8 @@ saucePlatforms = [
 
   // macOS 10.10, 10.11 would not spawn tests (missing and hang like bad combo)
 
-  ////["Linux", "Firefox", "latest"],
-  ////["Linux", "Chrome", "latest"]
+  ["Linux", "Firefox", "latest"],
+  ["Linux", "Chrome", "latest"]
 ];
 
 // Run the tests
