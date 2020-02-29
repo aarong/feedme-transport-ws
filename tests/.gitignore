@@ -1,4 +1,4 @@
 node.tmp.js
-webroot/client.bundle.withmaps.js
-webroot/client.bundle.withmaps.js.map
+webroot/browser.bundle.withmaps.js
+webroot/browser.bundle.withmaps.js.map
 webroot/tests.js

@@ -35,7 +35,7 @@ saucePlatforms = [
   ////// ["Windows 10", "Firefox", "11"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
   ["Windows 10", "Firefox", "54"], // Hangs on 55+ (Jasmine, I think), 1006 on 65+
   ////// ["Windows 10", "Chrome", "26"], // Type error
-  ["Windows 10", "Chrome", "latest"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
+  ////// ["Windows 10", "Chrome", "latest"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
   ////// ["Windows 10", "MicrosoftEdge", "13"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
   ////// ["Windows 10", "MicrosoftEdge", "latest"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
   ["Windows 10", "Internet Explorer", "11"],
@@ -70,12 +70,12 @@ async.series(
 
       copyFileSync(__dirname + "/tests.js", __dirname + "/webroot/tests.js");
       copyFileSync(
-        __dirname + "/../build/client.bundle.withmaps.js",
-        __dirname + "/webroot/client.bundle.withmaps.js"
+        __dirname + "/../build/browser.bundle.withmaps.js",
+        __dirname + "/webroot/browser.bundle.withmaps.js"
       );
       copyFileSync(
-        __dirname + "/../build/client.bundle.withmaps.js.map",
-        __dirname + "/webroot/client.bundle.withmaps.js.map"
+        __dirname + "/../build/browser.bundle.withmaps.js.map",
+        __dirname + "/webroot/browser.bundle.withmaps.js.map"
       );
 
       cb();
