@@ -1,2 +1,2 @@
 #!/bin/bash
-echo "localhost testingserver" >> /etc/hosts
+echo "127.0.0.1 testingserver" >> /etc/hosts
