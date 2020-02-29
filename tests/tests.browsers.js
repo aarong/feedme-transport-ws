@@ -60,6 +60,8 @@ saucePlatforms = [
 
   ["Linux", "Firefox", "latest"],
   ["Linux", "Chrome", "latest"]
+
+  //{ platformName: "Linux", browserName: "Chrome", browserVersion: "latest" }
 ];
 
 // Run the tests
@@ -150,7 +152,6 @@ async.series(
       );
     },
     function(cb) {
-      //return;
       // Call the Sauce REST API telling it to run the tests
       console.log("Calling Sauce REST API telling it to run the tests...");
 
@@ -170,7 +171,8 @@ async.series(
             url: "http://localhost:" + port,
             framework: "custom",
             platforms: saucePlatforms,
-            "tunnel-identifier": sauceTunnelId
+            "tunnel-identifier": sauceTunnelId,
+            prerun: '#!/bin/bash\necho "testingserver localhost" >> /etc/hosts'
           }
         },
         function(err, response) {
