@@ -1,13 +1,19 @@
-import client from "./client";
+import client from "./browser.main";
 
 /* eslint no-restricted-globals: ["off"] */
 /* global WebSocket, MozWebSocket, window, self */
 
-export default function clientFactory(...args) {
+/**
+ * Create a browser client with native WebSocket injected (dependency injection
+ * to facilitate unit testing).
+ * @param {string} address
+ * @param {?string|Array} protocols
+ * @throws {Error} "NO_WEBSOCKET: ..."
+ * @returns {Client}
+ */
+export default function feedmeTransportWsClient(address, protocols) {
+  // Get the native WebSocket implementation
   let ws;
-
-  // From isomorphic-ws
-  // Avoid putting Node-specific code in the browser bundle
   if (typeof WebSocket !== "undefined") {
     ws = WebSocket;
   } else if (typeof MozWebSocket !== "undefined") {
@@ -20,18 +26,13 @@ export default function clientFactory(...args) {
     ws = self.WebSocket || self.MozWebSocket;
   }
 
-  // Throw is there is no WebSocket module available
+  // Throw if WebSockets are not supported
   if (!ws) {
     throw new Error(
       "NO_WEBSOCKETS: The environment does not appear to support WebSockets."
     );
   }
 
-  if (args.length === 1) {
-    return client(ws, args[0]);
-  }
-  if (args.length === 3) {
-    return client(ws, args[0], args[1]);
-  }
-  return client(ws, args[0], args[1], args[2]);
+  // Create and return the client
+  return client(ws, address, protocols || "");
 }

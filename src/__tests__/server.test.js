@@ -1,9 +1,7 @@
 import server from "../server";
 
-describe("a test", () => {
-  it("should do something", () => {
-    // eslint-disable-next-line
-    const s = server();
-    expect(1).toBe(1);
+describe("The function", () => {
+  it("should work", () => {
+    expect(server({ port: 8080 })).toBeInstanceOf(Object);
   });
 });

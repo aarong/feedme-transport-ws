@@ -1,4 +1,4 @@
-import client from "../client";
+import client from "../browser";
 
 describe("The function", () => {
   it("should work", () => {

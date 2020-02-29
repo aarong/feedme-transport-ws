@@ -11,11 +11,11 @@ var ws = require("ws");
 copyFileSync(__dirname + "/tests.js", __dirname + "/node.tmp.js");
 
 // Prepend the module load to the tests
-var buildPath = path.normalize(path.join(__dirname, "../build/client.node"));
+var buildPath = path.normalize(path.join(__dirname, "../build/client"));
 var header =
-  "var feedmeTransportWsClient = require('" +
+  'var feedmeTransportWsClient = require("' +
   jsStringEscape(buildPath) +
-  "');\n\n";
+  '");\n\n';
 prependFile.sync(__dirname + "/node.tmp.js", header);
 
 // Start a transport server

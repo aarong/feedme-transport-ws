@@ -20,7 +20,7 @@ Works in any path. Gulp.src/dest are always relative to package root (Gulpfile).
 */
 const browserBundleWithmaps = () => {
   const b = browserify({
-    entries: path.join(__dirname, "src/client.browser.js"),
+    entries: path.join(__dirname, "src/browser.js"),
     debug: true,
     standalone: "feedmeTransportWsClient"
   });
@@ -30,10 +30,10 @@ const browserBundleWithmaps = () => {
       presets: [["@babel/preset-env"]] // Uses browserslist config in package.json
     })
     .bundle()
-    .pipe(source("client.bundle.withmaps.js"))
+    .pipe(source("browser.bundle.withmaps.js"))
     .pipe(buffer())
     .pipe(sourcemaps.init({ loadMaps: true })) // Browserify source maps are piped in
-    .pipe(babel({ plugins: ["add-module-exports"] })) // No feedmeTransportWsClient.default({})
+    .pipe(babel({ plugins: ["add-module-exports"] })) // No .default({})
     .pipe(uglify())
     .pipe(sourcemaps.write("."))
     .pipe(gulp.dest(path.join(__dirname, "build")));
@@ -41,16 +41,16 @@ const browserBundleWithmaps = () => {
 
 const browserBundleNomaps = () =>
   gulp
-    .src("build/client.bundle.withmaps.js")
-    .pipe(replace("//# sourceMappingURL=client.bundle.withmaps.js.map\n", ""))
-    .pipe(rename("client.bundle.js"))
+    .src("build/browser.bundle.withmaps.js")
+    .pipe(replace("//# sourceMappingURL=browser.bundle.withmaps.js.map\n", ""))
+    .pipe(rename("browser.bundle.js"))
     .pipe(gulp.dest("build/"));
 
 const nodeTranspile = () =>
   gulp
     .src(["src/*.js", "!src/main.browser.js"]) // Don't transpile the browser entry-point
     .pipe(sourcemaps.init())
-    .pipe(babel({ plugins: ["add-module-exports"] })) // No feedmeClient.default({})
+    .pipe(babel({ plugins: ["add-module-exports"] })) // No .default({})
     .pipe(sourcemaps.mapSources(sourcePath => `../src/${sourcePath}`))
     .pipe(sourcemaps.write("."))
     .pipe(gulp.dest("build/"));

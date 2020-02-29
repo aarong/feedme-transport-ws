@@ -4,6 +4,7 @@
   "description": "Feedme WebSocket transport for Node.js",
   "main": "index.js",
   "scripts": {
+    "docs": "documentation build src/client.node.js src/client.browser.js src/server.js -f html -o docs --access public --access private --access undefined --sort-order alpha",
     "build": "npm run test-src && gulp build && npm run test-build-node",
     "lint-src": "eslint src/**",
     "lint-build-tests": "eslint \"tests/*\"",
@@ -18,6 +19,7 @@
     "check-types": "^7.4.0",
     "component-emitter": "^1.2.1",
     "debug": "^4.1.1",
+    "lodash": "^4.17.15",
     "source-map-support": "^0.5.11",
     "uuid": "^3.3.2",
     "ws": "^6.2.1"
@@ -33,6 +35,7 @@
     "browserify": "^16.2.3",
     "coveralls": "^3.0.3",
     "del": "^4.0.0",
+    "documentation": "^9.1.1",
     "eslint": "^5.12.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-config-prettier": "^3.1.0",

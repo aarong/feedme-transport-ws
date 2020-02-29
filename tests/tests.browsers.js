@@ -34,8 +34,8 @@ saucePlatforms = [
 
   ////// ["Windows 10", "Firefox", "11"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
   ["Windows 10", "Firefox", "54"], // Hangs on 55+ (Jasmine, I think), 1006 on 65+
-  ["Windows 10", "Chrome", "26"],
-  ////// ["Windows 10", "Chrome", "latest"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
+  ////// ["Windows 10", "Chrome", "26"], // Type error
+  ["Windows 10", "Chrome", "latest"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
   ////// ["Windows 10", "MicrosoftEdge", "13"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
   ////// ["Windows 10", "MicrosoftEdge", "latest"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
   ["Windows 10", "Internet Explorer", "11"],
