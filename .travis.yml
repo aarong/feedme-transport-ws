@@ -1,7 +1,7 @@
 sudo: false
 addons:
   sauce_connect:
-    no_ssl_bump_domains: "localhost,127.0.0.1" # Needed for WebSockets to work
+    no_ssl_bump_domains: "all" # Needed for WebSockets to work
   hosts:
     - testinghost.com
 branches:
