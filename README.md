@@ -7,8 +7,7 @@
 
 WebSocket client and server transports for the
 [Feedme Javascript Client](https://github.com/aarong/feedme-client) and
-[Feedme Javascript Server](https://github.com/aarong/feedme-server-core)
-libraries.
+[Feedme Node.js Server](https://github.com/aarong/feedme-server-core) libraries.
 
 The server transport runs on Node.js. The client transport runs on Node.js and
 in the browser.
