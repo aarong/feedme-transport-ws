@@ -10,6 +10,13 @@ var sauceConnectProcess;
 var sauceTests;
 var sauceResults;
 
+// Are Sauce credentials present?
+if (!process.env.SAUCE_USERNAME || !process.env.SAUCE_ACCESS_KEY) {
+  throw new Error(
+    "NO_CREDENTIALS: The SAUCE_USERNAME or SAUCE_ACCESS_KEY environmental variable is missing."
+  );
+}
+
 // Config
 var port = 3000;
 var sauceTunnelId =
@@ -32,10 +39,15 @@ saucePlatforms = [
   // though Sauce never knew that the browser was "finished". Same problem on
   // Firefox 60, worked on 50, problem on 55, worked on 52, worked on 53, worked on 54 (hardcoded).
 
-  ////// ["Windows 10", "Firefox", "11"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
-  ["Windows 10", "Firefox", "54"], // Hangs on 55+ (Jasmine, I think), 1006 on 65+
-  ////// ["Windows 10", "Chrome", "26"], // Type error
-  ////// ["Windows 10", "Chrome", "latest"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
+  // WebSockets introduced in FireFox 11, but fails with ws:// URL (illegal string) in 17 and below
+  ["Windows 10", "Firefox", "18"],
+
+  // Was 54, latest (73) looked successful but didn't return
+  // 55 works, 65 works but hangs, 60 hangs, 57 hangs, 56 hangs
+  ["Windows 10", "Firefox", "55"],
+
+  ////// ["Windows 10", "Chrome", "26"],
+  ["Windows 10", "Chrome", "latest"],
   ////// ["Windows 10", "MicrosoftEdge", "13"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
   ////// ["Windows 10", "MicrosoftEdge", "latest"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
   ["Windows 10", "Internet Explorer", "11"],
@@ -60,8 +72,6 @@ saucePlatforms = [
 
   ["Linux", "Firefox", "latest"],
   ["Linux", "Chrome", "latest"]
-
-  //{ platformName: "Linux", browserName: "Chrome", browserVersion: "latest" }
 ];
 
 // Run the tests
@@ -135,7 +145,7 @@ async.series(
         {
           tunnelIdentifier: sauceTunnelId,
           logFile: null,
-          noSslBumpDomains: "localhost,127.0.0.1", // Needed to get WebSockets working: https://wiki.saucelabs.com/display/DOCS/Sauce+Connect+Proxy+and+SSL+Certificate+Bumping
+          noSslBumpDomains: "all", // Needed to get WebSockets working: https://wiki.saucelabs.com/display/DOCS/Sauce+Connect+Proxy+and+SSL+Certificate+Bumping
           noProxyCaching: true, // required?????
           verbose: true
         },
@@ -152,6 +162,7 @@ async.series(
       );
     },
     function(cb) {
+      //return;
       // Call the Sauce REST API telling it to run the tests
       console.log("Calling Sauce REST API telling it to run the tests...");
 
@@ -168,11 +179,16 @@ async.series(
           },
           json: true,
           body: {
-            url: "http://localhost:" + port,
+            url: "http://testinghost.com:" + port,
             framework: "custom",
             platforms: saucePlatforms,
             "tunnel-identifier": sauceTunnelId,
-            prerun: '#!/bin/bash\necho "testingserver localhost" >> /etc/hosts'
+            // prerun: {
+            //   executable:
+            //     "https://raw.githubusercontent.com/aarong/feedme-transport-ws/master/tests/prerun.windows.cmd",
+            //   background: false
+            // },
+            extendedDebugging: true // Works?
           }
         },
         function(err, response) {

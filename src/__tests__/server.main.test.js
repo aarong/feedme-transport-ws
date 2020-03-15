@@ -9,7 +9,7 @@ import config from "../server.config";
 Testing strategy
 
 The ws module is mocked -- these are unit tests only. The integration tests that
-are run on the build ensure that the transport plays nicely with ws.
+are run on the build ensure that the transport plays nicely with actual ws.
 
 1. Test state-modifying functionality
     For all outside function calls and ws events
@@ -83,12 +83,16 @@ const harness = function harness(options, wsConstructor) {
       this.mockClear = () => {
         this.close.mockClear();
       };
-      h.ws = this;
     };
   }
 
   h.server = server(constructor, options);
   return h;
+};
+
+harnessProto.getWs = function getWs() {
+  // The ws instance changes over time, so you can't store it as a property of the harness
+  return this.server._wsServer;
 };
 
 harnessProto.createServerListener = function createServerListener() {
@@ -746,12 +750,12 @@ describe("The server.stop() function", () => {
       harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const mockWs1 = harn.createMockWs();
-      harn.ws.emit("connection", mockWs1);
+      harn.getWs().emit("connection", mockWs1);
       jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
       const mockWs2 = harn.createMockWs();
-      harn.ws.emit("connection", mockWs2);
+      harn.getWs().emit("connection", mockWs2);
     });
 
     // Events
@@ -804,11 +808,12 @@ describe("The server.stop() function", () => {
     // Calls on ws
 
     it("should call ws.close()", () => {
-      harn.ws.mockClear();
+      const prevWs = harn.getWs();
+      harn.getWs().mockClear();
       harn.server.stop();
-      expect(harn.ws.close.mock.calls.length).toBe(1);
-      expect(harn.ws.close.mock.calls[0].length).toBe(1);
-      expect(harn.ws.close.mock.calls[0][0]).toBeInstanceOf(Function);
+      expect(prevWs.close.mock.calls.length).toBe(1);
+      expect(prevWs.close.mock.calls[0].length).toBe(1);
+      expect(prevWs.close.mock.calls[0][0]).toBeInstanceOf(Function);
     });
 
     // Outbound callbacks - N/A
@@ -817,10 +822,11 @@ describe("The server.stop() function", () => {
 
     describe("on ws.close() callback", () => {
       it("should emit disconnect for both clients, then stopping, stop", () => {
-        harn.ws.mockClear();
+        const prevWs = harn.getWs();
+        harn.getWs().mockClear();
         harn.server.stop();
         const listener = harn.createServerListener();
-        harn.ws.close.mock.calls[0][0](); // fire ws.close callback
+        prevWs.close.mock.calls[0][0](); // fire ws.close callback
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
         expect(listener.stopping.mock.calls.length).toBe(1);
@@ -839,11 +845,12 @@ describe("The server.stop() function", () => {
       });
 
       it("should update the state appropriately", () => {
-        harn.ws.mockClear();
+        const prevWs = harn.getWs();
+        harn.getWs().mockClear();
         harn.server.stop();
         const newState = harn.getServerState();
         newState._state = "stopped";
-        harn.ws.close.mock.calls[0][0](); // fire ws.close callback
+        prevWs.close.mock.calls[0][0](); // fire ws.close callback
         expect(harn.server).toHaveState(newState);
       });
     });
@@ -862,7 +869,7 @@ describe("The server.send() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       expect(() => {
         harn.server.send(123, "msg");
       }).toThrow(new Error("INVALID_ARGUMENT: Invalid client id or message."));
@@ -872,7 +879,7 @@ describe("The server.send() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       expect(() => {
         harn.server.send("cid", 123);
       }).toThrow(new Error("INVALID_ARGUMENT: Invalid client id or message."));
@@ -889,7 +896,7 @@ describe("The server.send() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       expect(() => {
         harn.server.send("cid", "msg");
       }).toThrow(new Error("INVALID_STATE: The client is not connected."));
@@ -903,13 +910,13 @@ describe("The server.send() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const ws = harn.createMockWs();
       let cid;
       harn.server.once("connect", c => {
         cid = c;
       });
-      harn.ws.emit("connection", ws);
+      harn.getWs().emit("connection", ws);
 
       const listener = harn.createServerListener();
       harn.server.send(cid, "msg");
@@ -928,13 +935,13 @@ describe("The server.send() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const ws = harn.createMockWs();
       let cid;
       harn.server.once("connect", c => {
         cid = c;
       });
-      harn.ws.emit("connection", ws);
+      harn.getWs().emit("connection", ws);
 
       const newState = harn.getServerState();
       harn.server.send(cid, "msg");
@@ -949,13 +956,13 @@ describe("The server.send() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const ws = harn.createMockWs();
       let cid;
       harn.server.once("connect", c => {
         cid = c;
       });
-      harn.ws.emit("connection", ws);
+      harn.getWs().emit("connection", ws);
 
       ws.mockClear();
       harn.server.send(cid, "msg");
@@ -977,13 +984,13 @@ describe("The server.send() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const ws = harn.createMockWs();
       let cid;
       harn.server.once("connect", c => {
         cid = c;
       });
-      harn.ws.emit("connection", ws);
+      harn.getWs().emit("connection", ws);
 
       expect(harn.server.send(cid, "msg")).toBe(undefined);
     });
@@ -1017,7 +1024,7 @@ describe("The server.disconnect() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       expect(() => {
         harn.server.disconnect("cid");
       }).toThrow(new Error("INVALID_STATE: The client is not connected."));
@@ -1031,13 +1038,13 @@ describe("The server.disconnect() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
       harn.server.once("connect", c => {
         cid = c;
       });
-      harn.ws.emit("connection", mockWs);
+      harn.getWs().emit("connection", mockWs);
 
       const listener = harn.createServerListener();
       harn.server.disconnect(cid);
@@ -1056,13 +1063,13 @@ describe("The server.disconnect() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
       harn.server.once("connect", c => {
         cid = c;
       });
-      harn.ws.emit("connection", mockWs);
+      harn.getWs().emit("connection", mockWs);
       jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
 
       const newState = harn.getServerState();
@@ -1079,13 +1086,13 @@ describe("The server.disconnect() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
       harn.server.once("connect", c => {
         cid = c;
       });
-      harn.ws.emit("connection", mockWs);
+      harn.getWs().emit("connection", mockWs);
       jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
 
       clearInterval.mockClear();
@@ -1105,13 +1112,13 @@ describe("The server.disconnect() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
       harn.server.once("connect", c => {
         cid = c;
       });
-      harn.ws.emit("connection", mockWs);
+      harn.getWs().emit("connection", mockWs);
 
       harn.server.disconnect(cid);
       expect(mockWs.ping.mock.calls.length).toBe(0);
@@ -1134,13 +1141,13 @@ describe("The server.disconnect() function", () => {
         const harn = harness({ port: PORT });
         harn.server.start();
         jest.advanceTimersByTime(EPSILON);
-        harn.ws.emit("listening");
+        harn.getWs().emit("listening");
         const mockWs = harn.createMockWs();
         let cid;
         harn.server.once("connect", c => {
           cid = c;
         });
-        harn.ws.emit("connection", mockWs);
+        harn.getWs().emit("connection", mockWs);
         harn.server.disconnect(cid);
 
         const listener = harn.createServerListener();
@@ -1160,13 +1167,13 @@ describe("The server.disconnect() function", () => {
         const harn = harness({ port: PORT });
         harn.server.start();
         jest.advanceTimersByTime(EPSILON);
-        harn.ws.emit("listening");
+        harn.getWs().emit("listening");
         const mockWs = harn.createMockWs();
         let cid;
         harn.server.once("connect", c => {
           cid = c;
         });
-        harn.ws.emit("connection", mockWs);
+        harn.getWs().emit("connection", mockWs);
         const err = new Error("SOMETHING");
         harn.server.disconnect(cid, err);
 
@@ -1191,13 +1198,13 @@ describe("The server.disconnect() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
       harn.server.once("connect", c => {
         cid = c;
       });
-      harn.ws.emit("connection", mockWs);
+      harn.getWs().emit("connection", mockWs);
 
       expect(harn.server.disconnect(cid)).toBe(undefined);
     });
@@ -1215,7 +1222,7 @@ describe("The server._processWsServerListening() function", () => {
     jest.advanceTimersByTime(EPSILON);
 
     const listener = harn.createServerListener();
-    harn.ws.emit("listening");
+    harn.getWs().emit("listening");
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(1);
     expect(listener.start.mock.calls[0].length).toBe(0);
@@ -1235,7 +1242,7 @@ describe("The server._processWsServerListening() function", () => {
 
     const newState = harn.getServerState();
     newState._state = "started";
-    harn.ws.emit("listening");
+    harn.getWs().emit("listening");
     expect(harn.server).toHaveState(newState);
   });
 
@@ -1257,25 +1264,25 @@ describe("The server._processWsServerClose() function", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
     jest.advanceTimersByTime(EPSILON);
-    harn.ws.emit("listening");
+    harn.getWs().emit("listening");
     const mockWs1 = harn.createMockWs();
     let cid1;
     harn.server.once("connect", c => {
       cid1 = c;
     });
-    harn.ws.emit("connection", mockWs1);
+    harn.getWs().emit("connection", mockWs1);
     const mockWs2 = harn.createMockWs();
     let cid2;
     harn.server.once("connect", c => {
       cid2 = c;
     });
-    harn.ws.emit("connection", mockWs2);
+    harn.getWs().emit("connection", mockWs2);
 
     // Not checking emit order, but verified disconnect(s), stopping, stop
     // Per requirements
 
     const listener = harn.createServerListener();
-    harn.ws.emit("close");
+    harn.getWs().emit("close");
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(0);
     expect(listener.stopping.mock.calls.length).toBe(1);
@@ -1319,11 +1326,11 @@ describe("The server._processWsServerClose() function", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
     jest.advanceTimersByTime(EPSILON);
-    harn.ws.emit("listening");
+    harn.getWs().emit("listening");
     const mockWs1 = harn.createMockWs();
-    harn.ws.emit("connection", mockWs1);
+    harn.getWs().emit("connection", mockWs1);
     const mockWs2 = harn.createMockWs();
-    harn.ws.emit("connection", mockWs2);
+    harn.getWs().emit("connection", mockWs2);
     jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
 
     const newState = harn.getServerState();
@@ -1332,7 +1339,7 @@ describe("The server._processWsServerClose() function", () => {
     newState._wsClients = {};
     newState._heartbeatIntervals = {};
     newState._heartbeatTimeouts = {};
-    harn.ws.emit("close");
+    harn.getWs().emit("close");
     expect(harn.server).toHaveState(newState);
   });
 
@@ -1344,16 +1351,16 @@ describe("The server._processWsServerClose() function", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
     jest.advanceTimersByTime(EPSILON);
-    harn.ws.emit("listening");
+    harn.getWs().emit("listening");
     const mockWs1 = harn.createMockWs();
-    harn.ws.emit("connection", mockWs1);
+    harn.getWs().emit("connection", mockWs1);
     jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
     const mockWs2 = harn.createMockWs();
-    harn.ws.emit("connection", mockWs2);
+    harn.getWs().emit("connection", mockWs2);
 
     clearInterval.mockClear();
     clearTimeout.mockClear();
-    harn.ws.emit("close");
+    harn.getWs().emit("close");
     expect(clearInterval.mock.calls.length).toBe(2);
     expect(clearInterval.mock.calls[0].length).toBe(1);
     expect(check.integer(clearInterval.mock.calls[0][0])).toBe(true);
@@ -1379,11 +1386,11 @@ describe("The server._processWsServerConnection() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
 
       const listener = harn.createServerListener();
       const mockWs = harn.createMockWs();
-      harn.ws.emit("connection", mockWs);
+      harn.getWs().emit("connection", mockWs);
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
       expect(listener.stopping.mock.calls.length).toBe(0);
@@ -1401,7 +1408,7 @@ describe("The server._processWsServerConnection() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
 
       // Outside code does not have access to the ws client
 
@@ -1411,7 +1418,7 @@ describe("The server._processWsServerConnection() function", () => {
       harn.server.once("connect", c => {
         cid = c;
       });
-      harn.ws.emit("connection", mockWs);
+      harn.getWs().emit("connection", mockWs);
       newState._wsClients[cid] = harn.server._wsClients[cid]; // Basically checking cid
       newState._heartbeatIntervals[cid] = 123;
       expect(harn.server).toHaveState(newState);
@@ -1430,9 +1437,9 @@ describe("The server._processWsServerConnection() function", () => {
         const harn = harness({ port: PORT });
         harn.server.start();
         jest.advanceTimersByTime(EPSILON);
-        harn.ws.emit("listening");
+        harn.getWs().emit("listening");
         const mockWs = harn.createMockWs();
-        harn.ws.emit("connection", mockWs);
+        harn.getWs().emit("connection", mockWs);
 
         const listener = harn.createServerListener();
         jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
@@ -1449,13 +1456,13 @@ describe("The server._processWsServerConnection() function", () => {
         const harn = harness({ port: PORT });
         harn.server.start();
         jest.advanceTimersByTime(EPSILON);
-        harn.ws.emit("listening");
+        harn.getWs().emit("listening");
         const mockWs = harn.createMockWs();
         let cid;
         harn.server.once("connect", c => {
           cid = c;
         });
-        harn.ws.emit("connection", mockWs);
+        harn.getWs().emit("connection", mockWs);
 
         const newState = harn.getServerState();
         jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
@@ -1467,9 +1474,9 @@ describe("The server._processWsServerConnection() function", () => {
         const harn = harness({ port: PORT });
         harn.server.start();
         jest.advanceTimersByTime(EPSILON);
-        harn.ws.emit("listening");
+        harn.getWs().emit("listening");
         const mockWs = harn.createMockWs();
-        harn.ws.emit("connection", mockWs);
+        harn.getWs().emit("connection", mockWs);
 
         mockWs.mockClear();
         jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
@@ -1486,9 +1493,9 @@ describe("The server._processWsServerConnection() function", () => {
           const harn = harness({ port: PORT });
           harn.server.start();
           jest.advanceTimersByTime(EPSILON);
-          harn.ws.emit("listening");
+          harn.getWs().emit("listening");
           const mockWs = harn.createMockWs();
-          harn.ws.emit("connection", mockWs);
+          harn.getWs().emit("connection", mockWs);
           jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
 
           mockWs.mockClear();
@@ -1506,9 +1513,9 @@ describe("The server._processWsServerConnection() function", () => {
           const harn = harness({ port: PORT });
           harn.server.start();
           jest.advanceTimersByTime(EPSILON);
-          harn.ws.emit("listening");
+          harn.getWs().emit("listening");
           const mockWs = harn.createMockWs();
-          harn.ws.emit("connection", mockWs);
+          harn.getWs().emit("connection", mockWs);
 
           jest.advanceTimersByTime(
             config.defaults.heartbeatIntervalMs + EPSILON
@@ -1527,9 +1534,9 @@ describe("The server._processWsServerConnection() function", () => {
           const harn = harness({ port: PORT });
           harn.server.start();
           jest.advanceTimersByTime(EPSILON);
-          harn.ws.emit("listening");
+          harn.getWs().emit("listening");
           const mockWs = harn.createMockWs();
-          harn.ws.emit("connection", mockWs);
+          harn.getWs().emit("connection", mockWs);
 
           jest.advanceTimersByTime(
             config.defaults.heartbeatIntervalMs +
@@ -1550,13 +1557,13 @@ describe("The server._processWsServerConnection() function", () => {
           const harn = harness({ port: PORT });
           harn.server.start();
           jest.advanceTimersByTime(EPSILON);
-          harn.ws.emit("listening");
+          harn.getWs().emit("listening");
           const mockWs = harn.createMockWs();
           let cid;
           harn.server.once("connect", c => {
             cid = c;
           });
-          harn.ws.emit("connection", mockWs);
+          harn.getWs().emit("connection", mockWs);
 
           jest.advanceTimersByTime(
             config.defaults.heartbeatIntervalMs + EPSILON
@@ -1581,9 +1588,9 @@ describe("The server._processWsServerConnection() function", () => {
           const harn = harness({ port: PORT });
           harn.server.start();
           jest.advanceTimersByTime(EPSILON);
-          harn.ws.emit("listening");
+          harn.getWs().emit("listening");
           const mockWs = harn.createMockWs();
-          harn.ws.emit("connection", mockWs);
+          harn.getWs().emit("connection", mockWs);
 
           jest.advanceTimersByTime(
             config.defaults.heartbeatIntervalMs + EPSILON
@@ -1614,11 +1621,11 @@ describe("The server._processWsServerConnection() function", () => {
       const harn = harness({ port: PORT, heartbeatIntervalMs: 0 });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
 
       const listener = harn.createServerListener();
       const mockWs = harn.createMockWs();
-      harn.ws.emit("connection", mockWs);
+      harn.getWs().emit("connection", mockWs);
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
       expect(listener.stopping.mock.calls.length).toBe(0);
@@ -1636,7 +1643,7 @@ describe("The server._processWsServerConnection() function", () => {
       const harn = harness({ port: PORT, heartbeatIntervalMs: 0 });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
 
       // Outside code does not have access to the ws client
 
@@ -1646,7 +1653,7 @@ describe("The server._processWsServerConnection() function", () => {
       harn.server.once("connect", c => {
         cid = c;
       });
-      harn.ws.emit("connection", mockWs);
+      harn.getWs().emit("connection", mockWs);
       newState._wsClients[cid] = harn.server._wsClients[cid]; // Basically checking cid
       expect(harn.server).toHaveState(newState);
     });
@@ -1671,13 +1678,13 @@ describe("The server._processWsClientMessage() function", () => {
 
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
       harn.server.once("connect", c => {
         cid = c;
       });
-      harn.ws.emit("connection", mockWs);
+      harn.getWs().emit("connection", mockWs);
 
       const listener = harn.createServerListener();
       mockWs.emit("message", "some_msg");
@@ -1701,9 +1708,9 @@ describe("The server._processWsClientMessage() function", () => {
 
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
-      harn.ws.emit("connection", mockWs);
+      harn.getWs().emit("connection", mockWs);
 
       const newState = harn.getServerState();
       mockWs.emit("message", "some_msg");
@@ -1718,9 +1725,9 @@ describe("The server._processWsClientMessage() function", () => {
 
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
-      harn.ws.emit("connection", mockWs);
+      harn.getWs().emit("connection", mockWs);
 
       mockWs.emit("message", "some_msg");
       expect(harn.server.disconnect.mock.calls.length).toBe(0);
@@ -1742,9 +1749,9 @@ describe("The server._processWsClientMessage() function", () => {
 
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
-      harn.ws.emit("connection", mockWs);
+      harn.getWs().emit("connection", mockWs);
 
       const listener = harn.createServerListener();
       mockWs.emit("message", 123);
@@ -1765,9 +1772,9 @@ describe("The server._processWsClientMessage() function", () => {
 
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
-      harn.ws.emit("connection", mockWs);
+      harn.getWs().emit("connection", mockWs);
 
       const newState = harn.getServerState();
       mockWs.emit("message", 123);
@@ -1782,13 +1789,13 @@ describe("The server._processWsClientMessage() function", () => {
 
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
-      harn.ws.emit("listening");
+      harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
       harn.server.once("connect", c => {
         cid = c;
       });
-      harn.ws.emit("connection", mockWs);
+      harn.getWs().emit("connection", mockWs);
 
       mockWs.emit("message", 123);
       expect(harn.server.disconnect.mock.calls.length).toBe(1);
@@ -1815,9 +1822,9 @@ describe("The server._processWsClientPong() function", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
     jest.advanceTimersByTime(EPSILON);
-    harn.ws.emit("listening");
+    harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
-    harn.ws.emit("connection", mockWs);
+    harn.getWs().emit("connection", mockWs);
     jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
 
     const listener = harn.createServerListener();
@@ -1837,13 +1844,13 @@ describe("The server._processWsClientPong() function", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
     jest.advanceTimersByTime(EPSILON);
-    harn.ws.emit("listening");
+    harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
     let cid;
     harn.server.once("connect", c => {
       cid = c;
     });
-    harn.ws.emit("connection", mockWs);
+    harn.getWs().emit("connection", mockWs);
     jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
 
     const newState = harn.getServerState();
@@ -1858,9 +1865,9 @@ describe("The server._processWsClientPong() function", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
     jest.advanceTimersByTime(EPSILON);
-    harn.ws.emit("listening");
+    harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
-    harn.ws.emit("connection", mockWs);
+    harn.getWs().emit("connection", mockWs);
     jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
 
     clearTimeout.mockClear();
@@ -1876,14 +1883,14 @@ describe("The server._processWsClientPong() function", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
     jest.advanceTimersByTime(EPSILON);
-    harn.ws.emit("listening");
+    harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
-    harn.ws.emit("connection", mockWs);
+    harn.getWs().emit("connection", mockWs);
     jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
 
-    harn.ws.mockClear();
+    harn.getWs().mockClear();
     mockWs.emit("pong");
-    expect(harn.ws.close.mock.calls.length).toBe(0);
+    expect(harn.getWs().close.mock.calls.length).toBe(0);
   });
 
   // Outbound callbacks - N/A
@@ -1898,13 +1905,13 @@ describe("The server._processWsClientClose() function", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
     jest.advanceTimersByTime(EPSILON);
-    harn.ws.emit("listening");
+    harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
     let cid;
     harn.server.once("connect", c => {
       cid = c;
     });
-    harn.ws.emit("connection", mockWs);
+    harn.getWs().emit("connection", mockWs);
 
     const listener = harn.createServerListener();
     mockWs.emit("close");
@@ -1929,13 +1936,13 @@ describe("The server._processWsClientClose() function", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
     jest.advanceTimersByTime(EPSILON);
-    harn.ws.emit("listening");
+    harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
     let cid;
     harn.server.once("connect", c => {
       cid = c;
     });
-    harn.ws.emit("connection", mockWs);
+    harn.getWs().emit("connection", mockWs);
     jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
 
     const newState = harn.getServerState();
@@ -1952,9 +1959,9 @@ describe("The server._processWsClientClose() function", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
     jest.advanceTimersByTime(EPSILON);
-    harn.ws.emit("listening");
+    harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
-    harn.ws.emit("connection", mockWs);
+    harn.getWs().emit("connection", mockWs);
     jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
 
     clearInterval.mockClear();
@@ -1972,9 +1979,9 @@ describe("The server._processWsClientClose() function", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
     jest.advanceTimersByTime(EPSILON);
-    harn.ws.emit("listening");
+    harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
-    harn.ws.emit("connection", mockWs);
+    harn.getWs().emit("connection", mockWs);
 
     clearInterval.mockClear();
     clearTimeout.mockClear();
@@ -1991,13 +1998,13 @@ describe("The server._processWsClientClose() function", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
     jest.advanceTimersByTime(EPSILON);
-    harn.ws.emit("listening");
+    harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
-    harn.ws.emit("connection", mockWs);
+    harn.getWs().emit("connection", mockWs);
 
-    harn.ws.mockClear();
+    harn.getWs().mockClear();
     mockWs.emit("close");
-    expect(harn.ws.close.mock.calls.length).toBe(0);
+    expect(harn.getWs().close.mock.calls.length).toBe(0);
   });
 
   // Outbound callbacks - N/A
@@ -2042,11 +2049,11 @@ describe("The server.state() function", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
     jest.advanceTimersByTime(EPSILON);
-    harn.ws.emit("listening");
+    harn.getWs().emit("listening");
 
-    harn.ws.mockClear();
+    harn.getWs().mockClear();
     harn.server.state();
-    expect(harn.ws.close.mock.calls.length).toBe(0);
+    expect(harn.getWs().close.mock.calls.length).toBe(0);
   });
 
   // Outbound callbacks - N/A
