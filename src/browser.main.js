@@ -199,7 +199,11 @@ proto.connect = function connect() {
   }
 
   // Create the WebSocket client and listen for events
-  this._ws = new this._WebSocket(this._address, this._protocols, this._options);
+  if (this._protocols) {
+    this._ws = new this._WebSocket(this._address, this._protocols); // Throws on ""
+  } else {
+    this._ws = new this._WebSocket(this._address);
+  }
   this._ws.onopen = this._processWsOpen.bind(this);
   this._ws.onmessage = this._processWsMessage.bind(this);
   this._ws.onclose = this._processWsClose.bind(this);
