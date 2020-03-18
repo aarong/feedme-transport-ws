@@ -120,6 +120,8 @@ If `ws` indicates that an active connection was terminated unexpectedly, then
 the `err` argument passed with the transport `disconnect` event has `err.wsCode`
 and `err.wsReason` properties containing the code and reason specified by `ws`.
 
+Both of these are available to the application.
+
 ## Client
 
 Client transport lets you connect to a Feedme API server over Webockets from
