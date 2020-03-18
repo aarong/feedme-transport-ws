@@ -19,8 +19,10 @@ project.
 <!-- TOC depthFrom:2 -->
 
 - [Server](#server)
+  - [Connection issues with ws (WHAT TO CALL?)](#connection-issues-with-ws-what-to-call)
 - [Client](#client)
   - [In Node.js](#in-nodejs)
+    - [Connection Issues with ws (what to call this section??)](#connection-issues-with-ws-what-to-call-this-section)
   - [In the Browser](#in-the-browser)
     - [NPM](#npm)
     - [CDN](#cdn)
@@ -33,8 +35,8 @@ project.
 The server transport lets you serve a Feedme API over WebSockets in Node.js.
 
 Depends on the [ws](https://github.com/websockets/ws) module and supports
-everything it does, including HTTPS, stand-alone WebSocket servers, external
-HTTP servers. Uses ws version 6.2.x to retain Node 6 support.
+everything that it does, including HTTPS, stand-alone WebSocket servers,
+external HTTP servers. Uses ws version 6.2.x to retain Node 6 support.
 
 To install the Feedme Server Core library and the WebSocket transport:
 
@@ -108,6 +110,16 @@ const feedmeServer = feedmeServerCore({
 httpServer.listen(8080);
 ```
 
+### Connection issues with ws (WHAT TO CALL?)
+
+If `ws` throws an error on initialization, then the `err` argument passed with
+the transport `stopping` and `stopped` events have a `err.wsError` property
+referencing the error thrown by `ws`.
+
+If `ws` indicates that an active connection was terminated unexpectedly, then
+the `err` argument passed with the transport `disconnect` event has `err.wsCode`
+and `err.wsReason` properties containing the code and reason specified by `ws`.
+
 ## Client
 
 Client transport lets you connect to a Feedme API server over Webockets from
@@ -172,6 +184,16 @@ const client = feedmeClient({
   transport: feedmeTransportWs("ws://localhost:8080");
 });
 ```
+
+#### Connection Issues with ws (what to call this section??)
+
+If `ws` throws an error on initialization, then the `err` argument passed with
+the transport `disconnect` event has a `err.wsError` property referencing the
+error thrown by `ws`.
+
+If `ws` indicates that an active connection was terminated unexpectedly, then
+the `err` argument passed with the transport `disconnect` event has `err.wsCode`
+and `err.wsReason` properties containing the code and reason specified by `ws`.
 
 ### In the Browser
 

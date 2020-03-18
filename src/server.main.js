@@ -253,36 +253,38 @@ proto.start = function start() {
     throw new Error("INVALID_STATE: The server is not stopped.");
   }
 
-  // Set state to starting
+  // Update state and emit
   this._state = "starting";
+  this.emit("starting");
 
-  // Wait until the next tick before emitting events
-  setTimeout(() => {
-    dbg("Emitting starting and initializing ws");
+  // Create the ws server
+  try {
+    // Passes the two extraneous heartbeat options, which are ignored by ws
+    this._wsServer = new this._wsConstructor(this._options);
+  } catch (e) {
+    // Emit stopping, emit stop
+    const err = new Error("FAILURE: Could not initialize WebSocket server.");
+    err.wsError = e;
+    this._state = "stopping";
+    this.emit("stopping", err);
+    this._state = "stopped";
+    this.emit("stop", err);
+    return; // Stop
+  }
 
-    // Emit starting
-    this.emit("starting");
+  // Listen for ws events
+  this._wsServer.on("listening", this._processWsServerListening.bind(this));
+  this._wsServer.on("close", this._processWsServerClose.bind(this));
+  this._wsServer.on("connection", this._processWsServerConnection.bind(this));
 
-    // Create the ws server
-    try {
-      // Passes the two extraneous heartbeat options, which are ignored by ws
-      this._wsServer = new this._wsConstructor(this._options);
-    } catch (e) {
-      // Emit stopping, emit stop, then stop
-      const err = new Error("FAILURE: Could not initialize WebSocket server.");
-      err.wsError = e;
-      this._state = "stopping";
-      this.emit("stopping", err);
-      this._state = "stopped";
-      this.emit("stop", err);
-      return; // Stop
-    }
-
-    // Listen for ws events
-    this._wsServer.on("listening", this._processWsServerListening.bind(this));
-    this._wsServer.on("close", this._processWsServerClose.bind(this));
-    this._wsServer.on("connection", this._processWsServerConnection.bind(this));
-  }, 0);
+  // If using ws in server-mode and the server is already listening, then ws
+  // will not emit a listening event. In that case, do it here. But you can
+  // get server.listening === true before the listening event has fired, so
+  // in the listening handler check that you haven't already emitted here
+  if (this._options.server && this._options.server.listening) {
+    this._state = "started";
+    this.emit("start");
+  }
 };
 
 /**
@@ -333,24 +335,23 @@ proto.stop = function stop() {
   this._heartbeatIntervals = {};
   this._heartbeatTimeouts = {};
 
+  // Emit a disconnect event for each previously-connected client
+  _.each(clients, (ws, cid) => {
+    this.emit(
+      "disconnect",
+      cid,
+      new Error("STOPPING: The server is stopping.")
+    );
+  });
+
+  // Emit stopping
+  this.emit("stopping");
+
   // Stop the ws server - callback is on a later tick
-  // The stopping and stop event are emitted together because you need to run
-  // ws.close() synchronously to prevent it from emitting further events, and
-  // you aren't allowed to emit the "stopping" event synchronously.
   wsServer.close(() => {
-    dbg("Emitting disconnect(s) and stopping, then closing ws server");
+    dbg("Observed ws close callback");
 
-    // Emit a disconnect event for each previously-connected client
-    _.each(clients, (ws, cid) => {
-      this.emit(
-        "disconnect",
-        cid,
-        new Error("STOPPING: The server is stopping.")
-      );
-    });
-
-    // Emit
-    this.emit("stopping");
+    // Emit stopped
     this._state = "stopped";
     this.emit("stop");
   });
@@ -445,16 +446,12 @@ proto.disconnect = function disconnect(...args) {
   // Disconnect the client (normal status)
   wsClient.close(1000, "Connection closed by the server.");
 
-  // Emit disconnect on next tick (with err if present)
-  setTimeout(() => {
-    dbg("Emitting disconnect");
-
-    if (err) {
-      this.emit("disconnect", cid, err);
-    } else {
-      this.emit("disconnect", cid);
-    }
-  }, 0);
+  // Emit disconnect (with err if present)
+  if (err) {
+    this.emit("disconnect", cid, err);
+  } else {
+    this.emit("disconnect", cid);
+  }
 };
 
 /**
@@ -467,8 +464,12 @@ proto.disconnect = function disconnect(...args) {
 proto._processWsServerListening = function _processWsServerListening() {
   dbg("Observed ws listening event");
 
-  this._state = "started";
-  this.emit("start");
+  // Only emit if you haven't already on server.start() - see notes there
+
+  if (this._state !== "started") {
+    this._state = "started";
+    this.emit("start");
+  }
 };
 
 /**
@@ -574,15 +575,9 @@ proto._processWsServerConnection = function _processWsServerConnection(ws) {
   }
 
   // Listen for ws client events
-  ws.on("message", msg => {
-    this._processWsClientMessage(cid, msg);
-  });
-  ws.on("pong", () => {
-    this._processWsClientPong(cid);
-  });
-  ws.on("close", (code, reason) => {
-    this._processWsClientClose(cid, code, reason);
-  });
+  ws.on("message", this._processWsClientMessage.bind(this, cid));
+  ws.on("pong", this._processWsClientPong.bind(this, cid));
+  ws.on("close", this._processWsClientClose.bind(this, cid));
 
   // Emit transport connect
   this.emit("connect", cid);

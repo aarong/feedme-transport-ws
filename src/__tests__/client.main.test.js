@@ -1963,7 +1963,7 @@ describe("The client._processWsClose() function", () => {
 
       const listener = harn.createClientListener();
       harn.getWs().readyState = harn.getWs().CLOSED;
-      harn.getWs().emit("close", "close_code", "close_reason");
+      harn.getWs().emit("close", 1234, "close_reason");
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -1971,7 +1971,11 @@ describe("The client._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "DISCONNECTED: The WebSocket connection was lost (close_code). Reason: close_reason"
+        "DISCONNECTED: The WebSocket closed."
+      );
+      expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1234);
+      expect(listener.disconnect.mock.calls[0][0].wsReason).toBe(
+        "close_reason"
       );
       expect(listener.message.mock.calls.length).toBe(0);
     });
@@ -2023,7 +2027,7 @@ describe("The client._processWsClose() function", () => {
 
       const listener = harn.createClientListener();
       harn.getWs().readyState = harn.getWs().CLOSED;
-      harn.getWs().emit("close", "close_code", "close_reason");
+      harn.getWs().emit("close", 1234, "close_reason");
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -2031,7 +2035,11 @@ describe("The client._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "DISCONNECTED: The WebSocket connection was lost (close_code). Reason: close_reason"
+        "DISCONNECTED: The WebSocket closed."
+      );
+      expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1234);
+      expect(listener.disconnect.mock.calls[0][0].wsReason).toBe(
+        "close_reason"
       );
       expect(listener.message.mock.calls.length).toBe(0);
     });

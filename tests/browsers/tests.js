@@ -4,14 +4,25 @@ var sauceConnectLauncher = require("sauce-connect-launcher");
 var async = require("async");
 var request = require("request");
 var ws = require("ws");
+var feedmeServerCore = require("feedme-server-core");
+var feedmeTransportWsServer = require("../../build/server");
 
 var webserver;
 var sauceConnectProcess;
 var sauceTests;
 var sauceResults;
 
-// Are Sauce credentials present?
-if (!process.env.SAUCE_USERNAME || !process.env.SAUCE_ACCESS_KEY) {
+// Run locally or on Sauce?
+var localMode = false;
+if (process.argv.length >= 3 && process.argv[2].toLowerCase() === "local") {
+  localMode = true;
+}
+
+// Require Sauce credentials if you're not running locally
+if (
+  !localMode &&
+  (!process.env.SAUCE_USERNAME || !process.env.SAUCE_ACCESS_KEY)
+) {
   throw new Error(
     "NO_CREDENTIALS: The SAUCE_USERNAME or SAUCE_ACCESS_KEY environmental variable is missing."
   );
@@ -78,15 +89,13 @@ saucePlatforms = [
 async.series(
   [
     function(cb) {
-      // Set up the webroot with the tests and built client.bundle.withmaps
-
-      copyFileSync(__dirname + "/tests.js", __dirname + "/webroot/tests.js");
+      // Set up the webroot with built client.bundle.withmaps
       copyFileSync(
-        __dirname + "/../build/browser.bundle.withmaps.js",
+        __dirname + "/../../build/browser.bundle.withmaps.js",
         __dirname + "/webroot/browser.bundle.withmaps.js"
       );
       copyFileSync(
-        __dirname + "/../build/browser.bundle.withmaps.js.map",
+        __dirname + "/../../build/browser.bundle.withmaps.js.map",
         __dirname + "/webroot/browser.bundle.withmaps.js.map"
       );
 
@@ -100,37 +109,62 @@ async.series(
 
       webserver = e.listen(port, function() {
         console.log("Local server started on http://localhost:" + port);
+
         cb();
       });
 
-      webserver.on("connection", function(socket) {
-        console.log("connection");
-        socket.on("data", function(data) {
-          console.log("data", data.toString("utf8"));
+      var fmServer = feedmeServerCore({
+        transport: feedmeTransportWsServer({ server: webserver })
+      });
+      fmServer.on("action", function(areq, ares) {
+        ares.success({ action: "data" });
+        fmServer.actionRevelation({
+          actionName: areq.actionName,
+          actionData: { action: "data" },
+          feedName: "SomeFeed",
+          feedArgs: { feed: "args" },
+          feedDeltas: [{ Operation: "Increment", Path: ["count"], Value: 1 }]
         });
       });
+      fmServer.on("feedOpen", function(foreq, fores) {
+        fores.success({ count: 0 });
+      });
+      fmServer.start();
 
-      webserver.on("request", function(req) {
-        console.log("request", req.originalUrl);
-      });
+      // webserver.on("connection", function(socket) {
+      //   console.log("connection");
+      //   socket.on("data", function(data) {
+      //     console.log("data", data.toString("utf8"));
+      //   });
+      // });
 
-      webserver.on("upgrade", function() {
-        console.log("UPGRADE");
-      });
+      // webserver.on("request", function(req) {
+      //   console.log("request", req.originalUrl);
+      // });
 
-      var wsServer = new ws.Server({
-        server: webserver
-      });
-      wsServer.on("listening", function() {});
-      wsServer.on("close", function() {});
-      wsServer.on("connection", function(socket) {
-        console.log("New connection!");
-        socket.on("message", function(msg) {
-          console.log("Server received: " + msg);
-          socket.send("hi");
-        });
-        socket.on("close", function(code, reason) {});
-      });
+      // webserver.on("upgrade", function() {
+      //   console.log("UPGRADE");
+      // });
+
+      // var wsServer = new ws.Server({
+      //   server: webserver
+      // });
+      // wsServer.on("listening", function() {});
+      // wsServer.on("close", function() {});
+      // wsServer.on("connection", function(socket) {
+      //   console.log("New connection!");
+      //   socket.on("message", function(msg) {
+      //     console.log("Server received: " + msg);
+      //     socket.send("hi");
+      //   });
+      //   socket.on("close", function(code, reason) {});
+      // });
+    },
+    function(cb) {
+      // If you're running in local mode then stop here
+      if (!localMode) {
+        cb();
+      }
     },
     function(cb) {
       // Start Sauce Connect proxy if you aren't on Travis
@@ -162,7 +196,6 @@ async.series(
       );
     },
     function(cb) {
-      //return;
       // Call the Sauce REST API telling it to run the tests
       console.log("Calling Sauce REST API telling it to run the tests...");
 

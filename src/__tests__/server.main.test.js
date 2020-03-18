@@ -597,11 +597,12 @@ describe("The server.start() function", () => {
   describe("can succeed", () => {
     // Events
 
-    it("should emit nothing this tick", () => {
+    it("should emit starting if the ws constructor succeeds", () => {
       const harn = harness({ port: PORT });
       const listener = harn.createServerListener();
       harn.server.start();
-      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.starting.mock.calls.length).toBe(1);
+      expect(listener.starting.mock.calls[0].length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
       expect(listener.stopping.mock.calls.length).toBe(0);
       expect(listener.stop.mock.calls.length).toBe(0);
@@ -610,23 +611,59 @@ describe("The server.start() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
     });
 
+    it("should emit starting, stopping, stopped if the ws constructor throws", () => {
+      const harn = harness({ port: PORT }, () => {
+        throw new Error("SOME_ERROR");
+      });
+      const listener = harn.createServerListener();
+      harn.server.start();
+      expect(listener.starting.mock.calls.length).toBe(1);
+      expect(listener.starting.mock.calls[0].length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(1);
+      expect(listener.stopping.mock.calls[0].length).toBe(1);
+      expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stopping.mock.calls[0][0].message).toBe(
+        "FAILURE: Could not initialize WebSocket server."
+      );
+      expect(listener.stopping.mock.calls[0][0].wsError).toBeInstanceOf(Error);
+      expect(listener.stopping.mock.calls[0][0].wsError.message).toBe(
+        "SOME_ERROR"
+      );
+      expect(listener.stop.mock.calls.length).toBe(1);
+      expect(listener.stop.mock.calls[0].length).toBe(1);
+      expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stop.mock.calls[0][0].message).toBe(
+        "FAILURE: Could not initialize WebSocket server."
+      );
+      expect(listener.stop.mock.calls[0][0].wsError).toBeInstanceOf(Error);
+      expect(listener.stop.mock.calls[0][0].wsError.message).toBe("SOME_ERROR");
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+    });
+
     // State
 
-    it("should update the state correctly", () => {
+    it("should update the state correctly if the transport constructor succeeds", () => {
       const harn = harness({ port: PORT });
       const newState = harn.getServerState();
       harn.server.start();
+      newState._wsServer = {};
       newState._state = "starting";
       expect(harn.server).toHaveState(newState);
     });
 
-    // Function calls - N/A
+    it("should not change the state if the transport constructor throws", () => {
+      const harn = harness({ port: PORT }, () => {
+        throw new Error("SOME_ERROR");
+      });
+      const newState = harn.getServerState();
+      harn.server.start();
+      expect(harn.server).toHaveState(newState);
+    });
 
-    // Calls on ws - N/A (not initialized until next tick)
-
-    // Outbound callbacks - N/A
-
-    // Inbound callbacks (events, state, ws, callbacks)
+    // Function calls
 
     it("should initialize the ws server with correct options", () => {
       // Manual mock constructor - can't use jest.fn()
@@ -645,83 +682,11 @@ describe("The server.start() function", () => {
       expect(calledOpts).toBe(opts);
     });
 
-    describe("on next tick, if ws constructor throws", () => {
-      it("should emit appropriately", () => {
-        // eslint-disable-next-line prefer-arrow-callback
-        const harn = harness({ port: PORT }, function c() {
-          throw new Error("SOME_ERROR");
-        });
-        harn.server.start();
-        const listener = harn.createServerListener();
-        jest.advanceTimersByTime(EPSILON);
-        expect(listener.starting.mock.calls.length).toBe(1);
-        expect(listener.starting.mock.calls[0].length).toBe(0);
-        expect(listener.start.mock.calls.length).toBe(0);
-        expect(listener.stopping.mock.calls.length).toBe(1);
-        expect(listener.stopping.mock.calls[0].length).toBe(1);
-        expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
-        expect(listener.stopping.mock.calls[0][0].message).toBe(
-          "FAILURE: Could not initialize WebSocket server."
-        );
-        expect(listener.stopping.mock.calls[0][0].wsError).toBeInstanceOf(
-          Error
-        );
-        expect(listener.stopping.mock.calls[0][0].wsError.message).toBe(
-          "SOME_ERROR"
-        );
-        expect(listener.stop.mock.calls.length).toBe(1);
-        expect(listener.stop.mock.calls[0].length).toBe(1);
-        expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
-        expect(listener.stop.mock.calls[0][0].message).toBe(
-          "FAILURE: Could not initialize WebSocket server."
-        );
-        expect(listener.stop.mock.calls[0][0].wsError).toBeInstanceOf(Error);
-        expect(listener.stop.mock.calls[0][0].wsError.message).toBe(
-          "SOME_ERROR"
-        );
-        expect(listener.connect.mock.calls.length).toBe(0);
-        expect(listener.message.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(0);
-      });
+    // Calls on ws - N/A (not initialized until next tick)
 
-      it("should update the state appropriately", () => {
-        // eslint-disable-next-line prefer-arrow-callback
-        const harn = harness({ port: PORT }, function c() {
-          throw new Error("SOME_ERROR");
-        });
-        harn.server.start();
-        const newState = harn.getServerState();
-        jest.advanceTimersByTime(EPSILON);
-        newState._state = "stopped";
-        expect(harn.server).toHaveState(newState);
-      });
-    });
+    // Outbound callbacks - N/A
 
-    describe("on next tick, if ws constructor is successful", () => {
-      it("should emit appropriately", () => {
-        const harn = harness({ port: PORT });
-        harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
-        const listener = harn.createServerListener();
-        expect(listener.starting.mock.calls.length).toBe(0);
-        expect(listener.start.mock.calls.length).toBe(0);
-        expect(listener.stopping.mock.calls.length).toBe(0);
-        expect(listener.stop.mock.calls.length).toBe(0);
-        expect(listener.connect.mock.calls.length).toBe(0);
-        expect(listener.message.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(0);
-      });
-
-      it("should update the state appropriately", () => {
-        const harn = harness({ port: PORT });
-        harn.server.start();
-        const newState = harn.getServerState();
-        jest.advanceTimersByTime(EPSILON);
-        newState._wsServer = {};
-        newState._state = "starting";
-        expect(harn.server).toHaveState(newState);
-      });
-    });
+    // Inbound callbacks (events, state, ws, callbacks) - N/A
 
     // Return value
 
@@ -760,16 +725,23 @@ describe("The server.stop() function", () => {
 
     // Events
 
-    it("should emit nothing this tick", () => {
+    it("should emit disconnect for both clients, then stopping", () => {
       const listener = harn.createServerListener();
       harn.server.stop();
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
-      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(1);
+      expect(listener.stopping.mock.calls[0].length).toBe(0);
       expect(listener.stop.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.message.mock.calls.length).toBe(0);
-      expect(listener.disconnect.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(2);
+      expect(listener.disconnect.mock.calls[0].length).toBe(2);
+      expect(check.string(listener.disconnect.mock.calls[0][0])).toBe(true);
+      expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
+      expect(listener.disconnect.mock.calls[0][1].message).toBe(
+        "STOPPING: The server is stopping."
+      );
     });
 
     // State
@@ -821,7 +793,7 @@ describe("The server.stop() function", () => {
     // Inbound callbacks (events, state, ws, callbacks)
 
     describe("on ws.close() callback", () => {
-      it("should emit disconnect for both clients, then stopping, stop", () => {
+      it("should emit stop", () => {
         const prevWs = harn.getWs();
         harn.getWs().mockClear();
         harn.server.stop();
@@ -829,19 +801,12 @@ describe("The server.stop() function", () => {
         prevWs.close.mock.calls[0][0](); // fire ws.close callback
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
-        expect(listener.stopping.mock.calls.length).toBe(1);
-        expect(listener.stopping.mock.calls[0].length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
         expect(listener.stop.mock.calls.length).toBe(1);
         expect(listener.stop.mock.calls[0].length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
         expect(listener.message.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(2);
-        expect(listener.disconnect.mock.calls[0].length).toBe(2);
-        expect(check.string(listener.disconnect.mock.calls[0][0])).toBe(true);
-        expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
-        expect(listener.disconnect.mock.calls[0][1].message).toBe(
-          "STOPPING: The server is stopping."
-        );
+        expect(listener.disconnect.mock.calls.length).toBe(0);
       });
 
       it("should update the state appropriately", () => {
@@ -1034,7 +999,7 @@ describe("The server.disconnect() function", () => {
   describe("can succeed", () => {
     // Events
 
-    it("should emit nothing this tick", () => {
+    it("should emit disconnect - no error", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
       jest.advanceTimersByTime(EPSILON);
@@ -1054,7 +1019,36 @@ describe("The server.disconnect() function", () => {
       expect(listener.stop.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.message.mock.calls.length).toBe(0);
-      expect(listener.disconnect.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(1);
+      expect(listener.disconnect.mock.calls[0].length).toBe(1);
+      expect(listener.disconnect.mock.calls[0][0]).toBe(cid);
+    });
+
+    it("should emit disconnect - with error", () => {
+      const harn = harness({ port: PORT });
+      harn.server.start();
+      jest.advanceTimersByTime(EPSILON);
+      harn.getWs().emit("listening");
+      const mockWs = harn.createMockWs();
+      let cid;
+      harn.server.once("connect", c => {
+        cid = c;
+      });
+      harn.getWs().emit("connection", mockWs);
+      const err = new Error("SOMETHING");
+
+      const listener = harn.createServerListener();
+      harn.server.disconnect(cid, err);
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(1);
+      expect(listener.disconnect.mock.calls[0].length).toBe(2);
+      expect(listener.disconnect.mock.calls[0][0]).toBe(cid);
+      expect(listener.disconnect.mock.calls[0][1]).toBe(err);
     });
 
     // State
@@ -1135,62 +1129,6 @@ describe("The server.disconnect() function", () => {
     // Outbound callbacks - N/A
 
     // Inbound callbacks (events, state, ws, callbacks)
-
-    describe("on next tick", () => {
-      it("should emit disconnect - no error", () => {
-        const harn = harness({ port: PORT });
-        harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
-        harn.getWs().emit("listening");
-        const mockWs = harn.createMockWs();
-        let cid;
-        harn.server.once("connect", c => {
-          cid = c;
-        });
-        harn.getWs().emit("connection", mockWs);
-        harn.server.disconnect(cid);
-
-        const listener = harn.createServerListener();
-        jest.advanceTimersByTime(EPSILON);
-        expect(listener.starting.mock.calls.length).toBe(0);
-        expect(listener.start.mock.calls.length).toBe(0);
-        expect(listener.stopping.mock.calls.length).toBe(0);
-        expect(listener.stop.mock.calls.length).toBe(0);
-        expect(listener.connect.mock.calls.length).toBe(0);
-        expect(listener.message.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(1);
-        expect(listener.disconnect.mock.calls[0].length).toBe(1);
-        expect(listener.disconnect.mock.calls[0][0]).toBe(cid);
-      });
-
-      it("should emit disconnect - with error", () => {
-        const harn = harness({ port: PORT });
-        harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
-        harn.getWs().emit("listening");
-        const mockWs = harn.createMockWs();
-        let cid;
-        harn.server.once("connect", c => {
-          cid = c;
-        });
-        harn.getWs().emit("connection", mockWs);
-        const err = new Error("SOMETHING");
-        harn.server.disconnect(cid, err);
-
-        const listener = harn.createServerListener();
-        jest.advanceTimersByTime(EPSILON);
-        expect(listener.starting.mock.calls.length).toBe(0);
-        expect(listener.start.mock.calls.length).toBe(0);
-        expect(listener.stopping.mock.calls.length).toBe(0);
-        expect(listener.stop.mock.calls.length).toBe(0);
-        expect(listener.connect.mock.calls.length).toBe(0);
-        expect(listener.message.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(1);
-        expect(listener.disconnect.mock.calls[0].length).toBe(2);
-        expect(listener.disconnect.mock.calls[0][0]).toBe(cid);
-        expect(listener.disconnect.mock.calls[0][1]).toBe(err);
-      });
-    });
 
     // Return value
 

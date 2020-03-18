@@ -561,9 +561,9 @@ proto._processWsClose = function _processWsClose(code, reason) {
     this._wsClient = null;
     this._wsPreviousState = null;
     this._state = "disconnected";
-    const err = new Error(
-      `DISCONNECTED: The WebSocket connection was lost (${code}). Reason: ${reason}`
-    );
+    const err = new Error("DISCONNECTED: The WebSocket closed.");
+    err.wsCode = code;
+    err.wsReason = reason;
     this.emit("disconnect", err);
   }
 };
