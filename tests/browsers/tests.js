@@ -12,7 +12,7 @@ var sauceConnectProcess;
 var sauceTests;
 var sauceResults;
 
-// Run locally or on Sauce?
+// Running locally or on Sauce?
 var localMode = false;
 if (process.argv.length >= 3 && process.argv[2].toLowerCase() === "local") {
   localMode = true;
