@@ -127,6 +127,9 @@ application via the library:
   `err.wsCode` and `err.wsReason` properties containing the code and reason
   specified by `ws`.
 
+- When the application server calls `server.transportClient(cid)` (??) it gets
+  an object with a remoteHost property?
+
 ## Client
 
 Client transport lets you connect to a Feedme API server over Webockets from
