@@ -391,6 +391,7 @@ proto.send = function send(msg) {
  * The outward-facing transport state could be disconnected or connecting.
  * @memberof Client
  * @instance
+ * @private
  * @returns {void}
  */
 proto._processWsOpen = function _processWsOpen() {
@@ -399,49 +400,43 @@ proto._processWsOpen = function _processWsOpen() {
   if (this._state === "disconnected") {
     // The transport is disconnected - there was a call to connect() and
     // then disconnect() or some sequence of that pair
+    dbg("Transport was disconnected");
+
     this._wsPreviousState = "disconnecting";
     this._wsClient.close(1000, "Connection closed by the client.");
   } else {
     // The transport is connecting - standard case
+    dbg("Transport was connecting");
+
+    // Set up the heartbeat (if so configured)
+    if (this._options.heartbeatIntervalMs > 0) {
+      dbg("Starting heartbeat interval");
+      this._heartbeatInterval = setInterval(() => {
+        dbg("Sending ping and starting heartbeat timeout");
+
+        // Start the heartbeat timeout
+        // Cleared on pong receipt and on disconnect, so if fired you know you need to terminate
+        this._heartbeatTimeout = setTimeout(() => {
+          dbg("Heartbeat timed out");
+          this._heartbeatFailure();
+        }, this._options.heartbeatTimeoutMs);
+
+        // Ping the server - ws automatically replies with pong
+        this._wsClient.ping(err => {
+          // The ping frame has been written or has failed to write (pong not received)
+          dbg("Ping callback fired");
+          if (err) {
+            dbg("Error writing ping frame");
+            this._heartbeatFailure();
+          }
+        });
+      }, this._options.heartbeatIntervalMs);
+    }
 
     // Update state and emit
     this._wsPreviousState = "connected";
     this._state = "connected";
     this.emit("connect");
-
-    // Set up the heartbeat (if so configured)
-    // If there is a problem with a ping then use ws.terminate() not ws.close(),
-    // as the client is not responsive and the latter tries to complete a
-    // close handshake. Terminating does trigger a ws close event.
-    if (this._options.heartbeatIntervalMs > 0) {
-      this._heartbeatInterval = setInterval(() => {
-        dbg("Starting heartbeat timeout");
-
-        // Start the heartbeat timeout
-        // Cleared on pong receipt and on disconnect, so if fired you know you need to terminate
-        this._heartbeatTimeout = setTimeout(() => {
-          // Terminating triggers a ws close event
-          dbg("Heartbeat timed out");
-          this._wsClient.terminate();
-        }, this._options.heartbeatTimeoutMs);
-
-        // Ping the server - ws automatically replies with pong
-        // Unsure of ws ping callback behavior if the connection is severed,
-        // so only terminate if the ws client still exists and the connection is still open
-        this._wsClient.ping(err => {
-          // The ping frame has been written or has failed to write (pong not received)
-          dbg("Ping callback fired");
-          if (
-            err &&
-            this._wsClient &&
-            this._wsClient.readyState === this._wsClient.OPEN
-          ) {
-            dbg("Error writing ping frame");
-            this._wsClient.terminate();
-          }
-        });
-      }, this._options.heartbeatIntervalMs);
-    }
   }
 };
 
@@ -449,6 +444,7 @@ proto._processWsOpen = function _processWsOpen() {
  * Processes a ws message event.
  * @memberof Client
  * @instance
+ * @private
  * @param {*} msg
  * @returns {void}
  */
@@ -474,6 +470,7 @@ proto._processWsMessage = function _processWsMessage(data) {
  * Processes a ws pong event.
  * @memberof Client
  * @instance
+ * @private
  * @returns {void}
  */
 proto._processWsPong = function _processWsPong() {
@@ -492,6 +489,7 @@ proto._processWsPong = function _processWsPong() {
  * connection fails due to an error.
  * @memberof Client
  * @instance
+ * @private
  * @param {?number} code
  * @param {?string} reason
  * @returns {void}
@@ -513,9 +511,9 @@ proto._processWsClose = function _processWsClose(code, reason) {
   }
 
   if (this._state === "disconnected") {
-    // There was a call to transport.disconnect(). The disconnect event has already
-    // been emitted and the heartbeat timers cleared, and the library still wants
-    // the transport disconnected
+    // There was a call to transport.disconnect() or the heartbeat failed.
+    // The disconnect event has already been emitted and the heartbeat timers
+    // cleared, and the library still wants the transport disconnected
     this._wsClient = null;
     this._wsPreviousState = null;
   } else if (
@@ -574,6 +572,7 @@ proto._processWsClose = function _processWsClose(code, reason) {
  * this is for debugging purposes only.
  * @memberof Client
  * @instance
+ * @private
  * @param {?number} code
  * @param {?string} reason
  * @returns {void}
@@ -581,4 +580,51 @@ proto._processWsClose = function _processWsClose(code, reason) {
 proto._processWsError = function _processWsError(err) {
   dbg("Observed ws error event");
   dbg(err);
+};
+
+// Internal Functions
+
+/**
+ * Handles a heartbeat failure. Called if a ping frame fails to write or if
+ * a heartbeat ping times out.
+ *
+ * The heartbeat code can't just call ws.terminate() and wait for a close event,
+ * because that event is emitted asynchronously and you want to stop the heartbeat
+ * interval and become disconnected synchronously.
+ * @memberof Client
+ * @instance
+ * @private
+ * @returns {void}
+ */
+proto._heartbeatFailure = function _heartbeatFailure() {
+  // Exit if the ws connection is no longer open
+  // Not sure if ws ping calls back on closure, but in that case
+  // it should be handled by _processWsClose, not here
+  if (!this._wsClient || this._wsClient.readyState !== this._wsClient.OPEN) {
+    return;
+  }
+
+  // Clear heartbeat (if any)
+  if (this._heartbeatInterval) {
+    clearInterval(this._heartbeatInterval);
+    this._heartbeatInterval = null;
+  }
+  if (this._heartbeatTimeout) {
+    clearTimeout(this._heartbeatTimeout);
+    this._heartbeatTimeout = null;
+  }
+
+  // Terminate the ws connection
+  // Use ws.terminate() not ws.close(), as the client is not responsive and
+  // the latter tries to complete a close handshake. Terminating does trigger
+  // a ws close event, which will reset _wsClient
+  this._wsClient.terminate();
+  this._wsPreviousState = "disconnecting";
+
+  // Update state and emit
+  this._state = "disconnected";
+  this.emit(
+    "disconnect",
+    new Error("FAILURE: The WebSocket heartbeat failed.")
+  );
 };
