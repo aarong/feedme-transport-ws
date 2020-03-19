@@ -102,7 +102,7 @@ const httpServer = http.createServer(function (req, res) => {
 
 const feedmeServer = feedmeServerCore({
   transport: feedmeTransportWs({
-    port: 8080,
+    port: 8080, //////////// Server: httpServer???
     path: "/feedme"
   })
 });
