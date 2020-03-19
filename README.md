@@ -19,7 +19,8 @@ project.
 <!-- TOC depthFrom:2 -->
 
 - [Server](#server)
-  - [Connection issues with ws (WHAT TO CALL?)](#connection-issues-with-ws-what-to-call)
+  - [Initialization](#initialization)
+  - [Transport-Specific Information](#transport-specific-information)
 - [Client](#client)
   - [In Node.js](#in-nodejs)
     - [Connection Issues with ws (what to call this section??)](#connection-issues-with-ws-what-to-call-this-section)
@@ -41,6 +42,8 @@ external HTTP servers. Uses ws version 6.2.x to retain Node 6 support.
 To install the Feedme Server Core library and the WebSocket transport:
 
 `npm install feedme-server-core feedme-transport-ws`
+
+### Initialization
 
 To initialize a Feedme server:
 
@@ -110,17 +113,19 @@ const feedmeServer = feedmeServerCore({
 httpServer.listen(8080);
 ```
 
-### Connection issues with ws (WHAT TO CALL?)
+### Transport-Specific Information
 
-If `ws` throws an error on initialization, then the `err` argument passed with
-the transport `stopping` and `stopped` events have a `err.wsError` property
-referencing the error thrown by `ws`.
+The following transport-specific information is made available to the
+application via the library:
 
-If `ws` indicates that an active connection was terminated unexpectedly, then
-the `err` argument passed with the transport `disconnect` event has `err.wsCode`
-and `err.wsReason` properties containing the code and reason specified by `ws`.
+- If `ws` throws an error on initialization, then the `err` argument passed with
+  the library `stopping` and `stopped` events have a `err.wsError` property
+  referencing the error thrown by `ws`.
 
-Both of these are available to the application.
+- If `ws` indicates that an active connection was terminated unexpectedly, then
+  the `err` argument passed with the transport `disconnect` event has
+  `err.wsCode` and `err.wsReason` properties containing the code and reason
+  specified by `ws`.
 
 ## Client
 
