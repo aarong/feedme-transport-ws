@@ -48,22 +48,14 @@ const browserBundleNomaps = () =>
 
 const nodeTranspile = () =>
   gulp
-    .src(["src/*.js", "!src/main.browser.js"]) // Don't transpile the browser entry-point
+    .src(["src/*.js"])
     .pipe(sourcemaps.init())
     .pipe(babel({ plugins: ["add-module-exports"] })) // No .default({})
     .pipe(sourcemaps.mapSources(sourcePath => `../src/${sourcePath}`))
     .pipe(sourcemaps.write("."))
     .pipe(gulp.dest("build/"));
 
-// Maybe make the index return an object with a .client and .server member?
-// Probably best practice to have an index.js
-// const copy1 = () =>
-//   gulp
-//     .src("./index.build.js")
-//     .pipe(rename("index.js"))
-//     .pipe(gulp.dest("build/"));
-
-const copy2 = () =>
+const copy = () =>
   gulp.src("./{package.json,LICENSE,README.md}").pipe(gulp.dest("build/"));
 
 export const build = gulp.series(
@@ -72,6 +64,5 @@ export const build = gulp.series(
   browserBundleWithmaps,
   browserBundleNomaps,
   nodeTranspile,
-  // copy1,
-  copy2
+  copy
 );
