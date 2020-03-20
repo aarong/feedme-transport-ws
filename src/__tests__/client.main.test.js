@@ -577,6 +577,19 @@ describe("The client() factory function", () => {
         )
       );
     });
+
+    it("should throw on invalid options.heartbeatTimeoutMs - heartbeat disabled", () => {
+      expect(() => {
+        client(() => {}, "ws://localhost", "protocol", {
+          heartbeatIntervalMs: 0,
+          heartbeatTimeoutMs: 5
+        });
+      }).toThrow(
+        new Error(
+          "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument."
+        )
+      );
+    });
   });
 
   describe("can succeed", () => {

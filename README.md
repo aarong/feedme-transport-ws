@@ -76,7 +76,7 @@ The transport also incorporates a heartbeat system, which can be confired using:
   Specifies how long to wait after pinging a client until the connection is
   considered to have been lost and the WebSocket is terminated.
 
-  Must be strictly less than `options.heartbeatIntervalMs`.
+  Must be strictly less than `options.heartbeatIntervalMs` if specified.
 
 Example: To serve a Feedme API on a stand-alone WebSocket server:
 
@@ -182,7 +182,7 @@ Arguments:
     Specifies how long to wait after pinging the server until the connection is
     considered to have been lost.
 
-    Must be strictly less than `options.heartbeatIntervalMs`.
+    Must be strictly less than `options.heartbeatIntervalMs` if specified.
 
 Example: Connect to a the WebSocket API server on _localhost:8080_:
 

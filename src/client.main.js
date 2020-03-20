@@ -101,13 +101,16 @@ export default function clientFactory(...args) {
     if (
       !check.integer(options.heartbeatTimeoutMs) ||
       options.heartbeatTimeoutMs <= 0 ||
-      options.heartbeatTimeoutMs >= options.heartbeatIntervalMs
+      options.heartbeatTimeoutMs >= options.heartbeatIntervalMs // Will fail if heartbeat disabled
     ) {
       throw new Error(
         "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument."
       );
     }
   } else {
+    // If heartbeatIntervalMs === 0 (disabled) and heartbeatTimeoutMs is not specified,
+    // then heartbeatTimeoutMs will be the default and thus greater than heartbeatIntervalMs,
+    // but the option is not relevant
     options.heartbeatTimeoutMs = config.defaults.heartbeatTimeoutMs; // eslint-disable-line no-param-reassign
   }
 
@@ -423,11 +426,12 @@ proto._processWsOpen = function _processWsOpen() {
 
         // Ping the server - ws automatically replies with pong
         this._wsClient.ping(err => {
-          // The ping frame has been written or has failed to write (pong not received)
-          dbg("Ping callback fired");
+          // The ping frame has been written or has failed to write - pong not yet received
           if (err) {
             dbg("Error writing ping frame");
             this._heartbeatFailure();
+          } else {
+            dbg("Ping frame written successfully");
           }
         });
       }, this._options.heartbeatIntervalMs);
@@ -597,6 +601,8 @@ proto._processWsError = function _processWsError(err) {
  * @returns {void}
  */
 proto._heartbeatFailure = function _heartbeatFailure() {
+  dbg("Heartbeat failed");
+
   // Exit if the ws connection is no longer open
   // Not sure if ws ping calls back on closure, but in that case
   // it should be handled by _processWsClose, not here
