@@ -1071,15 +1071,112 @@ describe("The client.send() function", () => {
       harn.client.send("msg");
       expect(harn.getWs().ping.mock.calls.length).toBe(0);
       expect(harn.getWs().send.mock.calls.length).toBe(1);
-      expect(harn.getWs().send.mock.calls[0].length).toBe(1);
+      expect(harn.getWs().send.mock.calls[0].length).toBe(2);
       expect(harn.getWs().send.mock.calls[0][0]).toBe("msg");
+      expect(harn.getWs().send.mock.calls[0][1]).toBeInstanceOf(Function);
       expect(harn.getWs().close.mock.calls.length).toBe(0);
       expect(harn.getWs().terminate.mock.calls.length).toBe(0);
     });
 
     // Outbound callbacks - N/A
 
-    // Inbound callbacks - N/A
+    // Inbound callbacks
+
+    describe("When the send callback fires with error", () => {
+      // Events
+
+      it("should emit disconnect", () => {
+        const harn = harness("ws://localhost");
+        harn.makeWsConnected();
+        const listener = harn.createClientListener();
+        harn.client.send("msg");
+        const cb = harn.getWs().send.mock.calls[0][1];
+        const err = new Error("SOME_ERROR");
+        cb(err);
+        expect(listener.connecting.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(1);
+        expect(listener.disconnect.mock.calls[0].length).toBe(1);
+        expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
+        expect(listener.disconnect.mock.calls[0][0].message).toBe(
+          "FAILURE: WebSocket transmission failed."
+        );
+        expect(listener.disconnect.mock.calls[0][0].wsError).toBe(err);
+        expect(listener.message.mock.calls.length).toBe(0);
+      });
+
+      // State
+
+      it("should update the state appropriately", () => {
+        const harn = harness("ws://localhost");
+        harn.makeWsConnected();
+        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs); // Create heartbeat timeout
+        harn.client.send("msg");
+        const cb = harn.getWs().send.mock.calls[0][1];
+        const err = new Error("SOME_ERROR");
+
+        const newState = harn.getClientState();
+        newState._wsPreviousState = "disconnecting";
+        newState._state = "disconnected";
+        newState._heartbeatInterval = null;
+        newState._heartbeatTimeout = null;
+        cb(err);
+        expect(harn.client).toHaveState(newState);
+      });
+
+      // Function calls
+
+      it("should call clearInterval and clearTimeout", () => {
+        const harn = harness("ws://localhost");
+        harn.makeWsConnected();
+        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs); // Create heartbeat timeout
+        harn.client.send("msg");
+        const cb = harn.getWs().send.mock.calls[0][1];
+        const err = new Error("SOME_ERROR");
+
+        clearInterval.mockClear();
+        clearTimeout.mockClear();
+        cb(err);
+        expect(clearInterval.mock.calls.length).toBe(1);
+        expect(clearInterval.mock.calls[0].length).toBe(1);
+        expect(check.number(clearInterval.mock.calls[0][0])).toBe(true);
+        expect(clearTimeout.mock.calls.length).toBe(1);
+        expect(clearTimeout.mock.calls[0].length).toBe(1);
+        expect(check.number(clearTimeout.mock.calls[0][0])).toBe(true);
+      });
+
+      // Calls on ws
+
+      it("should call ws.terminate()", () => {
+        const harn = harness("ws://localhost");
+        harn.makeWsConnected();
+        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs); // Create heartbeat timeout
+        harn.client.send("msg");
+        const cb = harn.getWs().send.mock.calls[0][1];
+        const err = new Error("SOME_ERROR");
+
+        harn.getWs().mockClear();
+        cb(err);
+        expect(harn.getWs().ping.mock.calls.length).toBe(0);
+        expect(harn.getWs().send.mock.calls.length).toBe(0);
+        expect(harn.getWs().close.mock.calls.length).toBe(0);
+        expect(harn.getWs().terminate.mock.calls.length).toBe(1);
+        expect(harn.getWs().terminate.mock.calls[0].length).toBe(0);
+      });
+
+      // Outbound callbacks - N/A
+
+      // Inbound callbacks - N/A
+    });
+
+    describe("When the send callback fires with success", () => {
+      // Events
+      // State
+      // Function calls
+      // Calls on ws
+      // Outbound callbacks - N/A
+      // Inbound callbacks - N/A
+    });
 
     // Return value
 
@@ -1373,7 +1470,8 @@ describe("The client._processWsOpen() function", () => {
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         const listener = harn.createClientListener();
-        cb(new Error("SOME_ERROR"));
+        const err = new Error("SOME_ERROR");
+        cb(err);
 
         expect(listener.connecting.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
@@ -1383,6 +1481,7 @@ describe("The client._processWsOpen() function", () => {
         expect(listener.disconnect.mock.calls[0][0].message).toBe(
           "FAILURE: The WebSocket heartbeat failed."
         );
+        expect(listener.disconnect.mock.calls[0][0].wsError).toBe(err);
         expect(listener.message.mock.calls.length).toBe(0);
       });
 
