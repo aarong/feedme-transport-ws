@@ -2337,7 +2337,7 @@ describe("The client._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "DISCONNECTED: The WebSocket closed."
+        "DISCONNECTED: The WebSocket could not be opened."
       );
       expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1234);
       expect(listener.disconnect.mock.calls[0][0].wsReason).toBe(
@@ -2401,7 +2401,7 @@ describe("The client._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "DISCONNECTED: The WebSocket closed."
+        "DISCONNECTED: The WebSocket closed unexpectedly."
       );
       expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1234);
       expect(listener.disconnect.mock.calls[0][0].wsReason).toBe(

@@ -537,12 +537,14 @@ proto._processWsClose = function _processWsClose(code, reason) {
     // a call to ws.send() threw an exception.
     // The disconnect event has already been emitted and the heartbeat timers
     // cleared, and the library still wants the transport disconnected
+    dbg("Transport state was disconnected");
     this._wsClient = null;
     this._wsPreviousState = null;
   } else if (
     this._state === "connecting" &&
     this._wsPreviousState === "disconnecting"
   ) {
+    dbg("Transport state was connecting and ws was disconnecting");
     // There was a call to transport.connect() when ws was disconnecting due to
     // a call to transport.disconnect(). The connecting event has already been
     // fired, so just try to establish a new ws connection
@@ -555,6 +557,7 @@ proto._processWsClose = function _processWsClose(code, reason) {
         this._options
       );
     } catch (e) {
+      dbg("Ws initialization failed");
       this._wsClient = null; // Otherwise it will be the previous client
       this._wsPreviousState = null;
       this._state = "disconnected";
@@ -576,13 +579,17 @@ proto._processWsClose = function _processWsClose(code, reason) {
     this._wsClient.on("close", this._processWsClose.bind(this));
     this._wsClient.on("error", this._processWsError.bind(this));
   } else {
-    // The transport connection failed, and not due to a call to
-    // transport.disconnect(). The transport state could be connecting or
-    // connected, but either way you emit disconnect.
+    // The transport connection failed unexpectedly. The transport state could
+    // be connecting or connected, but either way you emit disconnect
+    dbg("Transport connection failed unexpectedly");
+    const errMsg =
+      this._state === "connecting"
+        ? "DISCONNECTED: The WebSocket could not be opened."
+        : "DISCONNECTED: The WebSocket closed unexpectedly.";
     this._wsClient = null;
     this._wsPreviousState = null;
     this._state = "disconnected";
-    const err = new Error("DISCONNECTED: The WebSocket closed.");
+    const err = new Error(errMsg);
     err.wsCode = code;
     err.wsReason = reason;
     this.emit("disconnect", err);
