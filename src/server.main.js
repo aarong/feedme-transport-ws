@@ -224,7 +224,7 @@ export default function serverFactory(wsConstructor, options) {
  * @param {string} clientId
  * @param {?Error} err  "STOPPING: ..." if the due to a call to server.stop()
  *                      "FAILURE: ..." if the transport failed
- *                      Not present if due to call to server.disconnect()
+ *                      Not present if due to call to server.disconnect(...)
  */
 
 /**
@@ -310,13 +310,9 @@ proto.stop = function stop() {
 
   // Stop listening to all ws events
   _.each(this._wsClients, ws => {
-    ws.removeAllListeners("message");
-    ws.removeAllListeners("pong");
-    ws.removeAllListeners("close");
+    ws.removeAllListeners();
   });
-  this._wsServer.removeAllListeners("listening");
-  this._wsServer.removeAllListeners("close");
-  this._wsServer.removeAllListeners("connection");
+  this._wsServer.removeAllListeners();
 
   // Stop all heartbeat intervals and timers
   _.each(this._heartbeatIntervals, intervalId => {
@@ -347,7 +343,9 @@ proto.stop = function stop() {
   // Emit stopping
   this.emit("stopping");
 
-  // Stop the ws server - callback is on a later tick
+  // Stop the ws server
+  // A callback is received from ws even if the transport was established
+  // on an external http server, which is left running
   wsServer.close(() => {
     dbg("Observed ws close callback");
 
@@ -385,8 +383,18 @@ proto.send = function send(cid, msg) {
     throw new Error("INVALID_STATE: The client is not connected.");
   }
 
-  // Send the message
-  this._wsClients[cid].send(msg);
+  // Try to send the message
+  this._wsClients[cid].send(msg, err => {
+    // The message has been written or has failed to write
+    if (err) {
+      dbg("Error writing message");
+      const transportErr = new Error("FAILURE: WebSocket transmission failed.");
+      transportErr.wsError = err;
+      this._connectionFailure(cid, transportErr);
+    } else {
+      dbg("Message written successfully");
+    }
+  });
 };
 
 /**
@@ -427,9 +435,7 @@ proto.disconnect = function disconnect(...args) {
   // Success
 
   // Stop listening to client ws events
-  this._wsClients[cid].removeAllListeners("message");
-  this._wsClients[cid].removeAllListeners("pong");
-  this._wsClients[cid].removeAllListeners("close");
+  this._wsClients[cid].removeAllListeners();
 
   // Clear heartbeat interval/timeout
   clearInterval(this._heartbeatIntervals[cid]);
@@ -490,13 +496,9 @@ proto._processWsServerClose = function _processWsServerClose() {
 
   // Stop listening to all ws events
   _.each(this._wsClients, ws => {
-    ws.removeAllListeners("message");
-    ws.removeAllListeners("pong");
-    ws.removeAllListeners("close");
+    ws.removeAllListeners();
   });
-  this._wsServer.removeAllListeners("listening");
-  this._wsServer.removeAllListeners("close");
-  this._wsServer.removeAllListeners("connection");
+  this._wsServer.removeAllListeners();
 
   // Stop all heartbeat intervals and timers
   _.each(this._heartbeatIntervals, intervalId => {
@@ -559,16 +561,24 @@ proto._processWsServerConnection = function _processWsServerConnection(ws) {
       // Timeout is cleared on pong receipt and on client disconnect
       this._heartbeatTimeouts[cid] = setTimeout(() => {
         dbg("Heartbeat timed out");
-        this._wsClients[cid].terminate(); // Triggers a client "close" event
+        this._connectionFailure(
+          cid,
+          new Error("FAILURE: The WebSocket heartbeat failed.")
+        );
       }, this._options.heartbeatTimeoutMs);
 
-      // Ping the client
-      // The ws module automatically responds to pings with pongs
+      // Ping the client - ws automatically responds with pong
       this._wsClients[cid].ping(err => {
-        // The ping frame has been written or has failed to write
-        // At this point, the client may have actually disconnected
-        if (err && this._wsClients[cid]) {
-          this._wsClients[cid].terminate(); // Triggers a ws client "close" event
+        // The ping frame has been written or has failed to write - pong not yet received
+        if (err) {
+          dbg("Error writing ping frame");
+          const transportErr = new Error(
+            "FAILURE: The WebSocket heartbeat failed."
+          );
+          transportErr.wsError = err;
+          this._connectionFailure(cid, transportErr);
+        } else {
+          dbg("Ping frame written successfully");
         }
       });
     }, this._options.heartbeatIntervalMs);
@@ -628,16 +638,15 @@ proto._processWsClientPong = function _processWsClientPong(cid) {
  * Processes a ws client "close" event.
  *
  * The client "close" event is fired by ws...
+ *
  * - On server stoppage after the server-level close event
  * - On server call to ws.close() or ws.terminate()
  * - On client call to ws.close() or ws.terminate()
  *
- * The server.disconnect() method removes client ws event listeners and the
- * server.stop() method removes all ws event listeners, so this function is
- * called only when a single client disconnects unexpectedly. This includes
- * regular disconnects and heartbeat failures, which call ws.terminate() and
- * trigger a ws "close" event.
- *
+ * The server.disconnect() and server._connectionFailure() methods remove client
+ * ws event listeners and the server.stop() method removes all ws event
+ * listeners, so this function is called only when a single client disconnects
+ * unexpectedly but normally.
  * @memberof Server
  * @instance
  * @private
@@ -653,17 +662,59 @@ proto._processWsClientClose = function _processWsClientClose(
 ) {
   dbg("Observed ws client close event");
 
-  // Stop listening for client events
-  this._wsClients[cid].removeAllListeners("message");
-  this._wsClients[cid].removeAllListeners("pong");
-  this._wsClients[cid].removeAllListeners("close");
+  const err = new Error("FAILURE: The WebSocket closed.");
+  err.wsCode = code;
+  err.wsReason = reason;
+  this._connectionFailure(cid, err);
+};
 
-  // Clear any heartbeat interval/timer
+// Internal Functions
+
+/**
+ * Handles an unexpected connection failure:
+ *
+ *  - Ws client close event
+ *  - Heartbeat timeout
+ *  - Ws calls back error to ws.ping()
+ *  - Ws calls back error to ws.send()
+ *
+ * Resets the state, emits, and terminates the ws connection as appropriate.
+ * @memberof Client
+ * @instance
+ * @private
+ * @param {string} cid
+ * @param {Error} err
+ * @returns {void}
+ */
+proto._connectionFailure = function _connectionFailure(cid, err) {
+  dbg("Connection failed");
+
+  // Exit if the connection failure has already been handled, since it's not
+  // clear whether ws.ping() and ws.send() fire a close event before calling back error
+  if (!this._wsClients[cid]) {
+    dbg("Client has already disconnected");
+    return; // Stop
+  }
+  dbg("Client is still present");
+
+  // Stop listening for ws client events
+  this._wsClients[cid].removeAllListeners();
+
+  // Clear heartbeat (if any)
   if (this._heartbeatIntervals[cid]) {
     clearInterval(this._heartbeatIntervals[cid]);
   }
   if (this._heartbeatTimeouts[cid]) {
     clearTimeout(this._heartbeatTimeouts[cid]);
+  }
+
+  // Terminate the ws connection if still open - won't be if due to close event
+  // Fires ws close, but listeners removed
+  if (this._wsClients[cid].readyState === this._wsClients[cid].OPEN) {
+    dbg("Terminating client connection");
+    this._wsClients[cid].terminate();
+  } else {
+    dbg("Client connection already closing");
   }
 
   // Update the state
@@ -672,8 +723,5 @@ proto._processWsClientClose = function _processWsClientClose(
   delete this._heartbeatTimeouts[cid];
 
   // Emit disconnect
-  const err = new Error("FAILURE: The WebSocket closed.");
-  err.wsCode = code;
-  err.wsReason = reason;
   this.emit("disconnect", cid, err);
 };

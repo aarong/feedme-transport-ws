@@ -130,7 +130,12 @@ harnessProto.createMockWs = function createMockWs() {
     ping: jest.fn(),
     send: jest.fn(),
     close: jest.fn(),
-    terminate: jest.fn()
+    terminate: jest.fn(),
+    CONNECTING: 0,
+    OPEN: 1,
+    CLOSING: 2,
+    CLOSED: 3,
+    readyState: 1 // connection event emitted when client is open
   });
   ws.mockClear = () => {
     ws.ping.mockClear();
@@ -869,95 +874,313 @@ describe("The server.send() function", () => {
   });
 
   describe("can succeed", () => {
-    // Events
+    describe("the ws.send() callback may return success", () => {
+      // Events
 
-    it("should emit nothing", () => {
-      const harn = harness({ port: PORT });
-      harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
-      harn.getWs().emit("listening");
-      const ws = harn.createMockWs();
-      let cid;
-      harn.server.once("connect", c => {
-        cid = c;
+      it("should emit nothing", () => {
+        const harn = harness({ port: PORT });
+        harn.server.start();
+        jest.advanceTimersByTime(EPSILON);
+        harn.getWs().emit("listening");
+        const ws = harn.createMockWs();
+        let cid;
+        harn.server.once("connect", c => {
+          cid = c;
+        });
+        harn.getWs().emit("connection", ws);
+
+        const listener = harn.createServerListener();
+        harn.server.send(cid, "msg");
+        const cb = ws.send.mock.calls[0][1];
+        cb();
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
+        expect(listener.stop.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
       });
-      harn.getWs().emit("connection", ws);
 
-      const listener = harn.createServerListener();
-      harn.server.send(cid, "msg");
-      expect(listener.starting.mock.calls.length).toBe(0);
-      expect(listener.start.mock.calls.length).toBe(0);
-      expect(listener.stopping.mock.calls.length).toBe(0);
-      expect(listener.stop.mock.calls.length).toBe(0);
-      expect(listener.connect.mock.calls.length).toBe(0);
-      expect(listener.message.mock.calls.length).toBe(0);
-      expect(listener.disconnect.mock.calls.length).toBe(0);
+      // State
+
+      it("should not change the state", () => {
+        const harn = harness({ port: PORT });
+        harn.server.start();
+        jest.advanceTimersByTime(EPSILON);
+        harn.getWs().emit("listening");
+        const ws = harn.createMockWs();
+        let cid;
+        harn.server.once("connect", c => {
+          cid = c;
+        });
+        harn.getWs().emit("connection", ws);
+
+        const newState = harn.getServerState();
+        harn.server.send(cid, "msg");
+        const cb = ws.send.mock.calls[0][1];
+        cb();
+        expect(harn.server).toHaveState(newState);
+      });
+
+      // Function calls - N/A
+
+      // Calls on ws
+
+      it("should call ws ws.send()", () => {
+        const harn = harness({ port: PORT });
+        harn.server.start();
+        jest.advanceTimersByTime(EPSILON);
+        harn.getWs().emit("listening");
+        const ws = harn.createMockWs();
+        let cid;
+        harn.server.once("connect", c => {
+          cid = c;
+        });
+        harn.getWs().emit("connection", ws);
+
+        ws.mockClear();
+        harn.server.send(cid, "msg");
+        const cb = ws.send.mock.calls[0][1];
+        cb();
+        expect(ws.ping.mock.calls.length).toBe(0);
+        expect(ws.send.mock.calls.length).toBe(1);
+        expect(ws.send.mock.calls[0].length).toBe(2);
+        expect(ws.send.mock.calls[0][0]).toBe("msg");
+        expect(check.function(ws.send.mock.calls[0][1])).toBe(true);
+        expect(ws.close.mock.calls.length).toBe(0);
+        expect(ws.terminate.mock.calls.length).toBe(0);
+      });
+
+      // Outbound callbacks - N/A
+
+      // Inbound callbacks (events, state, ws, callbacks) - N/A
+
+      // Return value
+
+      it("should return nothing", () => {
+        const harn = harness({ port: PORT });
+        harn.server.start();
+        jest.advanceTimersByTime(EPSILON);
+        harn.getWs().emit("listening");
+        const ws = harn.createMockWs();
+        let cid;
+        harn.server.once("connect", c => {
+          cid = c;
+        });
+        harn.getWs().emit("connection", ws);
+
+        expect(harn.server.send(cid, "msg")).toBe(undefined);
+      });
     });
 
-    // State
+    describe("the ws.send() callback may return failure and the client is still present", () => {
+      // Events
 
-    it("should not change the state", () => {
-      const harn = harness({ port: PORT });
-      harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
-      harn.getWs().emit("listening");
-      const ws = harn.createMockWs();
-      let cid;
-      harn.server.once("connect", c => {
-        cid = c;
+      it("should emit disconnect", () => {
+        const harn = harness({ port: PORT });
+        harn.server.start();
+        jest.advanceTimersByTime(EPSILON);
+        harn.getWs().emit("listening");
+        const ws = harn.createMockWs();
+        let cid;
+        harn.server.once("connect", c => {
+          cid = c;
+        });
+        harn.getWs().emit("connection", ws);
+
+        const listener = harn.createServerListener();
+        harn.server.send(cid, "msg");
+        const cb = ws.send.mock.calls[0][1];
+        const err = new Error("SOME_ERROR");
+        cb(err);
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
+        expect(listener.stop.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(1);
+        expect(listener.disconnect.mock.calls[0].length).toBe(2);
+        expect(listener.disconnect.mock.calls[0][0]).toBe(cid);
+        expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
+        expect(listener.disconnect.mock.calls[0][1].message).toBe(
+          "FAILURE: WebSocket transmission failed."
+        );
+        expect(listener.disconnect.mock.calls[0][1].wsError).toBe(err);
       });
-      harn.getWs().emit("connection", ws);
 
-      const newState = harn.getServerState();
-      harn.server.send(cid, "msg");
-      expect(harn.server).toHaveState(newState);
+      // State
+
+      it("should update the state appropriately", () => {
+        const harn = harness({ port: PORT });
+        harn.server.start();
+        jest.advanceTimersByTime(EPSILON);
+        harn.getWs().emit("listening");
+        const ws = harn.createMockWs();
+        let cid;
+        harn.server.once("connect", c => {
+          cid = c;
+        });
+        harn.getWs().emit("connection", ws);
+
+        const newState = harn.getServerState();
+        delete newState._wsClients[cid];
+        delete newState._heartbeatIntervals[cid];
+        harn.server.send(cid, "msg");
+        const cb = ws.send.mock.calls[0][1];
+        cb(new Error("SOME_ERROR"));
+        expect(harn.server).toHaveState(newState);
+      });
+
+      // Function calls - N/A
+
+      // Calls on ws
+
+      it("should call ws ws.send() and ws.terminate()", () => {
+        const harn = harness({ port: PORT });
+        harn.server.start();
+        jest.advanceTimersByTime(EPSILON);
+        harn.getWs().emit("listening");
+        const ws = harn.createMockWs();
+        let cid;
+        harn.server.once("connect", c => {
+          cid = c;
+        });
+        harn.getWs().emit("connection", ws);
+
+        ws.mockClear();
+        harn.server.send(cid, "msg");
+        const cb = ws.send.mock.calls[0][1];
+        cb(new Error("SOME_ERROR"));
+        expect(ws.ping.mock.calls.length).toBe(0);
+        expect(ws.send.mock.calls.length).toBe(1);
+        expect(ws.send.mock.calls[0].length).toBe(2);
+        expect(ws.send.mock.calls[0][0]).toBe("msg");
+        expect(check.function(ws.send.mock.calls[0][1])).toBe(true);
+        expect(ws.close.mock.calls.length).toBe(0);
+        expect(ws.terminate.mock.calls.length).toBe(1);
+        expect(ws.terminate.mock.calls[0].length).toBe(0);
+      });
+
+      // Outbound callbacks - N/A
+
+      // Inbound callbacks (events, state, ws, callbacks) - N/A
+
+      // Return value
+
+      it("should return nothing", () => {
+        const harn = harness({ port: PORT });
+        harn.server.start();
+        jest.advanceTimersByTime(EPSILON);
+        harn.getWs().emit("listening");
+        const ws = harn.createMockWs();
+        let cid;
+        harn.server.once("connect", c => {
+          cid = c;
+        });
+        harn.getWs().emit("connection", ws);
+
+        expect(harn.server.send(cid, "msg")).toBe(undefined);
+      });
     });
 
-    // Function calls - N/A
+    describe("the ws.send() callback may return failure and the client has disconnected", () => {
+      // Events
 
-    // Calls on ws
+      it("should emit nothing", () => {
+        const harn = harness({ port: PORT });
+        harn.server.start();
+        jest.advanceTimersByTime(EPSILON);
+        harn.getWs().emit("listening");
+        const ws = harn.createMockWs();
+        let cid;
+        harn.server.once("connect", c => {
+          cid = c;
+        });
+        harn.getWs().emit("connection", ws);
 
-    it("should call ws client.send()", () => {
-      const harn = harness({ port: PORT });
-      harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
-      harn.getWs().emit("listening");
-      const ws = harn.createMockWs();
-      let cid;
-      harn.server.once("connect", c => {
-        cid = c;
+        harn.server.send(cid, "msg");
+        const cb = ws.send.mock.calls[0][1];
+
+        ws.readyState = ws.CLOSING;
+        ws.emit("close");
+
+        const err = new Error("SOME_ERROR");
+        const listener = harn.createServerListener();
+        cb(err);
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
+        expect(listener.stop.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
       });
-      harn.getWs().emit("connection", ws);
 
-      ws.mockClear();
-      harn.server.send(cid, "msg");
-      expect(ws.ping.mock.calls.length).toBe(0);
-      expect(ws.send.mock.calls.length).toBe(1);
-      expect(ws.send.mock.calls[0].length).toBe(1);
-      expect(ws.send.mock.calls[0][0]).toBe("msg");
-      expect(ws.close.mock.calls.length).toBe(0);
-      expect(ws.terminate.mock.calls.length).toBe(0);
-    });
+      // State
 
-    // Outbound callbacks - N/A
+      it("should not change the state", () => {
+        const harn = harness({ port: PORT });
+        harn.server.start();
+        jest.advanceTimersByTime(EPSILON);
+        harn.getWs().emit("listening");
+        const ws = harn.createMockWs();
+        let cid;
+        harn.server.once("connect", c => {
+          cid = c;
+        });
+        harn.getWs().emit("connection", ws);
 
-    // Inbound callbacks (events, state, ws, callbacks) - N/A
+        harn.server.send(cid, "msg");
+        const cb = ws.send.mock.calls[0][1];
 
-    // Return value
+        ws.readyState = ws.CLOSING;
+        ws.emit("close");
 
-    it("should return nothing", () => {
-      const harn = harness({ port: PORT });
-      harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
-      harn.getWs().emit("listening");
-      const ws = harn.createMockWs();
-      let cid;
-      harn.server.once("connect", c => {
-        cid = c;
+        const newState = harn.getServerState();
+        cb(new Error("SOME_ERROR"));
+        expect(harn.server).toHaveState(newState);
       });
-      harn.getWs().emit("connection", ws);
 
-      expect(harn.server.send(cid, "msg")).toBe(undefined);
+      // Function calls - N/A
+
+      // Calls on ws
+
+      it("should call ws ws.send() only", () => {
+        const harn = harness({ port: PORT });
+        harn.server.start();
+        jest.advanceTimersByTime(EPSILON);
+        harn.getWs().emit("listening");
+        const ws = harn.createMockWs();
+        let cid;
+        harn.server.once("connect", c => {
+          cid = c;
+        });
+        harn.getWs().emit("connection", ws);
+
+        ws.mockClear();
+        harn.server.send(cid, "msg");
+        const cb = ws.send.mock.calls[0][1];
+
+        ws.readyState = ws.CLOSING;
+        ws.emit("close");
+
+        cb(new Error("SOME_ERROR"));
+        expect(ws.ping.mock.calls.length).toBe(0);
+        expect(ws.send.mock.calls.length).toBe(1);
+        expect(ws.send.mock.calls[0].length).toBe(2);
+        expect(ws.send.mock.calls[0][0]).toBe("msg");
+        expect(check.function(ws.send.mock.calls[0][1])).toBe(true);
+        expect(ws.close.mock.calls.length).toBe(0);
+        expect(ws.terminate.mock.calls.length).toBe(0);
+      });
+
+      // Outbound callbacks - N/A
+
+      // Inbound callbacks (events, state, ws, callbacks) - N/A
+
+      // Return value - N/A
     });
   });
 });
@@ -1447,106 +1670,211 @@ describe("The server._processWsServerConnection() function", () => {
       });
 
       describe("when the ws.ping() callback is invoked", () => {
-        it("if the ping frame could not be written and the client is still there, call ws.terminate(cid)", () => {
-          const harn = harness({ port: PORT });
-          harn.server.start();
-          jest.advanceTimersByTime(EPSILON);
-          harn.getWs().emit("listening");
-          const mockWs = harn.createMockWs();
-          harn.getWs().emit("connection", mockWs);
+        describe("if the ping frame was written successfully", () => {
+          it("should emit nothing", () => {
+            const harn = harness({ port: PORT });
+            harn.server.start();
+            jest.advanceTimersByTime(EPSILON);
+            harn.getWs().emit("listening");
+            const mockWs = harn.createMockWs();
+            harn.getWs().emit("connection", mockWs);
 
-          jest.advanceTimersByTime(
-            config.defaults.heartbeatIntervalMs + EPSILON
-          );
-          const pingCb = mockWs.ping.mock.calls[0][0];
-          mockWs.mockClear();
-          pingCb(new Error("SOMETHING"));
-          expect(mockWs.ping.mock.calls.length).toBe(0);
-          expect(mockWs.send.mock.calls.length).toBe(0);
-          expect(mockWs.close.mock.calls.length).toBe(0);
-          expect(mockWs.terminate.mock.calls.length).toBe(1);
-          expect(mockWs.terminate.mock.calls[0].length).toBe(0);
-        });
+            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
 
-        it("if the ping frame was written and the client is still there, do nothing", () => {
-          const harn = harness({ port: PORT });
-          harn.server.start();
-          jest.advanceTimersByTime(EPSILON);
-          harn.getWs().emit("listening");
-          const mockWs = harn.createMockWs();
-          harn.getWs().emit("connection", mockWs);
-
-          jest.advanceTimersByTime(
-            config.defaults.heartbeatIntervalMs +
-              config.defaults.heartbeatTimeoutMs +
-              EPSILON
-          );
-
-          const pingCb = mockWs.ping.mock.calls[0][0];
-          mockWs.mockClear();
-          pingCb();
-          expect(mockWs.ping.mock.calls.length).toBe(0);
-          expect(mockWs.send.mock.calls.length).toBe(0);
-          expect(mockWs.close.mock.calls.length).toBe(0);
-          expect(mockWs.terminate.mock.calls.length).toBe(0);
-        });
-
-        it("if the ping frame was written but the client was disconnected intentionally, do nothing", () => {
-          const harn = harness({ port: PORT });
-          harn.server.start();
-          jest.advanceTimersByTime(EPSILON);
-          harn.getWs().emit("listening");
-          const mockWs = harn.createMockWs();
-          let cid;
-          harn.server.once("connect", c => {
-            cid = c;
+            const pingCb = mockWs.ping.mock.calls[0][0];
+            const listener = harn.createServerListener();
+            pingCb();
+            expect(listener.starting.mock.calls.length).toBe(0);
+            expect(listener.start.mock.calls.length).toBe(0);
+            expect(listener.stopping.mock.calls.length).toBe(0);
+            expect(listener.stop.mock.calls.length).toBe(0);
+            expect(listener.connect.mock.calls.length).toBe(0);
+            expect(listener.message.mock.calls.length).toBe(0);
+            expect(listener.disconnect.mock.calls.length).toBe(0);
           });
-          harn.getWs().emit("connection", mockWs);
 
-          jest.advanceTimersByTime(
-            config.defaults.heartbeatIntervalMs + EPSILON
-          );
+          it("should not change the state", () => {
+            const harn = harness({ port: PORT });
+            harn.server.start();
+            jest.advanceTimersByTime(EPSILON);
+            harn.getWs().emit("listening");
+            const mockWs = harn.createMockWs();
+            harn.getWs().emit("connection", mockWs);
 
-          harn.server.disconnect(cid);
+            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
 
-          jest.advanceTimersByTime(
-            config.defaults.heartbeatTimeoutMs + EPSILON
-          );
+            const pingCb = mockWs.ping.mock.calls[0][0];
+            const newState = harn.getServerState();
+            pingCb();
+            expect(harn.server).toHaveState(newState);
+          });
 
-          const pingCb = mockWs.ping.mock.calls[0][0];
-          mockWs.mockClear();
-          pingCb();
-          expect(mockWs.ping.mock.calls.length).toBe(0);
-          expect(mockWs.send.mock.calls.length).toBe(0);
-          expect(mockWs.close.mock.calls.length).toBe(0);
-          expect(mockWs.terminate.mock.calls.length).toBe(0);
+          it("should do nothing on ws", () => {
+            const harn = harness({ port: PORT });
+            harn.server.start();
+            jest.advanceTimersByTime(EPSILON);
+            harn.getWs().emit("listening");
+            const mockWs = harn.createMockWs();
+            harn.getWs().emit("connection", mockWs);
+
+            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+
+            const pingCb = mockWs.ping.mock.calls[0][0];
+            mockWs.mockClear();
+            pingCb();
+            expect(mockWs.ping.mock.calls.length).toBe(0);
+            expect(mockWs.send.mock.calls.length).toBe(0);
+            expect(mockWs.close.mock.calls.length).toBe(0);
+            expect(mockWs.terminate.mock.calls.length).toBe(0);
+          });
         });
 
-        it("if the ping frame was written but the client disconnected unexpectedly, do nothing", () => {
-          const harn = harness({ port: PORT });
-          harn.server.start();
-          jest.advanceTimersByTime(EPSILON);
-          harn.getWs().emit("listening");
-          const mockWs = harn.createMockWs();
-          harn.getWs().emit("connection", mockWs);
+        describe("if there was an error writing the ping frame and the client is still there", () => {
+          it("should emit disconnect", () => {
+            const harn = harness({ port: PORT });
+            harn.server.start();
+            jest.advanceTimersByTime(EPSILON);
+            harn.getWs().emit("listening");
+            let clientId;
+            harn.server.once("connect", cid => {
+              clientId = cid;
+            });
+            const mockWs = harn.createMockWs();
+            harn.getWs().emit("connection", mockWs);
 
-          jest.advanceTimersByTime(
-            config.defaults.heartbeatIntervalMs + EPSILON
-          );
+            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
 
-          mockWs.emit("close");
+            const pingCb = mockWs.ping.mock.calls[0][0];
+            const listener = harn.createServerListener();
+            const err = new Error("SOME_ERROR");
+            pingCb(err);
+            expect(listener.starting.mock.calls.length).toBe(0);
+            expect(listener.start.mock.calls.length).toBe(0);
+            expect(listener.stopping.mock.calls.length).toBe(0);
+            expect(listener.stop.mock.calls.length).toBe(0);
+            expect(listener.connect.mock.calls.length).toBe(0);
+            expect(listener.message.mock.calls.length).toBe(0);
+            expect(listener.disconnect.mock.calls.length).toBe(1);
+            expect(listener.disconnect.mock.calls[0].length).toBe(2);
+            expect(listener.disconnect.mock.calls[0][0]).toBe(clientId);
+            expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
+            expect(listener.disconnect.mock.calls[0][1].message).toBe(
+              "FAILURE: The WebSocket heartbeat failed."
+            );
+            expect(listener.disconnect.mock.calls[0][1].wsError).toBe(err);
+          });
 
-          jest.advanceTimersByTime(
-            config.defaults.heartbeatTimeoutMs + EPSILON
-          );
+          it("should update the state appropriately", () => {
+            const harn = harness({ port: PORT });
+            harn.server.start();
+            jest.advanceTimersByTime(EPSILON);
+            harn.getWs().emit("listening");
+            let clientId;
+            harn.server.once("connect", cid => {
+              clientId = cid;
+            });
+            const mockWs = harn.createMockWs();
+            harn.getWs().emit("connection", mockWs);
 
-          const pingCb = mockWs.ping.mock.calls[0][0];
-          mockWs.mockClear();
-          pingCb();
-          expect(mockWs.ping.mock.calls.length).toBe(0);
-          expect(mockWs.send.mock.calls.length).toBe(0);
-          expect(mockWs.close.mock.calls.length).toBe(0);
-          expect(mockWs.terminate.mock.calls.length).toBe(0);
+            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+
+            const pingCb = mockWs.ping.mock.calls[0][0];
+            const newState = harn.getServerState();
+            delete newState._wsClients[clientId];
+            delete newState._heartbeatIntervals[clientId];
+            delete newState._heartbeatTimeouts[clientId];
+            pingCb(new Error("SOME_ERROR"));
+            expect(harn.server).toHaveState(newState);
+          });
+
+          it("should call ws.terminate()", () => {
+            const harn = harness({ port: PORT });
+            harn.server.start();
+            jest.advanceTimersByTime(EPSILON);
+            harn.getWs().emit("listening");
+            const mockWs = harn.createMockWs();
+            harn.getWs().emit("connection", mockWs);
+
+            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+
+            const pingCb = mockWs.ping.mock.calls[0][0];
+            mockWs.mockClear();
+            pingCb(new Error("SOME_ERROR"));
+            expect(mockWs.ping.mock.calls.length).toBe(0);
+            expect(mockWs.send.mock.calls.length).toBe(0);
+            expect(mockWs.close.mock.calls.length).toBe(0);
+            expect(mockWs.terminate.mock.calls.length).toBe(1);
+            expect(mockWs.terminate.mock.calls[0].length).toBe(0);
+          });
+        });
+
+        describe("if there was an error writing the ping frame and the client was already disconnected", () => {
+          it("should emit disconnect", () => {
+            const harn = harness({ port: PORT });
+            harn.server.start();
+            jest.advanceTimersByTime(EPSILON);
+            harn.getWs().emit("listening");
+            const mockWs = harn.createMockWs();
+            harn.getWs().emit("connection", mockWs);
+
+            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+
+            mockWs.readyState = mockWs.CLOSING;
+            mockWs.emit("close");
+
+            const pingCb = mockWs.ping.mock.calls[0][0];
+            const listener = harn.createServerListener();
+            const err = new Error("SOME_ERROR");
+            pingCb(err);
+            expect(listener.starting.mock.calls.length).toBe(0);
+            expect(listener.start.mock.calls.length).toBe(0);
+            expect(listener.stopping.mock.calls.length).toBe(0);
+            expect(listener.stop.mock.calls.length).toBe(0);
+            expect(listener.connect.mock.calls.length).toBe(0);
+            expect(listener.message.mock.calls.length).toBe(0);
+            expect(listener.disconnect.mock.calls.length).toBe(0);
+          });
+
+          it("should not change the state", () => {
+            const harn = harness({ port: PORT });
+            harn.server.start();
+            jest.advanceTimersByTime(EPSILON);
+            harn.getWs().emit("listening");
+            const mockWs = harn.createMockWs();
+            harn.getWs().emit("connection", mockWs);
+
+            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+
+            mockWs.readyState = mockWs.CLOSING;
+            mockWs.emit("close");
+
+            const pingCb = mockWs.ping.mock.calls[0][0];
+            const newState = harn.getServerState();
+            pingCb(new Error("SOME_ERROR"));
+            expect(harn.server).toHaveState(newState);
+          });
+
+          it("should do nothing on ws", () => {
+            const harn = harness({ port: PORT });
+            harn.server.start();
+            jest.advanceTimersByTime(EPSILON);
+            harn.getWs().emit("listening");
+            const mockWs = harn.createMockWs();
+            harn.getWs().emit("connection", mockWs);
+
+            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+
+            mockWs.readyState = mockWs.CLOSING;
+            mockWs.emit("close");
+
+            const pingCb = mockWs.ping.mock.calls[0][0];
+            mockWs.mockClear();
+            pingCb(new Error("SOME_ERROR"));
+            expect(mockWs.ping.mock.calls.length).toBe(0);
+            expect(mockWs.send.mock.calls.length).toBe(0);
+            expect(mockWs.close.mock.calls.length).toBe(0);
+            expect(mockWs.terminate.mock.calls.length).toBe(0);
+          });
         });
       });
     });
@@ -1852,7 +2180,10 @@ describe("The server._processWsClientClose() function", () => {
     harn.getWs().emit("connection", mockWs);
 
     const listener = harn.createServerListener();
+
+    mockWs.readyState = mockWs.CLOSING;
     mockWs.emit("close");
+
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(0);
     expect(listener.stopping.mock.calls.length).toBe(0);
@@ -1884,7 +2215,10 @@ describe("The server._processWsClientClose() function", () => {
     jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
 
     const newState = harn.getServerState();
+
+    mockWs.readyState = mockWs.CLOSING;
     mockWs.emit("close");
+
     delete newState._wsClients[cid];
     delete newState._heartbeatIntervals[cid];
     delete newState._heartbeatTimeouts[cid];
@@ -1904,7 +2238,10 @@ describe("The server._processWsClientClose() function", () => {
 
     clearInterval.mockClear();
     clearTimeout.mockClear();
+
+    mockWs.readyState = mockWs.CLOSING;
     mockWs.emit("close");
+
     expect(clearInterval.mock.calls.length).toBe(1);
     expect(clearInterval.mock.calls[0].length).toBe(1);
     expect(check.integer(clearInterval.mock.calls[0][0])).toBe(true);
@@ -1923,7 +2260,10 @@ describe("The server._processWsClientClose() function", () => {
 
     clearInterval.mockClear();
     clearTimeout.mockClear();
+
+    mockWs.readyState = mockWs.CLOSING;
     mockWs.emit("close");
+
     expect(clearInterval.mock.calls.length).toBe(1);
     expect(clearInterval.mock.calls[0].length).toBe(1);
     expect(check.integer(clearInterval.mock.calls[0][0])).toBe(true);
@@ -1941,7 +2281,10 @@ describe("The server._processWsClientClose() function", () => {
     harn.getWs().emit("connection", mockWs);
 
     harn.getWs().mockClear();
+
+    mockWs.readyState = mockWs.CLOSING;
     mockWs.emit("close");
+
     expect(harn.getWs().close.mock.calls.length).toBe(0);
   });
 
@@ -2005,3 +2348,5 @@ describe("The server.state() function", () => {
     expect(harn.server.state()).toBe("stopped");
   });
 });
+
+// Internal functions - tested as part of outward-facing functions (just one)

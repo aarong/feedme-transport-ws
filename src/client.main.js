@@ -615,13 +615,13 @@ proto._processWsError = function _processWsError(err) {
 // Internal Functions
 
 /**
- * Handles an unexpected connection failure by resetting state, emitting, and
- * closing the ws connection as appropriate.
+ * Handles an abnormal connection failure:
  *
- * Run on:
  *  - Heartbeat timeout
  *  - Ws calls back error to ws.ping()
  *  - Ws calls back error to ws.send()
+ *
+ * Resets the state, emits, and terminates the ws connection as appropriate.
  *
  * Unsure whether ws.ping() and ws.send() trigger close events when calling back
  * error, but it doesn't matter.
