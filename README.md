@@ -102,15 +102,135 @@ const httpServer = http.createServer(function (req, res) => {
   res.writeHead(200);
   res.end("Welcome");
 });
+httpServer.listen(8080);
 
 const feedmeServer = feedmeServerCore({
   transport: feedmeTransportWs({
-    port: 8080, //////////// Server: httpServer???
+    server: httpServer,
     path: "/feedme"
   })
 });
+feedmeServer.start();
+```
 
-httpServer.listen(8080);
+A few considerations when serving an API on an existing HTTP server:
+
+- The HTTP server need not be listening in order to construct the Feedme
+  transport and server. If there is a call to `feedmeServer.start()` and the
+  external HTTP server is not listening, then the Feedme transport/server will
+  emit `starting` and will then wait for the HTTP server to be started by the
+  application (the library/transport will not attempt to start it), at which
+  point the Feedme transport/server will emit `start`. If the HTTP server is
+  already listening when the application calls `feedmeServer.start()`, then the
+  Feedme transport/server emit `starting` and `start` immediately.
+
+- Once the server has started, calling `feedmeServer.stop()` will not close the
+  external HTTP server, but will close the WebSocket layer on top of it. If the
+  external HTTP server is closed by the application then the Feedme
+  transport/server will become `stopped` and will emit `stopping` and `stop`, so
+  the application should not also call `feedmeServer.stop()`.
+
+Example: To serve multiple Feedme APIs on a single HTTP server:
+
+```javascript
+// Create the basic HTTP server
+const httpServer = http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end("Welcome");
+});
+httpServer.listen(port);
+
+// Create the first Feedme server
+const feedmeTransport1 = feedmeTransportWs({
+  noServer: true
+});
+const feedmeServer1 = feedmeServerCore({
+  transport: feedmeTransport1
+});
+feedmeServer1.on("connect", clientId => {
+  // Got a Feedme API client on /feedme1
+});
+feedmeServer1.start();
+
+// Create the second Feedme server
+const feedmeTransport2 = feedmeTransportWs({
+  noServer: true
+});
+const feedmeServer2 = feedmeServerCore({
+  transport: feedmeTransport2
+});
+feedmeServer2.on("connect", clientId => {
+  // Got a Feedme API client on /feedme2
+});
+feedmeServer2.start();
+
+// Route WebSocket upgrade requests to the appropriate Feedme server
+httpServer.on("upgrade", (request, socket, head) => {
+  const { pathname } = url.parse(request.url);
+
+  if (pathname === "/feedme1") {
+    feedmeTransport1.handleUpgrade(request, socket, head);
+  } else if (pathname === "/feedme2") {
+    feedmeTransport2.handleUpgrade(request, socket, head);
+  } else {
+    socket.destroy();
+  }
+});
+```
+
+A few considerations when serving a Feedme API in `noServer` mode:
+
+- The application still needs to call `feedmeServer.start()` and the transport
+  will throw an error if the application calls `feedmeTransport.handleUpgrade()`
+  when the server is not started.
+
+- The transport will not automatically know if the HTTP server stops, though it
+  will observe that existing clients disconnect. If the HTTP server stops, the
+  application should call `feedmeServer.stop()`.
+
+Example: To run a Feedme API alongside an existing WebSocket service on the same
+HTTP server:
+
+```javascript
+// Create the basic HTTP server
+const httpServer = http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end("Welcome");
+});
+httpServer.listen(port);
+
+// Create a raw WebSocket server
+const wsServer = new WebSocket.Server({ noServer: true });
+wsServer.on("connection", ws => {
+  // Got a raw WebSocket connection on /ws
+});
+
+// Create a Feedme server
+const feedmeTransport = feedmeTransportWs({
+  noServer: true
+});
+const feedmeServer = feedmeServerCore({
+  transport: feedmeTransport
+});
+feedmeServer.on("connect", clientId => {
+  // Got a Feedme API client on /feedme
+});
+feedmeServer.start();
+
+// Route upgrade requests to WebSocket or Feedme server as appropriate
+httpServer.on("upgrade", (request, socket, head) => {
+  const { pathname } = url.parse(request.url);
+
+  if (pathname === "/ws") {
+    wsServer.handleUpgrade(request, socket, head, ws => {
+      wsServer.emit("connection", ws, request);
+    });
+  } else if (pathname === "/feedme") {
+    feedmeTransport.handleUpgrade(request, socket, head);
+  } else {
+    socket.destroy();
+  }
+});
 ```
 
 ### Transport-Specific Information

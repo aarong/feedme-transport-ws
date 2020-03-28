@@ -17,17 +17,26 @@ Browserify was not applying the Babelify plugin to external dependencies, but
 it was rolling up the code. As a result, I use Gulp to pipe the output through
 Babel again and then Uglify it (the latter does not support ES6).
 Works in any path. Gulp.src/dest are always relative to package root (Gulpfile).
+
+Do not have Browserify do the polyfills (its url implementation does not support
+new URL()). Have Babel do it, which requires core-js.
 */
 const browserBundleWithmaps = () => {
   const b = browserify({
     entries: path.join(__dirname, "src/browser.js"),
     debug: true,
-    standalone: "feedmeTransportWsClient"
+    standalone: "feedmeTransportWsClient",
+    bare: true // No polyfills here
   });
 
   return b
     .transform("babelify", {
-      presets: [["@babel/preset-env"]] // Uses browserslist config in package.json
+      presets: [
+        [
+          "@babel/preset-env",
+          { useBuiltIns: "usage", corejs: { version: 3, proposals: true } } // Polyfills
+        ]
+      ] // Uses browserslist config in package.json
     })
     .bundle()
     .pipe(source("browser.bundle.withmaps.js"))

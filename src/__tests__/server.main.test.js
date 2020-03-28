@@ -1,6 +1,8 @@
 import _ from "lodash";
 import check from "check-types";
 import emitter from "component-emitter";
+import http from "http";
+import stream from "stream";
 import server from "../server.main";
 import config from "../server.config";
 
@@ -80,8 +82,10 @@ const harness = function harness(options, wsConstructor) {
     constructor = function c() {
       emitter(this);
       this.close = jest.fn();
+      this.handleUpgrade = jest.fn();
       this.mockClear = () => {
         this.close.mockClear();
+        this.handleUpgrade.mockClear();
       };
     };
   }
@@ -164,6 +168,7 @@ harnessProto.getServerState = function getServerState() {
     state._heartbeatTimeouts[cid] = true; // Boolean - checking keys only
   });
   state._options = _.clone(this.server._options); // Object copy
+  state._httpCloseHandler = this.server._httpCloseHandler; // Function reference
   return state;
 };
 
@@ -260,6 +265,25 @@ const toHaveState = function toHaveState(receivedServer, expectedState) {
     };
   }
 
+  // Check ._httpCloseHandler (both functions or both null)
+  if (
+    (check.function(receivedServer._httpCloseHandler) &&
+      !check.function(expectedState._httpCloseHandler)) ||
+    (!check.function(receivedServer._httpCloseHandler) &&
+      check.function(expectedState._httpCloseHandler)) ||
+    (receivedServer._httpCloseHandler === null &&
+      expectedState._httpCloseHandler !== null) ||
+    (receivedServer._httpCloseHandler !== null &&
+      expectedState._httpCloseHandler === null)
+  ) {
+    return {
+      pass: false,
+      message() {
+        return "expected ._httpCloseHandler to match, but they didn't";
+      }
+    };
+  }
+
   // Match
   return { pass: true };
 };
@@ -283,14 +307,6 @@ describe("The toHaveState() function", () => {
 
     it("should fail if _wsServer values don't match - case 1", () => {
       const result = toHaveState({ _wsServer: null }, { _wsServer: {} });
-      expect(result.pass).toBe(false);
-      expect(result.message()).toBe(
-        "expected ._wsServer to match, but they didn't"
-      );
-    });
-
-    it("should fail if _wsServer values don't match - case 2", () => {
-      const result = toHaveState({ _wsServer: {} }, { _wsServer: null });
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
         "expected ._wsServer to match, but they didn't"
@@ -356,6 +372,28 @@ describe("The toHaveState() function", () => {
         "expected ._options to match, but they didn't"
       );
     });
+
+    it("should fail if _httpCloseHandler values don't match - case 1", () => {
+      const result = toHaveState(
+        { _httpCloseHandler: null },
+        { _httpCloseHandler: () => {} }
+      );
+      expect(result.pass).toBe(false);
+      expect(result.message()).toBe(
+        "expected ._httpCloseHandler to match, but they didn't"
+      );
+    });
+
+    it("should fail if _httpCloseHandler values don't match - case 2", () => {
+      const result = toHaveState(
+        { _httpCloseHandler: () => {} },
+        { _httpCloseHandler: null }
+      );
+      expect(result.pass).toBe(false);
+      expect(result.message()).toBe(
+        "expected ._httpCloseHandler to match, but they didn't"
+      );
+    });
   });
 
   describe("can pass", () => {
@@ -408,6 +446,22 @@ describe("The toHaveState() function", () => {
       const result = toHaveState(
         { _options: { someOption: "val" } },
         { _options: { someOption: "val" } }
+      );
+      expect(result.pass).toBe(true);
+    });
+
+    it("should pass if _httpCloseHandler matches - case 1", () => {
+      const result = toHaveState(
+        { _httpCloseHandler: () => {} },
+        { _httpCloseHandler: () => {} }
+      );
+      expect(result.pass).toBe(true);
+    });
+
+    it("should pass if _httpCloseHandler matches - case 2", () => {
+      const result = toHaveState(
+        { _httpCloseHandler: null },
+        { _httpCloseHandler: null }
       );
       expect(result.pass).toBe(true);
     });
@@ -471,6 +525,22 @@ describe("The server() function", () => {
         new Error(
           "INVALID_ARGUMENT: Must specify a valid port, server, or noServer option."
         )
+      );
+    });
+
+    it("should throw if invalid server setting", () => {
+      expect(() => {
+        harness({ server: 123 });
+      }).toThrow(
+        new Error("INVALID_ARGUMENT: Invalid options.server argument.")
+      );
+    });
+
+    it("should throw if invalid noServer setting", () => {
+      expect(() => {
+        harness({ noServer: 123 });
+      }).toThrow(
+        new Error("INVALID_ARGUMENT: Invalid options.noServer argument.")
       );
     });
 
@@ -545,11 +615,12 @@ describe("The server() function", () => {
           port: PORT,
           heartbeatIntervalMs: config.defaults.heartbeatIntervalMs,
           heartbeatTimeoutMs: config.defaults.heartbeatTimeoutMs
-        }
+        },
+        _httpCloseHandler: null
       });
     });
 
-    it("should have the correct state - custom options", () => {
+    it("should have the correct state - custom options with stand-alone server", () => {
       const harn = harness({
         port: PORT,
         heartbeatIntervalMs: 456,
@@ -566,7 +637,8 @@ describe("The server() function", () => {
           port: PORT,
           heartbeatIntervalMs: 456,
           heartbeatTimeoutMs: 123
-        }
+        },
+        _httpCloseHandler: null
       });
     });
 
@@ -602,7 +674,7 @@ describe("The server.start() function", () => {
   describe("can succeed", () => {
     // Events
 
-    it("should emit starting if the ws constructor succeeds", () => {
+    it("should emit starting if the ws constructor succeeds - standalone server", () => {
       const harn = harness({ port: PORT });
       const listener = harn.createServerListener();
       harn.server.start();
@@ -616,7 +688,7 @@ describe("The server.start() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
     });
 
-    it("should emit starting, stopping, stopped if the ws constructor throws", () => {
+    it("should emit starting, stopping, stopped if the ws constructor throws - standalone server", () => {
       const harn = harness({ port: PORT }, () => {
         throw new Error("SOME_ERROR");
       });
@@ -648,6 +720,50 @@ describe("The server.start() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
     });
 
+    it("should emit starting if the ws constructor succeeds - standalone server not listening", () => {
+      const harn = harness({ server: emitter({}) });
+      const listener = harn.createServerListener();
+      harn.server.start();
+      expect(listener.starting.mock.calls.length).toBe(1);
+      expect(listener.starting.mock.calls[0].length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+    });
+
+    it("should emit starting and start if the ws constructor succeeds - standalone server already listening", () => {
+      const harn = harness({ server: emitter({ listening: true }) });
+      const listener = harn.createServerListener();
+      harn.server.start();
+      expect(listener.starting.mock.calls.length).toBe(1);
+      expect(listener.starting.mock.calls[0].length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(1);
+      expect(listener.start.mock.calls[0].length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+    });
+
+    it("should emit starting and start if the ws constructor succeeds - noServer mode", () => {
+      const harn = harness({ noServer: true });
+      const listener = harn.createServerListener();
+      harn.server.start();
+      expect(listener.starting.mock.calls.length).toBe(1);
+      expect(listener.starting.mock.calls[0].length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(1);
+      expect(listener.start.mock.calls[0].length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+    });
+
     // State
 
     it("should update the state correctly if the transport constructor succeeds", () => {
@@ -664,6 +780,35 @@ describe("The server.start() function", () => {
         throw new Error("SOME_ERROR");
       });
       const newState = harn.getServerState();
+      harn.server.start();
+      expect(harn.server).toHaveState(newState);
+    });
+
+    it("should update the state correctly if the transport constructor succeeds in external server mode - server not listening", () => {
+      const harn = harness({ server: emitter({}) });
+      const newState = harn.getServerState();
+      newState._wsServer = {};
+      newState._state = "starting";
+      newState._httpCloseHandler = () => {};
+      harn.server.start();
+      expect(harn.server).toHaveState(newState);
+    });
+
+    it("should update the state correctly if the transport constructor succeeds in external server mode - server listening", () => {
+      const harn = harness({ server: emitter({ listening: true }) });
+      const newState = harn.getServerState();
+      newState._wsServer = {};
+      newState._state = "started";
+      newState._httpCloseHandler = () => {};
+      harn.server.start();
+      expect(harn.server).toHaveState(newState);
+    });
+
+    it("should update the state correctly if the transport constructor succeeds in noServer mode", () => {
+      const harn = harness({ noServer: true });
+      const newState = harn.getServerState();
+      newState._wsServer = {};
+      newState._state = "started";
       harn.server.start();
       expect(harn.server).toHaveState(newState);
     });
@@ -751,7 +896,7 @@ describe("The server.stop() function", () => {
 
     // State
 
-    it("should update the state appropriately", () => {
+    it("should update the state appropriately - standalone http server", () => {
       const newState = harn.getServerState();
       newState._wsServer = null;
       newState._state = "stopping";
@@ -760,6 +905,18 @@ describe("The server.stop() function", () => {
       newState._heartbeatTimeouts = {};
       harn.server.stop();
       expect(harn.server).toHaveState(newState);
+    });
+
+    it("should update the state appropriately - external http server", () => {
+      const harnInner = harness({ server: emitter({ listening: true }) });
+      harnInner.server.start();
+      harnInner.getWs().emit("listening");
+      const newState = harnInner.getServerState();
+      newState._wsServer = null;
+      newState._state = "stopping";
+      newState._httpCloseHandler = null;
+      harnInner.server.stop();
+      expect(harnInner.server).toHaveState(newState);
     });
 
     // Function calls
@@ -791,6 +948,7 @@ describe("The server.stop() function", () => {
       expect(prevWs.close.mock.calls.length).toBe(1);
       expect(prevWs.close.mock.calls[0].length).toBe(1);
       expect(prevWs.close.mock.calls[0][0]).toBeInstanceOf(Function);
+      expect(prevWs.handleUpgrade.mock.calls.length).toBe(0);
     });
 
     // Outbound callbacks - N/A
@@ -1372,6 +1530,224 @@ describe("The server.disconnect() function", () => {
   });
 });
 
+describe("The server.handleUpgrade() function", () => {
+  describe("can fail", () => {
+    it("should throw on invalid request argument", () => {
+      const harn = harness({ noServer: true });
+      expect(() => {
+        harn.server.handleUpgrade(123, new stream.Duplex(), Buffer.from("abc"));
+      }).toThrow(
+        new Error("INVALID_ARGUMENT: Invalid request, socket, or head.")
+      );
+    });
+
+    it("should throw on invalid socket argument", () => {
+      const harn = harness({ noServer: true });
+      expect(() => {
+        harn.server.handleUpgrade(
+          new http.IncomingMessage(),
+          123,
+          Buffer.from("abc")
+        );
+      }).toThrow(
+        new Error("INVALID_ARGUMENT: Invalid request, socket, or head.")
+      );
+    });
+
+    it("should throw on invalid head argument", () => {
+      const harn = harness({ noServer: true });
+      expect(() => {
+        harn.server.handleUpgrade(
+          new http.IncomingMessage(),
+          new stream.Duplex(),
+          123
+        );
+      }).toThrow(
+        new Error("INVALID_ARGUMENT: Invalid request, socket, or head.")
+      );
+    });
+
+    it("should throw if transport is not started", () => {
+      const harn = harness({ noServer: true });
+      expect(() => {
+        harn.server.handleUpgrade(
+          new http.IncomingMessage(),
+          new stream.Duplex(),
+          Buffer.from("abc")
+        );
+      }).toThrow(
+        new Error("INVALID_STATE: The transport server is not started.")
+      );
+    });
+
+    it("should throw if ws is not in noServer mode", () => {
+      const harn = harness({ port: 8080 });
+      harn.server.start();
+      harn.getWs().emit("listening");
+      expect(() => {
+        harn.server.handleUpgrade(
+          new http.IncomingMessage(),
+          new stream.Duplex(),
+          Buffer.from("abc")
+        );
+      }).toThrow(
+        new Error("INVALID_STATE: The transport is not in noServer mode.")
+      );
+    });
+  });
+
+  describe("can succeed", () => {
+    // Events
+
+    it("should emit nothing", () => {
+      const harn = harness({ noServer: true });
+      harn.server.start();
+
+      const listener = harn.createServerListener();
+      harn.server.handleUpgrade(
+        new http.IncomingMessage(),
+        new stream.Duplex(),
+        Buffer.from("abc")
+      );
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+    });
+
+    // State
+
+    it("should not change the state", () => {
+      const harn = harness({ noServer: true });
+      harn.server.start();
+
+      const newState = harn.getServerState();
+      harn.server.handleUpgrade(
+        new http.IncomingMessage(),
+        new stream.Duplex(),
+        Buffer.from("abc")
+      );
+      expect(harn.server).toHaveState(newState);
+    });
+
+    // Function calls - N/A
+
+    // Calls on ws
+
+    it("should call ws.handleUpgrade()", () => {
+      const harn = harness({ noServer: true });
+      harn.server.start();
+
+      harn.getWs().mockClear();
+      const req = new http.IncomingMessage();
+      const socket = new stream.Duplex();
+      const head = Buffer.from("abc");
+      harn.server.handleUpgrade(req, socket, head);
+      expect(harn.getWs().close.mock.calls.length).toBe(0);
+      expect(harn.getWs().handleUpgrade.mock.calls.length).toBe(1);
+      expect(harn.getWs().handleUpgrade.mock.calls[0].length).toBe(4);
+      expect(harn.getWs().handleUpgrade.mock.calls[0][0]).toBe(req);
+      expect(harn.getWs().handleUpgrade.mock.calls[0][1]).toBe(socket);
+      expect(harn.getWs().handleUpgrade.mock.calls[0][2]).toBe(head);
+      expect(check.function(harn.getWs().handleUpgrade.mock.calls[0][3])).toBe(
+        true
+      );
+    });
+
+    // Outbound callbacks - N/A
+
+    // Inbound callbacks (events, state, ws, callbacks)
+
+    describe("The ws.handleUpgrade() callback", () => {
+      it("should emit connect", () => {
+        const harn = harness({ noServer: true });
+        harn.server.start();
+        harn.getWs().mockClear();
+        harn.server.handleUpgrade(
+          new http.IncomingMessage(),
+          new stream.Duplex(),
+          Buffer.from("abc")
+        );
+        const cb = harn.getWs().handleUpgrade.mock.calls[0][3];
+
+        const listener = harn.createServerListener();
+        cb(harn.createMockWs());
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
+        expect(listener.stop.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(1);
+        expect(listener.connect.mock.calls[0].length).toBe(1);
+        expect(check.string(listener.connect.mock.calls[0][0])).toBe(true);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+      });
+
+      it("should update the state appropriately", () => {
+        const harn = harness({ noServer: true });
+        let cid;
+        harn.server.once("connect", c => {
+          cid = c;
+        });
+        harn.server.start();
+        harn.getWs().mockClear();
+        harn.server.handleUpgrade(
+          new http.IncomingMessage(),
+          new stream.Duplex(),
+          Buffer.from("abc")
+        );
+        const cb = harn.getWs().handleUpgrade.mock.calls[0][3];
+
+        const newState = harn.getServerState();
+        cb(harn.createMockWs()); // Do this first to get clientId
+        newState._wsClients[cid] = {};
+        newState._heartbeatIntervals[cid] = 123;
+        expect(harn.server).toHaveState(newState);
+      });
+
+      it("should do nothing on ws", () => {
+        const harn = harness({ noServer: true });
+        harn.server.start();
+        harn.getWs().mockClear();
+        harn.server.handleUpgrade(
+          new http.IncomingMessage(),
+          new stream.Duplex(),
+          Buffer.from("abc")
+        );
+        const cb = harn.getWs().handleUpgrade.mock.calls[0][3];
+
+        harn.getWs().mockClear();
+        const mockWs = harn.createMockWs();
+        cb(mockWs);
+        expect(harn.getWs().close.mock.calls.length).toBe(0);
+        expect(harn.getWs().handleUpgrade.mock.calls.length).toBe(0);
+
+        expect(mockWs.ping.mock.calls.length).toBe(0);
+        expect(mockWs.send.mock.calls.length).toBe(0);
+        expect(mockWs.close.mock.calls.length).toBe(0);
+        expect(mockWs.terminate.mock.calls.length).toBe(0);
+      });
+    });
+
+    // Return value
+
+    it("should return nothing", () => {
+      const harn = harness({ noServer: true });
+      harn.server.start();
+
+      harn.getWs().mockClear();
+      const req = new http.IncomingMessage();
+      const socket = new stream.Duplex();
+      const head = Buffer.from("abc");
+      expect(harn.server.handleUpgrade(req, socket, head)).toBe(undefined);
+    });
+  });
+});
+
 // State-modifying functions -- triggered by ws
 
 describe("The server._processWsServerListening() function", () => {
@@ -1481,7 +1857,7 @@ describe("The server._processWsServerClose() function", () => {
 
   // State
 
-  it("should update the state appropriately", () => {
+  it("should update the state appropriately - standalone server", () => {
     // Set up two connected clients
     // One with no heartbeat timeout and one with
     const harn = harness({ port: PORT });
@@ -1500,6 +1876,19 @@ describe("The server._processWsServerClose() function", () => {
     newState._wsClients = {};
     newState._heartbeatIntervals = {};
     newState._heartbeatTimeouts = {};
+    harn.getWs().emit("close");
+    expect(harn.server).toHaveState(newState);
+  });
+
+  it("should update the state appropriately - external server", () => {
+    const harn = harness({ server: emitter({ listening: true }) });
+    harn.server.start();
+    harn.getWs().emit("listening");
+
+    const newState = harn.getServerState();
+    newState._wsServer = null;
+    newState._state = "stopped";
+    newState._httpCloseHandler = null;
     harn.getWs().emit("close");
     expect(harn.server).toHaveState(newState);
   });
@@ -2157,6 +2546,7 @@ describe("The server._processWsClientPong() function", () => {
     harn.getWs().mockClear();
     mockWs.emit("pong");
     expect(harn.getWs().close.mock.calls.length).toBe(0);
+    expect(harn.getWs().handleUpgrade.mock.calls.length).toBe(0);
   });
 
   // Outbound callbacks - N/A
@@ -2286,6 +2676,7 @@ describe("The server._processWsClientClose() function", () => {
     mockWs.emit("close");
 
     expect(harn.getWs().close.mock.calls.length).toBe(0);
+    expect(harn.getWs().handleUpgrade.mock.calls.length).toBe(0);
   });
 
   // Outbound callbacks - N/A
@@ -2335,6 +2726,7 @@ describe("The server.state() function", () => {
     harn.getWs().mockClear();
     harn.server.state();
     expect(harn.getWs().close.mock.calls.length).toBe(0);
+    expect(harn.getWs().handleUpgrade.mock.calls.length).toBe(0);
   });
 
   // Outbound callbacks - N/A

@@ -55,7 +55,8 @@ saucePlatforms = [
 
   // Was 54, latest (73) looked successful but didn't return
   // 55 works, 65 works but hangs, 60 hangs, 57 hangs, 56 hangs
-  ["Windows 10", "Firefox", "55"],
+  // And not 55 times out for some reason
+  // ["Windows 10", "Firefox", "55"],
 
   ////// ["Windows 10", "Chrome", "26"],
   ["Windows 10", "Chrome", "latest"],

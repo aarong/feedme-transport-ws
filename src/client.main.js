@@ -1,7 +1,6 @@
 import emitter from "component-emitter";
 import check from "check-types";
 import debug from "debug";
-import url from "url";
 import config from "./client.config";
 
 const dbg = debug("feedme-transport-ws:client");
@@ -48,7 +47,7 @@ export default function clientFactory(...args) {
 
   // Check address format (don't wait until ws initialization to fail)
   try {
-    new url.URL(address); // eslint-disable-line no-new
+    new URL(address); // eslint-disable-line no-new
   } catch (e) {
     throw new Error("INVALID_ARGUMENT: Invalid address argument.");
   }

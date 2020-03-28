@@ -3,6 +3,8 @@ import uuid from "uuid";
 import debug from "debug";
 import check from "check-types";
 import _ from "lodash";
+import http from "http";
+import stream from "stream";
 import config from "./server.config";
 
 const dbg = debug("feedme-transport-ws:server");
@@ -13,6 +15,31 @@ const dbg = debug("feedme-transport-ws:server");
  * The ws module does not provide a way to reuse a server object once closed,
  * so a new one is initialized for each start/stop cycle. The WebSocket.server
  * constructor is injected to facilitate testing.
+ *
+ * There are some complexities involved in getting the transport to play nicely
+ * with the various ws server modes (stand-alone server, existing HTTP server,
+ * and noServer).
+ *
+ * With an existing http server...
+ *
+ * 1. If the http server is already started when passed to ws, then ws will
+ * not emit a listening event. In this case, the transport start event is
+ * emitted synchronously from the transport.start() method.
+ *
+ * 2. If the http server is closed by the application, then ws does not emit
+ * a close event. So the transport server listens directly for close events
+ * on the http server.
+ *
+ * With no-server mode...
+ *
+ * 1. There is no server to be start, so emit start synchronously when there
+ * is a call to transport.start().
+ *
+ * 2. You can still call wsServer.close(cb) and receive a callback, so there
+ * are no changes to transport.stop().
+ *
+ * 2. WebSocket upgrades need to be piped in by the application, so a
+ * transport.handleUpgrade() function is exposed.
  * @typedef {Object} Server
  * @extends emitter
  */
@@ -171,6 +198,16 @@ export default function serverFactory(wsConstructor, options) {
    */
   server._options = options;
 
+  /**
+   * The close event handler attached to the external HTTP server, if ws is
+   * operating in that mode. Null otherwise.
+   * @memberof Server
+   * @instance
+   * @private
+   * @type {?Function}
+   */
+  server._httpCloseHandler = null;
+
   return server;
 }
 
@@ -277,13 +314,32 @@ proto.start = function start() {
   this._wsServer.on("close", this._processWsServerClose.bind(this));
   this._wsServer.on("connection", this._processWsServerConnection.bind(this));
 
-  // If using ws in server-mode and the server is already listening, then ws
-  // will not emit a listening event. In that case, do it here. But you can
-  // get server.listening === true before the listening event has fired, so
-  // in the listening handler check that you haven't already emitted here
-  if (this._options.server && this._options.server.listening) {
+  // If using ws in with an external http server and the server is already
+  // listening, then ws will not emit a listening event. In that case, do it
+  // here. But you can sometimes observe server.listening === true before the listening
+  // event has fired, so in the listening handler check that you haven't already
+  // emitted here.
+  // You also emit start synchronously in noServer mode.
+  if (
+    (this._options.server && this._options.server.listening) ||
+    this._options.noServer
+  ) {
+    dbg(
+      "External http server is already started or in noServer mode - emitting start now"
+    );
     this._state = "started";
     this.emit("start");
+  }
+
+  // If using ws with an external http server then attach a close listener to
+  // the server, as ws will not emit a close event when the server closes and
+  // you need to stop the transport. Keep a reference to the handler so that
+  // you can remove it (and not others) if the server closes.
+  if (this._options.server) {
+    dbg("Listening for external http server close event");
+    // To do - don't just refer to server close event (bad debugging, for example)
+    this._httpCloseHandler = this._processWsServerClose.bind(this);
+    this._options.server.on("close", this._httpCloseHandler);
   }
 };
 
@@ -313,6 +369,12 @@ proto.stop = function stop() {
     ws.removeAllListeners();
   });
   this._wsServer.removeAllListeners();
+
+  // Remove the http close handler if using an external server
+  if (this._options.server) {
+    this._options.server.removeListener("close", this._httpCloseHandler);
+    this._httpCloseHandler = null;
+  }
 
   // Stop all heartbeat intervals and timers
   _.each(this._heartbeatIntervals, intervalId => {
@@ -346,6 +408,7 @@ proto.stop = function stop() {
   // Stop the ws server
   // A callback is received from ws even if the transport was established
   // on an external http server, which is left running
+  // Also succeeds and calls back in noServer mode
   wsServer.close(() => {
     dbg("Observed ws close callback");
 
@@ -461,6 +524,48 @@ proto.disconnect = function disconnect(...args) {
 };
 
 /**
+ * Allows the application to pipe in upgrade requests when operating in
+ * noServer mode.
+ * @memberof Server
+ * @instance
+ * @param {http.IncomingMessage} request
+ * @param {stream.Duplex} socket
+ * @param {Buffer} head
+ * @throws {Error} "INVALID_ARGUMENT: ..."
+ * @throws {Error} "INVALID_STATE: ..."
+ * @returns {void}
+ */
+proto.handleUpgrade = function handleUpgrade(request, socket, head) {
+  dbg("WebSocket upgrade requested");
+
+  // Check arguments
+  if (
+    !check.instance(request, http.IncomingMessage) ||
+    !check.instance(socket, stream.Duplex) ||
+    !Buffer.isBuffer(head)
+  ) {
+    throw new Error("INVALID_ARGUMENT: Invalid request, socket, or head.");
+  }
+
+  // Check that ws is in noServer mode
+  if (!this._options.noServer) {
+    throw new Error("INVALID_STATE: The transport is not in noServer mode.");
+  }
+
+  // Check transport state
+  if (this._state !== "started") {
+    throw new Error("INVALID_STATE: The transport server is not started.");
+  }
+
+  // Success
+  // The callback is only fired by ws if the upgrade is completed successfully
+  this._wsServer.handleUpgrade(request, socket, head, ws => {
+    dbg("Received callback from ws.handleUpgrade()");
+    this._wsServer.emit("connection", ws, request);
+  });
+};
+
+/**
  * Processes a ws server "listening" event.
  * @memberof Server
  * @instance
@@ -499,6 +604,12 @@ proto._processWsServerClose = function _processWsServerClose() {
     ws.removeAllListeners();
   });
   this._wsServer.removeAllListeners();
+
+  // Remove the http close handler if using an external server
+  if (this._options.server) {
+    this._options.server.removeListener("close", this._httpCloseHandler);
+    this._httpCloseHandler = null;
+  }
 
   // Stop all heartbeat intervals and timers
   _.each(this._heartbeatIntervals, intervalId => {
