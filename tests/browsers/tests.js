@@ -3,9 +3,28 @@ var express = require("express");
 var sauceConnectLauncher = require("sauce-connect-launcher");
 var async = require("async");
 var request = require("request");
-var ws = require("ws");
 var feedmeServerCore = require("feedme-server-core");
+var hostile = require("hostile");
 var feedmeTransportWsServer = require("../../build/server");
+
+/*
+
+Testing WebSockets on Sauce Labs
+
+Due to the way that Sauce Connect Proxy works, in many browsers you can’t establish
+WebSocket connections directly from the browser to localhost. To get around this,
+you need to route another domain to 127.0.0.1 and have the browser access that domain.
+
+This routing is done by adjusting the local hosts file. The Sauce Connect proxy
+routes all VM browser connection requests to the PC running Sauce Connect,
+which then looks up the domain in the hosts file and sees that it is routed to
+localhost.
+
+You can't use a prerun script to edit the VM hosts file, as that does not work
+with the Sauce Connect proxy. So any developers running the Sauce tests need
+to add an entry to their local hosts file. 
+
+*/
 
 var webserver;
 var sauceConnectProcess;
@@ -16,6 +35,24 @@ var sauceResults;
 var localMode = false;
 if (process.argv.length >= 3 && process.argv[2].toLowerCase() === "local") {
   localMode = true;
+}
+
+// If you're running the tests on Sauce, make sure the hosts file has the required entry
+if (!localMode) {
+  var lines = hostile.get(false);
+  var hasEntry = false;
+  lines.forEach(function(line) {
+    var ip = line[0];
+    var host = line[1];
+    if (ip === "127.0.0.1" && host === "testinghost.com") {
+      hasEntry = true;
+    }
+  });
+  if (!hasEntry) {
+    throw new Error(
+      "NO_HOSTS_ENTRY: You need to route testinghost.com to 127.0.0.1 in your hosts file in order to run the Sauce tests."
+    );
+  }
 }
 
 // Require Sauce credentials if you're not running locally
@@ -131,35 +168,6 @@ async.series(
         fores.success({ count: 0 });
       });
       fmServer.start();
-
-      // webserver.on("connection", function(socket) {
-      //   console.log("connection");
-      //   socket.on("data", function(data) {
-      //     console.log("data", data.toString("utf8"));
-      //   });
-      // });
-
-      // webserver.on("request", function(req) {
-      //   console.log("request", req.originalUrl);
-      // });
-
-      // webserver.on("upgrade", function() {
-      //   console.log("UPGRADE");
-      // });
-
-      // var wsServer = new ws.Server({
-      //   server: webserver
-      // });
-      // wsServer.on("listening", function() {});
-      // wsServer.on("close", function() {});
-      // wsServer.on("connection", function(socket) {
-      //   console.log("New connection!");
-      //   socket.on("message", function(msg) {
-      //     console.log("Server received: " + msg);
-      //     socket.send("hi");
-      //   });
-      //   socket.on("close", function(code, reason) {});
-      // });
     },
     function(cb) {
       // If you're running in local mode then stop here
@@ -181,7 +189,6 @@ async.series(
           tunnelIdentifier: sauceTunnelId,
           logFile: null,
           noSslBumpDomains: "all", // Needed to get WebSockets working: https://wiki.saucelabs.com/display/DOCS/Sauce+Connect+Proxy+and+SSL+Certificate+Bumping
-          noProxyCaching: true, // required?????
           verbose: true
         },
         function(err, process) {
