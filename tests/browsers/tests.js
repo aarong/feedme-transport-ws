@@ -53,10 +53,9 @@ var hasHostsEntry = false;
 if (mode !== "local") {
   var lines = hostile.get(false);
   lines.forEach(function(line) {
-    console.log(line);
     var ip = line[0];
-    var host = line[1];
-    if (ip === "127.0.0.1" && host === "testinghost.com") {
+    var hosts = line[1].split(" "); // Travis routes multiple hosts to 127.0.0.1 delimited by spaces
+    if (ip === "127.0.0.1" && _.includes(hosts, "testinghost.com")) {
       hasHostsEntry = true;
     }
   });
