@@ -57,3 +57,18 @@ describe("Server test", function() {
     fmControllerClient.connect();
   });
 });
+
+// var prom = new Promise(function(resolve, reject) {
+//   setTimeout(function() {
+//     //resolve("ok!!");
+//     reject(new Error("junk"));
+//   }, 5000);
+// });
+
+// prom
+//   .then(function(result) {
+//     console.log("done", result);
+//   })
+//   .catch(function(err) {
+//     console.log("caught", err);
+//   });

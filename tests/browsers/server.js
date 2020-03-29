@@ -128,7 +128,7 @@ proto._controllerActions.CreateTransportServer = function(areq, ares) {
         function() {
           var args = [];
           _.each(arguments, function(val, idx) {
-            args.push(val);
+            args.push(val.toString()); // Convert Errors to strings (everything else is already)
           });
           var actionData = { EventName: evt, Arguments: args };
           console.log(actionData);
