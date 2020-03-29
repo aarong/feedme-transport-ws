@@ -10,9 +10,8 @@ Server for browser tests.
 
 An Express web server delivers static content, including tests.
 
-The Controller Feedme API allows the browser to create WebSocket, transport, and
-Feedme servers. The browser can then listen for their events, invoke methods on
-them, and destroy them using the Controller API.
+A Feedme API (the "controller") allows the browser to create and interact with
+WebSocket, transport, and Feedme servers.
 
 Path structure:
 
@@ -21,9 +20,8 @@ Path structure:
   /feedme/transport/id - A transport server instance
   /feedme/feedme/id - A Feedme server instance
 
-Feedme Controller API
+Feedme Controller Actions
 
-Actions
   CreateWsServer
     Args: {}
     Returns: { WsServerId }
@@ -54,10 +52,10 @@ Actions
     Args: { FeedmeServerId }
     Returns: {}
 
-Feeds
+Feedme Controller Feeds
   WsEvents
     Args: { WsServerId }
-    Revealed actions:
+    Revealed actions: 
       WsEvent with action data { Name, Arguments: [] }
   TransportEvents
     Args: { TransportServerId }
@@ -72,93 +70,113 @@ Feeds
 
 var proto = {};
 
+// Asynchronous factory function that calls back a server object once listening
 module.exports = function server(port, cb) {
   var server = Object.create(proto);
 
-  server._fmInstanceServers = {}; // Indexed by instance server id
+  server._nextPort = 4000;
 
-  // Start HTTP server
-  var e = express();
-  e.use("/", express.static(__dirname + "/webroot"));
+  // Server instances - indexed by port
+  server._trasportServerInstances = {};
 
-  server._httpServer = e.listen(port, function(err) {
-    if (err) {
-      cb(err);
-      return;
-    }
+  // Set up the HTTP server
+  server._express = express();
+  server._express.use("/", express.static(__dirname + "/webroot"));
 
-    // Start Feedme controller server
-    server._fmControllerTransport = feedmeTransportWsServer({
-      noServer: true
-    });
-    server._fmControllerServer = feedmeServerCore({
-      transport: server._fmControllerTransport
-    });
-    server._fmControllerServer.on("action", function(areq, ares) {
-      if (areq.actionName === "CreateServer") {
-        // Generate an unused instance id
-        var instanceId;
-        do {
-          instanceId = parseInt(Math.random() * 10000) + "";
-        } while (server._fmInstanceServers[instanceId]);
+  // Start listening and call back
+  server._httpServer = server._express.listen(port, cb);
 
-        // Reveal an Event action on the controller when transport emits an event
-        var fmInstanceTransport = feedmeTransportWsServer({ noServer: true });
-        [
-          "starting",
-          "start",
-          "stopping",
-          "stop",
-          "connect",
-          "message",
-          "disconnect"
-        ].forEach(function(evt) {
-          fmInstanceTransport.on(evt, function() {
-            var actionData = { EventName: evt };
-            _.each(arguments, function(val, idx) {
-              actionData["Arg" + idx] = val;
-            });
-            server._fmControllerServer.actionRevelation({
-              feedName: "Events",
-              feedArgs: { ServerId: instanceId },
-              actionName: "Event",
-              actionData: actionData,
-              feedDeltas: []
-            });
-          });
-        });
-
-        setTimeout(function() {
-          fmInstanceTransport.start();
-        }, 2000);
-
-        server._fmInstanceServers[instanceId] = fmInstanceTransport;
-
-        ares.success({ ServerId: instanceId });
-      } else {
-        ares.failure("INVALID_ACTION", {});
-      }
-    });
-    server._fmControllerServer.on("feedOpen", function(foreq, fores) {
-      fores.success({ count: 0 });
-    });
-    server._fmControllerServer.once("start", cb);
-    server._fmControllerServer.start();
-
-    server._httpServer.on("upgrade", function(request, socket, head) {
-      var pathname = url.parse(request.url).pathname;
-      if (pathname === "/feedme/controller") {
-        server._fmControllerTransport.handleUpgrade(request, socket, head);
-      } else if (false) {
-        // Need to check path structure and that the instance server exists
-      } else {
-        socket.destroy();
-      }
-    });
+  // Start Feedme controller API
+  server._fmControllerServer = feedmeServerCore({
+    transport: feedmeTransportWsServer({
+      server: server._httpServer
+      //  noServer: true
+    })
   });
+  server._fmControllerServer.on("action", function(areq, ares) {
+    server._controllerActions[areq.actionName].bind(server)(areq, ares);
+  });
+  server._fmControllerServer.on("feedOpen", function(foreq, fores) {
+    fores.success({});
+  });
+  server._fmControllerServer.start();
+
+  // Route WebSocket upgrades to the appropriate server instance
+  // server._httpServer.on("upgrade", function(request, socket, head) {
+  //   var pathname = url.parse(request.url).pathname;
+  //   if (pathname === "/feedme/controller") {
+  //     server._fmControllerTransport.handleUpgrade(request, socket, head);
+  //   } else if (false) {
+  //     // Need to check path structure and that the instance server exists
+  //   } else {
+  //     socket.destroy();
+  //   }
+  // });
 };
 
 proto.close = function close(cb) {
   this._httpServer.close(cb);
-  this._fmServer.stop();
+  this._fmControllerServer.stop();
 };
+
+proto._controllerActions = {};
+
+proto._controllerActions.CreateTransportServer = function(areq, ares) {
+  // Create a new transport server
+  var port = this._nextPort;
+  var transportServer = feedmeTransportWsServer({
+    port: port
+    //noServer: true
+  });
+  this._nextPort += 1;
+
+  console.log(port);
+
+  // // Generate an unused instance id
+  // var instanceId;
+  // do {
+  //   instanceId = parseInt(Math.random() * 10000) + "";
+  // } while (this._fmInstanceServers[instanceId]);
+
+  // When the transport server emits an event, reveal an action it on the TransportEvents
+  [
+    "starting",
+    "start",
+    "stopping",
+    "stop",
+    "connect",
+    "message",
+    "disconnect"
+  ].forEach(
+    function(evt) {
+      transportServer.on(
+        evt,
+        function() {
+          var actionData = { EventName: evt };
+          _.each(arguments, function(val, idx) {
+            actionData["Arg" + idx] = val;
+          });
+          this._fmControllerServer.actionRevelation({
+            feedName: "Events",
+            feedArgs: { Port: port + "" },
+            actionName: "Event",
+            actionData: actionData,
+            feedDeltas: []
+          });
+        }.bind(this)
+      );
+    }.bind(this)
+  );
+
+  setTimeout(function() {
+    transportServer.start();
+  }, 2000);
+
+  this._trasportServerInstances[port + ""] = transportServer;
+
+  ares.success({ Port: port });
+};
+
+proto._controllerActions.InvokeTransportMethod = function(areq, ares) {};
+
+proto._controllerActions.DestroyTransportServer = function(areq, ares) {};
