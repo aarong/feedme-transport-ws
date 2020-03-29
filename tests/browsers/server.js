@@ -131,6 +131,7 @@ proto._controllerActions.CreateTransportServer = function(areq, ares) {
             args.push(val);
           });
           var actionData = { EventName: evt, Arguments: args };
+          console.log(actionData);
           this._fmControllerServer.actionRevelation({
             feedName: "Events",
             feedArgs: { Port: port + "" },
