@@ -5,6 +5,7 @@ var async = require("async");
 var request = require("request");
 var feedmeServerCore = require("feedme-server-core");
 var hostile = require("hostile");
+var _ = require("lodash");
 var feedmeTransportWsServer = require("../../build/server");
 
 /*
@@ -26,29 +27,40 @@ to add an entry to their local hosts file.
 
 */
 
-var webserver;
-var sauceConnectProcess;
-var sauceTests;
-var sauceResults;
-
-// Running locally or on Sauce?
-var localMode = false;
-if (process.argv.length >= 3 && process.argv[2].toLowerCase() === "local") {
-  localMode = true;
+// Determine mode
+// sauce-automatic: launches Sauce Connect Proxy and a suite of testing VMs on Sauce
+// sauce-live: launches Sauce Connect Proxy so that you log into Sauce and do a live test
+// local: launches only the local web server, which can be accessed from a local browser
+var mode = "sauce-automatic"; // default (for Travis)
+if (process.argv.length >= 3) {
+  if (
+    _.includes(
+      ["sauce-automatic", "sauce-live", "local"],
+      process.argv[2].toLowerCase()
+    )
+  ) {
+    mode = process.argv[2].toLowerCase();
+  } else {
+    throw new Error(
+      "INVALID_ARGUMENT: Mode must be local, sauce-live, or sauce-automatic (default)."
+    );
+  }
 }
 
 // If you're running the tests on Sauce, make sure the hosts file has the required entry
-if (!localMode) {
+// You'll want this check whether you're running automated or LIVE tests
+var hasHostsEntry = false;
+if (mode !== "local") {
   var lines = hostile.get(false);
-  var hasEntry = false;
   lines.forEach(function(line) {
+    console.log(line);
     var ip = line[0];
     var host = line[1];
     if (ip === "127.0.0.1" && host === "testinghost.com") {
-      hasEntry = true;
+      hasHostsEntry = true;
     }
   });
-  if (!hasEntry) {
+  if (!hasHostsEntry) {
     throw new Error(
       "NO_HOSTS_ENTRY: You need to route testinghost.com to 127.0.0.1 in your hosts file in order to run the Sauce tests."
     );
@@ -57,7 +69,7 @@ if (!localMode) {
 
 // Require Sauce credentials if you're not running locally
 if (
-  !localMode &&
+  mode !== "local" &&
   (!process.env.SAUCE_USERNAME || !process.env.SAUCE_ACCESS_KEY)
 ) {
   throw new Error(
@@ -124,6 +136,10 @@ saucePlatforms = [
 ];
 
 // Run the tests
+var webserver;
+var sauceConnectProcess;
+var sauceTests;
+var sauceResults;
 async.series(
   [
     function(cb) {
@@ -148,6 +164,11 @@ async.series(
       webserver = e.listen(port, function() {
         console.log("Local server started on http://localhost:" + port);
 
+        if (hasHostsEntry) {
+          console.log(
+            "Also available as http://testinghost.com:3000 via hosts file"
+          );
+        }
         cb();
       });
 
@@ -171,7 +192,7 @@ async.series(
     },
     function(cb) {
       // If you're running in local mode then stop here
-      if (!localMode) {
+      if (mode !== "local") {
         cb();
       }
     },
@@ -204,6 +225,12 @@ async.series(
       );
     },
     function(cb) {
+      // If you're running in sauce-live mode then stop here
+      if (mode !== "sauce-live") {
+        cb();
+      }
+    },
+    function(cb) {
       // Call the Sauce REST API telling it to run the tests
       console.log("Calling Sauce REST API telling it to run the tests...");
 
@@ -224,11 +251,6 @@ async.series(
             framework: "custom",
             platforms: saucePlatforms,
             "tunnel-identifier": sauceTunnelId,
-            // prerun: {
-            //   executable:
-            //     "https://raw.githubusercontent.com/aarong/feedme-transport-ws/master/tests/prerun.windows.cmd",
-            //   background: false
-            // },
             extendedDebugging: true // Works?
           }
         },
