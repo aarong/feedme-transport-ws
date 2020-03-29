@@ -7,9 +7,9 @@ Browser functional tests.
 describe("Server test", function() {
   it("should work", function(done) {
     var PORT = 3000;
-    var URL = "ws://testinghost.com:" + PORT + "/feedme/controller";
+    var URL = "ws://testinghost.com";
     var fmControllerClient = feedmeClient({
-      transport: feedmeTransportWsClient(URL)
+      transport: feedmeTransportWsClient(URL + ":" + PORT)
     });
     fmControllerClient.on("connect", function() {
       fmControllerClient.action("CreateTransportServer", {}, function(
@@ -20,42 +20,39 @@ describe("Server test", function() {
         var eventFeed = fmControllerClient.feed("Events", {
           Port: actionData.Port + ""
         });
-        eventFeed.on("action", function(actionName, actionData) {
-          console.log("GOT ACTION" + actionName, actionData);
-          if (actionData.EventName === "start") {
-            // Try to connect to the transport server
-            console.log("trying to connect");
-            var client = feedmeTransportWsClient("ws://localhost:4000");
-            client.on("connect", function() {
-              expect(1).toBe(1);
+        eventFeed.on("action", function(actionName, ad) {
+          console.log("EVENT " + actionName, ad);
+          if (ad.EventName === "start") {
+            // Try to connect to the transport instance
+            console.log(URL + ":" + actionData.Port);
+            var transportClient = feedmeTransportWsClient(
+              URL + ":" + actionData.Port
+            );
+            transportClient.on("connect", function() {
+              console.log("done");
               done();
             });
-            client.on("disconnect", function() {
-              console.log("DISCONNECT", arguments);
-            });
-            client.connect();
+            transportClient.connect();
           }
         });
+
+        eventFeed.on("open", function() {
+          // Try to start the transport server
+          fmControllerClient.action(
+            "InvokeTransportMethod",
+            {
+              Port: actionData.Port + 0,
+              Method: "start",
+              Arguments: []
+            },
+            function(err, ad) {
+              expect(1).toBe(1);
+            }
+          );
+        });
+
         eventFeed.desireOpen();
       });
-      // var feed = fmControllerClient.feed("SomeFeed", { feed: "args" });
-      // feed.on("open", function() {
-      //   expect(1).toBe(1);
-      //   done();
-      //   console.log(feed.data());
-      //   setInterval(function() {
-      //     fmControllerClient.action("SomeAction", { action: "args" }, function(
-      //       err,
-      //       actionData
-      //     ) {
-      //       console.log(err, actionData);
-      //     });
-      //   }, 1000);
-      //   feed.on("action", function(an, aa, fd, ofd) {
-      //     console.log(fd);
-      //   });
-      // });
-      // feed.desireOpen();
     });
     fmControllerClient.connect();
   });

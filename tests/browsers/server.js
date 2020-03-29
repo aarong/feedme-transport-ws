@@ -13,56 +13,52 @@ An Express web server delivers static content, including tests.
 A Feedme API (the "controller") allows the browser to create and interact with
 WebSocket, transport, and Feedme servers.
 
-Path structure:
-
-  /feedme/controller - Feedme Controller API
-  /feedme/ws/id - A WebSocket server instance
-  /feedme/transport/id - A transport server instance
-  /feedme/feedme/id - A Feedme server instance
+CORS does not restrict connections to WebSocket server hosts, so each server is
+created on a separate port and is identified by its port number.
 
 Feedme Controller Actions
 
   CreateWsServer
     Args: {}
-    Returns: { WsServerId }
+    Returns: { Port }
   CreateTransportServer
     Args: {}
-    Returns: { TransportServerId }
+    Returns: { Port }
   CreateFeedmeServer
     Args: {}
-    Returns: { FeedmeServerId }
+    Returns: { Port }
   
   InvokeWsMethod
-    Args: { WsServerId, Method, Arguments: [] }
+    Args: { Port, Method, Arguments: [] }
     Returns: { ReturnValue }
   InvokeTransportMethod
-    Args: { TransportServerId, Method, Arguments: [] }
+    Args: { Port, Method, Arguments: [] }
     Returns: { ReturnValue }
   InvokeFeedmeMethod
-    Args: { FeedmeServerId, Method, Arguments: [] }
+    Args: { Port, Method, Arguments: [] }
     Returns: { ReturnValue }
   
   DestroyWsServer
-    Args: { WsServerId }
+    Args: { Port }
     Returns: {}
   DestroyTransportServer
-    Args: { TransportServerId }
+    Args: { Port }
     Returns: {}
   DestroyFeedmeServer
-    Args: { FeedmeServerId }
+    Args: { Port }
     Returns: {}
 
 Feedme Controller Feeds
   WsEvents
-    Args: { WsServerId }
+    Args: { Port }
     Revealed actions: 
       WsEvent with action data { Name, Arguments: [] }
   TransportEvents
-    Args: { TransportServerId }
+    Args: { Port }
     Revealed actions:
       TransportEvent with action data { Name, Arguments: [] }
   FeedmeEvents
-    Args: { FeedmeServerId }
+    Args: { Port }
     Revealed actions:
       FeedmeEvent with action data { Name, Arguments: [] }	
 
@@ -77,46 +73,31 @@ module.exports = function server(port, cb) {
   server._nextPort = 4000;
 
   // Server instances - indexed by port
-  server._trasportServerInstances = {};
+  server._transportServerInstances = {};
 
-  // Set up the HTTP server
-  server._express = express();
-  server._express.use("/", express.static(__dirname + "/webroot"));
-
-  // Start listening and call back
-  server._httpServer = server._express.listen(port, cb);
+  // Set up the HTTP server and call back when listening
+  var e = express();
+  e.use("/", express.static(__dirname + "/webroot"));
+  server._httpServer = e.listen(port, cb);
 
   // Start Feedme controller API
   server._fmControllerServer = feedmeServerCore({
     transport: feedmeTransportWsServer({
       server: server._httpServer
-      //  noServer: true
     })
   });
   server._fmControllerServer.on("action", function(areq, ares) {
     server._controllerActions[areq.actionName].bind(server)(areq, ares);
   });
   server._fmControllerServer.on("feedOpen", function(foreq, fores) {
-    fores.success({});
+    fores.success({}); // Permit any feed to be opened
   });
   server._fmControllerServer.start();
-
-  // Route WebSocket upgrades to the appropriate server instance
-  // server._httpServer.on("upgrade", function(request, socket, head) {
-  //   var pathname = url.parse(request.url).pathname;
-  //   if (pathname === "/feedme/controller") {
-  //     server._fmControllerTransport.handleUpgrade(request, socket, head);
-  //   } else if (false) {
-  //     // Need to check path structure and that the instance server exists
-  //   } else {
-  //     socket.destroy();
-  //   }
-  // });
 };
 
 proto.close = function close(cb) {
-  this._httpServer.close(cb);
   this._fmControllerServer.stop();
+  this._httpServer.close(cb);
 };
 
 proto._controllerActions = {};
@@ -126,19 +107,12 @@ proto._controllerActions.CreateTransportServer = function(areq, ares) {
   var port = this._nextPort;
   var transportServer = feedmeTransportWsServer({
     port: port
-    //noServer: true
   });
   this._nextPort += 1;
+  this._transportServerInstances[port + ""] = transportServer;
 
-  console.log(port);
-
-  // // Generate an unused instance id
-  // var instanceId;
-  // do {
-  //   instanceId = parseInt(Math.random() * 10000) + "";
-  // } while (this._fmInstanceServers[instanceId]);
-
-  // When the transport server emits an event, reveal an action it on the TransportEvents
+  // When the transport server emits an event, reveal an action it on
+  // the controller TransportEvents feed
   [
     "starting",
     "start",
@@ -152,10 +126,11 @@ proto._controllerActions.CreateTransportServer = function(areq, ares) {
       transportServer.on(
         evt,
         function() {
-          var actionData = { EventName: evt };
+          var args = [];
           _.each(arguments, function(val, idx) {
-            actionData["Arg" + idx] = val;
+            args.push(val);
           });
+          var actionData = { EventName: evt, Arguments: args };
           this._fmControllerServer.actionRevelation({
             feedName: "Events",
             feedArgs: { Port: port + "" },
@@ -168,15 +143,44 @@ proto._controllerActions.CreateTransportServer = function(areq, ares) {
     }.bind(this)
   );
 
-  setTimeout(function() {
-    transportServer.start();
-  }, 2000);
-
-  this._trasportServerInstances[port + ""] = transportServer;
-
+  // Return success to the browser
   ares.success({ Port: port });
 };
 
-proto._controllerActions.InvokeTransportMethod = function(areq, ares) {};
+proto._controllerActions.InvokeTransportMethod = function(areq, ares) {
+  // Make sure the port reference is valid
+  var transportServer = this._transportServerInstances[
+    areq.actionArgs.Port + ""
+  ];
+  if (!transportServer) {
+    ares.failure("INVALID_PORT", {});
+    return;
+  }
 
-proto._controllerActions.DestroyTransportServer = function(areq, ares) {};
+  // Make sure the method is valid
+  var method = transportServer[areq.actionArgs.Method];
+  if (!method) {
+    ares.failure("INVALID_METHOD", {});
+    return;
+  }
+
+  // Run the method and get the result
+  var ret;
+  try {
+    ret = method.apply(transportServer, areq.Arguments);
+  } catch (e) {
+    ares.failure("ERROR_THROWN", { Error: e.toString() });
+    return;
+  }
+
+  // Return the result to the client
+  if (ret === undefined) {
+    ares.success({}); // Can't serialize undefined
+  } else {
+    ares.success({ ReturnValue: ret });
+  }
+};
+
+proto._controllerActions.DestroyTransportServer = function(areq, ares) {
+  // Remove all listeners
+};
