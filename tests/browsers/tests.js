@@ -1,12 +1,10 @@
 var copyFileSync = require("fs-copy-file-sync"); // Not in Node 6
-var express = require("express");
 var sauceConnectLauncher = require("sauce-connect-launcher");
 var async = require("async");
 var request = require("request");
-var feedmeServerCore = require("feedme-server-core");
 var hostile = require("hostile");
 var _ = require("lodash");
-var feedmeTransportWsServer = require("../../build/server");
+var testingServer = require("./server");
 
 /*
 
@@ -47,8 +45,7 @@ if (process.argv.length >= 3) {
   }
 }
 
-// If you're running the tests on Sauce, make sure the hosts file has the required entry
-// You'll want this check whether you're running automated or LIVE tests
+// If the tests are to be run on Sauce, make sure the hosts file has the required entry
 var hasHostsEntry = false;
 if (mode !== "local") {
   var lines = hostile.get(false);
@@ -80,8 +77,8 @@ if (
 var port = 3000;
 var sauceTunnelId =
   process.env.TRAVIS_JOB_NUMBER || "feedme-transport-ws-tunnel"; // Travis sets tunnel id to job number
-var pollInterval = 10000;
-saucePlatforms = [
+var saucePollInterval = 10000;
+var saucePlatforms = [
   // Available Sauce platforms: https://saucelabs.com/platforms
   // General approach is to tests earliest and latest browser versions available on all platforms
 
@@ -135,7 +132,7 @@ saucePlatforms = [
 ];
 
 // Run the tests
-var webserver;
+var server;
 var sauceConnectProcess;
 var sauceTests;
 var sauceResults;
@@ -155,39 +152,23 @@ async.series(
       cb();
     },
     function(cb) {
-      // Start the local webserver (adapted from Jasmine-standalone)
-      console.log("Starting local webserver to host the tests...");
-      var e = express();
-      e.use("/", express.static(__dirname + "/webroot"));
-
-      webserver = e.listen(port, function() {
-        console.log("Local server started on http://localhost:" + port);
-
-        if (hasHostsEntry) {
-          console.log(
-            "Also available as http://testinghost.com:3000 via hosts file"
-          );
+      // Start the local server
+      console.log("Starting local server to host the tests...");
+      testingServer(port, function(err, s) {
+        if (err) {
+          console.log("Failed to start server.");
+          cb(err);
+        } else {
+          server = s;
+          console.log("Local server started on http://localhost:" + port);
+          if (hasHostsEntry) {
+            console.log(
+              "Also available as http://testinghost.com:3000 via hosts file"
+            );
+          }
+          cb();
         }
-        cb();
       });
-
-      var fmServer = feedmeServerCore({
-        transport: feedmeTransportWsServer({ server: webserver })
-      });
-      fmServer.on("action", function(areq, ares) {
-        ares.success({ action: "data" });
-        fmServer.actionRevelation({
-          actionName: areq.actionName,
-          actionData: { action: "data" },
-          feedName: "SomeFeed",
-          feedArgs: { feed: "args" },
-          feedDeltas: [{ Operation: "Increment", Path: ["count"], Value: 1 }]
-        });
-      });
-      fmServer.on("feedOpen", function(foreq, fores) {
-        fores.success({ count: 0 });
-      });
-      fmServer.start();
     },
     function(cb) {
       // If you're running in local mode then stop here
@@ -307,7 +288,7 @@ async.series(
             }
           }
         );
-      }, pollInterval);
+      }, saucePollInterval);
     },
     function(cb) {
       var allPassed = true;
@@ -330,7 +311,7 @@ async.series(
 
         // Display the platform name and result
         if (platformPassed) {
-          console.log("       " + platformName + " passed all tests");
+          console.log(platformName + " passed all tests");
         } else {
           console.log(
             "FAILED " +
@@ -341,15 +322,15 @@ async.series(
               (platformResult ? platformResult.total : "???") +
               " tests"
           );
-          console.log("       " + platformUrl);
+          console.log(platformUrl);
 
           // Print failed tests
           if (platformResult && platformResult.tests) {
             for (var j = 0; j < platformResult.tests.length; j++) {
               var test = platformResult.tests[j];
               if (!test.result) {
-                console.log("         Failing test: " + test.name);
-                console.log("         Message: " + test.message);
+                console.log("Failing test: " + test.name);
+                console.log("Message: " + test.message);
               }
             }
           }
@@ -386,9 +367,9 @@ async.series(
           }
         },
         function(cb) {
-          if (webserver) {
-            webserver.close(function() {
-              console.log("Local webserver stopped.");
+          if (server) {
+            server.close(function() {
+              console.log("Local server stopped.");
               cb();
             });
           } else {
