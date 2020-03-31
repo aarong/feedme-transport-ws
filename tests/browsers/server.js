@@ -128,10 +128,9 @@ proto._controllerActions.CreateTransportServer = function(areq, ares) {
         function() {
           var args = [];
           _.each(arguments, function(val, idx) {
-            args.push(val.toString()); // Convert Errors to strings (everything else is already)
+            args.push(val.toString()); // Convert Errors to strings (everything else is a string already)
           });
           var actionData = { EventName: evt, Arguments: args };
-          console.log(actionData);
           this._fmControllerServer.actionRevelation({
             feedName: "Events",
             feedArgs: { Port: port + "" },
@@ -183,5 +182,29 @@ proto._controllerActions.InvokeTransportMethod = function(areq, ares) {
 };
 
 proto._controllerActions.DestroyTransportServer = function(areq, ares) {
-  // Remove all listeners
+  // Make sure the port reference is valid
+  var transportServer = this._transportServerInstances[
+    areq.actionArgs.Port + ""
+  ];
+  if (!transportServer) {
+    ares.failure("INVALID_PORT", {});
+    return;
+  }
+
+  // Remove transport server reference and listeners
+  delete this._transportServerInstances[areq.actionArgs.Port + ""];
+  transportServer.removeAllListeners();
+
+  // Stop the server if necessary
+  var state = transportServer.state();
+  if (state === "starting") {
+    transportServer.once("start", function() {
+      transportServer.stop();
+    });
+  } else if (state === "started") {
+    transportServer.stop();
+  }
+
+  // Return success
+  ares.success({});
 };

@@ -47,7 +47,9 @@ export default function browserFactory(...args) {
   try {
     new URL(address); // eslint-disable-line no-new
   } catch (e) {
-    throw new Error("INVALID_ARGUMENT: Invalid address argument.");
+    const err = new Error("INVALID_ARGUMENT: Invalid address argument.");
+    err.urlError = e;
+    throw err;
   }
 
   // Check protocols (if specified)
@@ -208,7 +210,7 @@ proto.connect = function connect() {
 
   // If the ws client is disconnected then start connecting, otherwise wait for ws event
   if (!this._wsClient) {
-    dbg("Initializing ws client");
+    dbg("Initializing WebSocket client");
 
     // Try to create the WebSocket client and emit disconnect if constructor throws
     try {
@@ -217,7 +219,7 @@ proto.connect = function connect() {
         this._protocols ? this._protocols : undefined
       );
     } catch (e) {
-      dbg("Failed to initialize ws client");
+      dbg("Failed to initialize WebSocket client");
       dbg(e);
       const err = new Error(
         "DISCONNECTED: Could not initialize the WebSocket client."
@@ -227,6 +229,7 @@ proto.connect = function connect() {
       this.emit("disconnect", err);
       return; // Stop
     }
+    dbg("Initialized WebSocket client");
 
     // Update state
     this._wsPreviousState = "connecting";
@@ -234,7 +237,7 @@ proto.connect = function connect() {
     // Listen for events
     this._wsClient.onopen = this._processWsOpen.bind(this);
     this._wsClient.onmessage = this._processWsMessage.bind(this);
-    this._wsClient.close = this._processWsClose.bind(this);
+    this._wsClient.onclose = this._processWsClose.bind(this);
     this._wsClient.onerror = this._processWsError.bind(this);
   }
 };
