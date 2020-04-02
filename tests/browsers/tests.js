@@ -108,7 +108,10 @@ var saucePlatforms = [
   ////// ["Windows 10", "MicrosoftEdge", "13"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
   ////// ["Windows 10", "MicrosoftEdge", "latest"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
   ["Windows 10", "Internet Explorer", "11"],
-  ["Windows 8", "Internet Explorer", "10"],
+
+  // IE 10 prevents more than six WebSocket connections from being established in one browser instance,
+  // apparently even sequentially. So don't test on it
+  // ["Windows 8", "Internet Explorer", "10"],
 
   // IE 9 does not support Jasmine
   // ["Windows 7", "Internet Explorer", "9"],
@@ -227,11 +230,16 @@ async.series(
           },
           json: true,
           body: {
-            url: "http://testinghost.com:" + port,
+            //url: "http://testinghost.com:" + port,
+            url:
+              "http://localhost:" +
+              port +
+              "/?throwFailures=true&failFast=true&oneFailurePerSpec=true",
             framework: "custom",
             platforms: saucePlatforms,
             "tunnel-identifier": sauceTunnelId,
             extendedDebugging: true // Works?
+            // maxDuration: 1800 // seconds - DOES work (low fails), but capped at around 5-6 minutes by Sauce
           }
         },
         function(err, response) {
