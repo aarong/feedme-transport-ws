@@ -233,6 +233,9 @@ proto._getNextPort = function(cb) {
       wss.removeAllListeners();
       tryListen();
     });
+    wss.on("error", function() {
+      // No uncaught exceptions
+    });
   };
   tryListen();
 };
