@@ -102,7 +102,7 @@ module.exports = function server(port, cb) {
   var server = Object.create(proto);
 
   // Internal members
-  server._nextPort = 4000;
+  server._nextPort = 10000;
   server._wsServers = {}; // indexed by port
   server._wsServerClients = {}; // indexed by port and then client id
   server._transportServers = {}; // indexed by port
@@ -133,8 +133,11 @@ proto.close = function close(cb) {
   this._httpServer.close(cb);
 };
 
-// Unsafe ports on Chrome
+// Unsafe ports (on Chrome)
 // https://superuser.com/questions/188058/which-ports-are-considered-unsafe-by-chrome?rq=1
+// DONT NEED THIS WITH PORT STARTING AT 10K
+// Tested 10K-13.4K (then Chrome died)
+// Document where _nextPort is set that it needs to be high
 var unsafePorts = [
   1, // tcpmux
   7, // echo
@@ -205,13 +208,33 @@ var unsafePorts = [
   6697 // IRC + TLS
 ];
 
-proto._getNextPort = function() {
+proto._getNextPort = function(cb) {
+  // Don't return ports that browsers consider unsafe
+  // And don't return a port that you can't actually listen on
+  var _this = this;
   var p;
-  do {
-    p = this._nextPort;
-    this._nextPort += 1;
-  } while (unsafePorts.indexOf(p) >= 0);
-  return p;
+  var tryListen = function() {
+    // Get the next browser-suitable port
+    do {
+      p = _this._nextPort;
+      _this._nextPort += 1;
+    } while (unsafePorts.indexOf(p) >= 0);
+
+    // Make sure the server can listen on it
+    var wss = new WebSocket.Server({ port: p });
+    wss.on("listening", function() {
+      wss.removeAllListeners();
+      wss.close(function() {
+        cb(p);
+      });
+    });
+    wss.on("close", function() {
+      // Try again
+      wss.removeAllListeners();
+      tryListen();
+    });
+  };
+  tryListen();
 };
 
 proto._getJsonExpressible = function(a) {
@@ -227,14 +250,14 @@ proto._controllerActions.CreateWsPort = function(areq, ares) {
   dbg("Received CreateWsPort action request");
 
   var _this = this;
+  this._getNextPort(function(port) {
+    // Reserve a new WebSocket port
+    _this._wsServers[port + ""] = null;
+    _this._wsServerClients[port + ""] = {};
 
-  // Reserve a new WebSocket port
-  var port = this._getNextPort();
-  this._wsServers[port + ""] = null;
-  this._wsServerClients[port + ""] = {};
-
-  // Return success to the browser
-  ares.success({ Port: port });
+    // Return success to the browser
+    ares.success({ Port: port });
+  });
 };
 
 proto._controllerActions.CreateWsServer = function(areq, ares) {
@@ -442,6 +465,7 @@ proto._controllerActions.DestroyWsServer = function(areq, ares) {
 // Transport server actions
 
 proto._controllerActions.CreateTransportServer = function(areq, ares) {
+  throw new Error("YOU NEED TO USE THE ASYNC _getPort");
   dbg("Received CreateTransportServer action request");
 
   var _this = this;

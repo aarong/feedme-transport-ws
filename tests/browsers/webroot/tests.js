@@ -15,28 +15,50 @@ Check:
   - Client transport events
   - Server events
 
-Don't worry about testing argument validity (done in unit tests) or that return
+Don't worry about testing invalid arguments (done in unit tests) or that return
 values are empty (only state() returns a value and it's checked everywhere).
 
-Timeouts are used to account for latency.
+The Feedme controller client connection is re-established for each tests, as
+sharing across tests was causing failures even for a small number of tests.
+  -- TRY AGAIN
 
+It's crucial to properly close any open WebSocket connections at the end
+of each test, otherwise many tests will fail.
+
+Sauce seems to limit total test duration to around 5-6 minutes by capping
+maxDuration. So you're limited to a maximum of around 150 tests overall,
+unless you want to build the infrastructure to break them into smaller suites.
+
+Around 1% of tests tend to fail due to connectivity issues, resulting in the
+test timing out or DISCONNECT/TIMEOUT errors. So all tests are retried several
+times on failure.
+
+          // You need masterResolve/reject so that disconnect events can
+          // fail the tests at any time - can't reject a promise once resolved
+          // Otherwise tests hang if the connection is broken --
+
+          
+
+// Connect to the controller Feedme API before starting each test
+// Keeping the controller connected between tests caused problems on browsers
 */
 
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 60000; // You have long-running tests -- REASONABLE??
+// Allow each test to take significant time, given latency (defaults to 5000)
+jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000; // Per test
 
 var PORT = 3000; // Port for controller Feedme API
 var ROOT_URL = "ws://testinghost.com";
-var LATENCY = 500; // Assumed latency to the server
+var RETRY_LIMIT = 8; // How many times to attempt each test
 
-var delay = function(ms) {
-  return function() {
-    return new Promise(function(resolve, reject) {
-      setTimeout(function() {
-        resolve();
-      }, ms);
-    });
-  };
-};
+// var delay = function(ms) {
+//   return function() {
+//     return new Promise(function(resolve, reject) {
+//       setTimeout(function() {
+//         resolve();
+//       }, ms);
+//     });
+//   };
+// };
 
 /*
 
@@ -356,138 +378,199 @@ var createTransportServerListener = function(ts) {
 
 /*
 
+Wrapper to retry failed tests (almost always a temporary conenctivity issue).
+
+Accepts a function that returns a promise and returns a function that
+returns a promise.
+
+On failure, how do you ensure proper clean-up? Maybe don't worry about it too much -- very few tests fail
+*/
+
+var retry = function(testPromiseGenerator) {
+  return function() {
+    return new Promise(function(resolve, reject) {
+      var attempts = 0;
+
+      // Fucntion to run one attempt - recursive
+      var attempt = function() {
+        attempts += 1;
+        testPromiseGenerator()
+          .then(function() {
+            // Test passed
+            resolve();
+          })
+          .catch(function(err) {
+            // Attempt failed - retry or fail the test
+            if (attempts < RETRY_LIMIT) {
+              attempt();
+            } else {
+              reject(err); // Only rejects with the latest error
+            }
+          });
+      };
+
+      // Start attempt
+      attempt();
+    });
+  };
+};
+
+/*
+
+Feedme controller client functions. You can't put these in beforeEach/afterEach
+because they need to be within individual test retry wrappers -- if they fail,
+they are retried.
+
+*/
+
+var connectControllerClient = function() {
+  return new Promise(function(resolve, reject) {
+    dbg("Connecting controller client");
+    var client = feedmeClient({
+      transport: feedmeTransportWsClient(ROOT_URL + ":" + PORT)
+    });
+    client.once("connect", function() {
+      client.removeAllListeners("disconnect");
+      resolve(client);
+    });
+    client.once("disconnect", function(err) {
+      client.removeAllListeners("connect");
+      reject(err);
+    });
+    client.connect();
+  });
+};
+
+var disconnectControllerClient = function(fmClient) {
+  return new Promise(function(resolve, reject) {
+    dbg("Disconnecting controller client");
+    fmClient.removeAllListeners();
+    fmClient.once("disconnect", function() {
+      resolve();
+    });
+    fmClient.disconnect();
+  });
+};
+
+/*
+
 Tests
 
 */
 
 describe("Browser tests", function() {
-  // Connect to the controller Feedme API before starting each test
-  // Keeping the controller connected between tests caused problems on browsers
-  var feedmeControllerClient;
-  beforeEach(function() {
-    return new Promise(function(resolve, reject) {
-      feedmeControllerClient = feedmeClient({
-        transport: feedmeTransportWsClient(ROOT_URL + ":" + PORT)
-      });
-      feedmeControllerClient.once("connect", function() {
-        feedmeControllerClient.removeAllListeners("disconnect");
-        resolve();
-      });
-      feedmeControllerClient.once("disconnect", function(err) {
-        // This connection always seems to time out on the 6th attempt in IE 10
-        // Is there some browser limitation? YES
-        // https://stackoverflow.com/questions/15114279/websocket-on-ie10-giving-a-securityerror
-        // Am I waiting for full disconnect everywhere? Worst case ditch IE 10
-        feedmeControllerClient.removeAllListeners("connect");
-        reject(err);
-      });
-      feedmeControllerClient.connect();
-    });
-  });
-  afterEach(function() {
-    return new Promise(function(resolve, reject) {
-      feedmeControllerClient.once("disconnect", function() {
-        resolve();
-      });
-      feedmeControllerClient.disconnect();
-    });
-  });
-
   var test = function() {
-    it("should work using the JS adapter", function() {
-      var wsServer;
-      var transportClient;
-      var wsServerListener;
-      return createWsServer(feedmeControllerClient) // Promise
-        .then(function(s) {
-          console.log("outer");
-          return new Promise(function(resolve, reject) {
-            console.log("inner");
-            wsServer = s;
-            wsServer.start();
-            wsServer.once("listening", resolve);
-            // THIS was the problem for everything except IE 10!!!
-            // So have an action to reserve a port, and then an action to initialize ws server
-          });
-        })
-        .then(function() {
-          return new Promise(function(resolve, reject) {
-            // Connect a transport client
-            transportClient = feedmeTransportWsClient(
-              ROOT_URL + ":" + wsServer.port
-            );
-            transportClient.connect();
-            wsServer.once("connection", function() {
-              transportClient.removeAllListeners("disconnect");
-              resolve();
-            });
-            transportClient.once("disconnect", function(err) {
-              // What if the disconnect is after server connection event?
-              // You could add disconnect handlers to everything below?
-              // And what if the feedmeControllerClient fails??
-              // Build into server API? Another harness layer?
-              reject(err);
-            });
-          });
-        })
-        .then(function() {
-          return new Promise(function(resolve, reject) {
-            // Make sure the client is connected
-            if (transportClient.state() === "connected") {
-              resolve();
-            } else {
-              transportClient.once("connect", function() {
-                transportClient.removeAllListeners("disconnect");
-                resolve();
+    it(
+      "should work using the JS adapter",
+      retry(function() {
+        return new Promise(function(masterResolve, masterReject) {
+          var feedmeControllerClient;
+          var wsServer;
+          var transportClient;
+          var wsServerListener;
+          connectControllerClient()
+            .then(function(c) {
+              feedmeControllerClient = c;
+              feedmeControllerClient.on("disconnect", function() {
+                masterReject();
               });
-              transportClient.once("disconnect", function(err) {
-                transportClient.removeAllListeners("connect");
-                reject(err);
+              return createWsServer(feedmeControllerClient);
+            })
+            .then(function(s) {
+              return new Promise(function(resolve, reject) {
+                wsServer = s;
+                wsServer.start();
+                wsServer.once("listening", resolve);
+                wsServer.on("close", function(err) {
+                  masterReject(err);
+                });
               });
-            }
-          });
-        })
-        .then(function() {
-          return new Promise(function(resolve, reject) {
-            wsServer.on("clientMessage", function() {
-              dbg("got client message");
-            });
-            transportClient.send("hi"); // Not a promise
-            wsServer.once("clientMessage", function() {
-              resolve();
-            });
-          });
-        })
-        .then(function() {
-          return new Promise(function(resolve, reject) {
-            transportClient.once("disconnect", function() {
-              resolve();
-            });
-            transportClient.disconnect();
-          });
-        })
-        .then(function() {
-          return new Promise(function(resolve, reject) {
-            console.log(wsServer);
-            // Destroy the server
-            feedmeControllerClient.action(
-              "DestroyWsServer",
-              { Port: wsServer.port },
-              function(err, ad) {
-                if (err) {
-                  reject(err);
-                } else {
-                  expect(1).toBe(1);
+            })
+            .then(function() {
+              return new Promise(function(resolve, reject) {
+                // Connect a transport client
+                transportClient = feedmeTransportWsClient(
+                  ROOT_URL + ":" + wsServer.port
+                );
+                transportClient.connect();
+                wsServer.once("connection", function() {
                   resolve();
+                });
+                transportClient.on("disconnect", function(err) {
+                  masterReject(err);
+                });
+              });
+            })
+            .then(function() {
+              return new Promise(function(resolve, reject) {
+                // Make sure the client is connected
+                if (transportClient.state() === "connected") {
+                  resolve();
+                } else {
+                  transportClient.once("connect", function() {
+                    transportClient.removeAllListeners("disconnect");
+                    resolve();
+                  });
+                  transportClient.once("disconnect", function(err) {
+                    transportClient.removeAllListeners("connect");
+                    reject(err);
+                  });
                 }
-              }
-            );
-          });
+              });
+            })
+            .then(function() {
+              return new Promise(function(resolve, reject) {
+                wsServer.on("clientMessage", function() {
+                  dbg("got client message");
+                });
+                transportClient.send("hi"); // Not a promise
+                wsServer.once("clientMessage", function() {
+                  resolve();
+                });
+              });
+            })
+            .then(function() {
+              transportClient.removeAllListeners();
+              return new Promise(function(resolve, reject) {
+                transportClient.once("disconnect", function() {
+                  resolve();
+                });
+                transportClient.disconnect();
+              });
+            })
+            .then(function() {
+              return new Promise(function(resolve, reject) {
+                // Destroy the server
+                wsServer.removeAllListeners();
+                feedmeControllerClient.action(
+                  "DestroyWsServer",
+                  { Port: wsServer.port },
+                  function(err, ad) {
+                    if (err) {
+                      reject(err);
+                    } else {
+                      resolve();
+                    }
+                  }
+                );
+              });
+            })
+            .then(function() {
+              return disconnectControllerClient(feedmeControllerClient);
+            })
+            .then(function() {
+              expect(1).toBe(1);
+              masterResolve();
+            })
+            .catch(function(err) {
+              masterReject(err);
+            });
         });
-    });
+      })
+    );
   };
 
-  for (var i = 0; i < 10; i++) {
+  for (var i = 0; i < 50; i++) {
     describe("Iteration " + i, test);
   }
 });

@@ -90,47 +90,83 @@ var saucePlatforms = [
   // configurator), or one of their testing frameworks:
   // https://github.com/saucelabs-sample-test-frameworks
 
-  // Firefox 66 (latest) on Mac and Windows (but not Linux) was running the tests successfully
-  // and printing the results to console, but the tests would never return, as
-  // though Sauce never knew that the browser was "finished". Same problem on
-  // Firefox 60, worked on 50, problem on 55, worked on 52, worked on 53, worked on 54 (hardcoded).
+  // WebSockets introduced in FireFox 11, but fails on 15 and below with 1006 error
+  ["Windows 10", "Firefox", "16"],
 
-  // WebSockets introduced in FireFox 11, but fails with ws:// URL (illegal string) in 17 and below
-  ["Windows 10", "Firefox", "18"],
+  // In 56 and above the tests are shown in the VM to have completed
+  // successfully (no console errors) but the VM doesn't terminate and
+  // Sauce eventually kills the VM after 5-6 minutes
+  // Tests pass locally on recent Firefox version
+  ["Windows 10", "Firefox", "55"],
 
-  // Was 54, latest (73) looked successful but didn't return
-  // 55 works, 65 works but hangs, 60 hangs, 57 hangs, 56 hangs
-  // And not 55 times out for some reason
-  // ["Windows 10", "Firefox", "55"],
-
-  ////// ["Windows 10", "Chrome", "26"],
+  // In 28 and below tests don't even seem to launch (VM blank)
+  ["Windows 10", "Chrome", "29"],
   ["Windows 10", "Chrome", "latest"],
-  ////// ["Windows 10", "MicrosoftEdge", "13"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
-  ////// ["Windows 10", "MicrosoftEdge", "latest"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
-  ["Windows 10", "Internet Explorer", "11"],
 
-  // IE 10 prevents more than six WebSocket connections from being established in one browser instance,
-  // apparently even sequentially. So don't test on it
-  // ["Windows 8", "Internet Explorer", "10"],
+  ["Windows 10", "MicrosoftEdge", "13"], // Earliest available version
+  ["Windows 10", "MicrosoftEdge", "latest"],
 
   // IE 9 does not support Jasmine
   // ["Windows 7", "Internet Explorer", "9"],
 
-  // macOS 10.14 tests get 500 error - what is localhost:3000 pointing to? Sauce Connect issue?
+  // IE 10 prevents more than six WebSocket connections from being established
+  // by one browser instance, apparently even sequentially
+  // ["Windows 8", "Internet Explorer", "10"],
+
+  ["Windows 10", "Internet Explorer", "11"],
+
+  // Same issue was Win 10 FF 56+ - tests seem to pass but don't return results
   // ["macOS 10.14", "Safari", "latest"],
   // ["macOS 10.14", "Firefox", "latest"],
-  // ["macOS 10.14", "Chrome", "latest"],
-  ["macOS 10.13", "Firefox", "54"], // Hangs on 55+ (Jasmine, I think), 1006 on 65+
-  ////// ["macOS 10.13", "Chrome", "latest"], // Failing 1006: https://github.com/aarong/sauce-connect-proxy-problem
-  // Safari tests hang - Jasmine results show in the browser and there are
-  // no console errors, but Sauce doesn't return
+
+  ["macOS 10.14", "Chrome", "latest"],
+
+  /*
+
+  macOS 10.13
+
+  */
+
+  // 55 works - how early can I go on this? And all others?
+  // 56+ tests pass but don't return
+  ["macOS 10.13", "Firefox", "55"],
+
+  // Tests pass but don't return
+  //["macOS 10.13", "Firefox", "latest"],
+
+  ["macOS 10.13", "Chrome", "latest"],
+
+  // Safari tests all pass but don't return
   // ["macOS 10.13", "Safari", "latest"],
   // ["macOS 10.13", "Safari", "11"],
-  // ["macOS 10.12", "Safari", "10"],
 
-  // macOS 10.10, 10.11 would not spawn tests (missing and hang like bad combo)
+  /*
 
+  macOS 10.12
+
+  */
+
+  // Safari tests pass but don't return
+  //["macOS 10.12", "Safari", "10"],
+
+  /*
+
+  Platforms macOS 10.10 and 10.11 report unsupported OS/browser/version combo
+
+  */
+
+  /*
+
+  Platform: LINUX
+
+  */
+
+  // Firefox 15 and below fail with 1006 error
+  ["Linux", "Firefox", "16"],
   ["Linux", "Firefox", "latest"],
+
+  // Chrome 29 and below tests won't even start
+  ["Linux", "Chrome", "30"],
   ["Linux", "Chrome", "latest"]
 ];
 
@@ -234,11 +270,12 @@ async.series(
             url:
               "http://localhost:" +
               port +
-              "/?throwFailures=true&failFast=true&oneFailurePerSpec=true",
+              "/?throwFailures=true&oneFailurePerSpec=true", // &failFast=true (stop tests on first fail)
             framework: "custom",
             platforms: saucePlatforms,
             "tunnel-identifier": sauceTunnelId,
-            extendedDebugging: true // Works?
+            extendedDebugging: true, // Works?
+            maxDuration: 1800
             // maxDuration: 1800 // seconds - DOES work (low fails), but capped at around 5-6 minutes by Sauce
           }
         },
