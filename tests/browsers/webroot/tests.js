@@ -95,7 +95,7 @@ var createWsServer = function(feedmeControllerClient) {
       // Open the server event feed and emit on revelation
       dbg("Opening WsEvents feed for port " + server.port);
       var eventFeed = feedmeControllerClient.feed("WsEvents", {
-        Port: server.port + ""
+        Port: server.port + "",
       });
       server._eventFeed = eventFeed;
       eventFeed.once("open", function() {
@@ -172,7 +172,7 @@ var createWsServer = function(feedmeControllerClient) {
           ClientId: clientId,
           Port: _this.port,
           Method: method.toLowerCase(),
-          Arguments: args
+          Arguments: args,
         },
         function(err, ad) {
           if (err) {
@@ -226,7 +226,7 @@ var createWsServerListener = function(ws) {
     "connection",
     "clientMessage",
     "clientClose",
-    "clientError"
+    "clientError",
   ];
   var l = {};
   evts.forEach(function(evt) {
@@ -279,7 +279,7 @@ var createTransportServer = function(feedmeControllerClient) {
       // Open the server event feed and emit on revelation
       dbg("Opening TransportEvents feed for port " + server.port);
       var eventFeed = feedmeControllerClient.feed("TransportEvents", {
-        Port: server.port + ""
+        Port: server.port + "",
       });
       server._eventFeed = eventFeed;
       eventFeed.once("open", function() {
@@ -361,7 +361,7 @@ var createTransportServerListener = function(ts) {
     "stop",
     "connect",
     "message",
-    "disconnect"
+    "disconnect",
   ];
   var l = {};
   evts.forEach(function(evt) {
@@ -427,7 +427,7 @@ var connectControllerClient = function() {
   return new Promise(function(resolve, reject) {
     dbg("Connecting controller client");
     var client = feedmeClient({
-      transport: feedmeTransportWsClient(ROOT_URL + ":" + PORT)
+      transport: feedmeTransportWsClient(ROOT_URL + ":" + PORT),
     });
     client.once("connect", function() {
       client.removeAllListeners("disconnect");
@@ -457,6 +457,8 @@ var disconnectControllerClient = function(fmClient) {
 Tests
 
 */
+
+var testNum = -"";
 
 describe("Browser tests", function() {
   var test = function() {
@@ -559,6 +561,17 @@ describe("Browser tests", function() {
               return disconnectControllerClient(feedmeControllerClient);
             })
             .then(function() {
+              // Add a wait every 50 tests
+              return new Promise(function(resolve, reject) {
+                testNum += 1;
+                if (testNum % 50 === 0) {
+                  setTimeout(resolve, 10000);
+                } else {
+                  resolve();
+                }
+              });
+            })
+            .then(function() {
               expect(1).toBe(1);
               masterResolve();
             })
@@ -570,7 +583,7 @@ describe("Browser tests", function() {
     );
   };
 
-  for (var i = 0; i < 50; i++) {
+  for (var i = 0; i < 500; i++) {
     describe("Iteration " + i, test);
   }
 });

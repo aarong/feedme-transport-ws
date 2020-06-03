@@ -79,95 +79,95 @@ var sauceTunnelId =
   process.env.TRAVIS_JOB_NUMBER || "feedme-transport-ws-tunnel"; // Travis sets tunnel id to job number
 var saucePollInterval = 10000;
 var saucePlatforms = [
-  // Available Sauce platforms: https://saucelabs.com/platforms
-  // General approach is to tests earliest and latest browser versions available on all platforms
+  // // Available Sauce platforms: https://saucelabs.com/platforms
+  // // General approach is to tests earliest and latest browser versions available on all platforms
 
-  // If you include a bad platform-browser combination, Sauce never returns results even when
-  // the good ones are done, and does not return an error either (bad tests not listed on dashboard)
+  // // If you include a bad platform-browser combination, Sauce never returns results even when
+  // // the good ones are done, and does not return an error either (bad tests not listed on dashboard)
 
-  // REST API only supports desktop platforms, not mobile (confirmed with support)
-  // For mobile platforms you need to use Appium directly (see their platform
-  // configurator), or one of their testing frameworks:
-  // https://github.com/saucelabs-sample-test-frameworks
+  // // REST API only supports desktop platforms, not mobile (confirmed with support)
+  // // For mobile platforms you need to use Appium directly (see their platform
+  // // configurator), or one of their testing frameworks:
+  // // https://github.com/saucelabs-sample-test-frameworks
 
-  // WebSockets introduced in FireFox 11, but fails on 15 and below with 1006 error
-  ["Windows 10", "Firefox", "16"],
+  // // WebSockets introduced in FireFox 11, but fails on 15 and below with 1006 error
+  // ["Windows 10", "Firefox", "16"],
 
-  // In 56 and above the tests are shown in the VM to have completed
-  // successfully (no console errors) but the VM doesn't terminate and
-  // Sauce eventually kills the VM after 5-6 minutes
-  // Tests pass locally on recent Firefox version
-  ["Windows 10", "Firefox", "55"],
+  // // In 56 and above the tests are shown in the VM to have completed
+  // // successfully (no console errors) but the VM doesn't terminate and
+  // // Sauce eventually kills the VM after 5-6 minutes
+  // // Tests pass locally on recent Firefox version
+  // ["Windows 10", "Firefox", "55"],
 
-  // In 28 and below tests don't even seem to launch (VM blank)
-  ["Windows 10", "Chrome", "29"],
-  ["Windows 10", "Chrome", "latest"],
+  // // In 28 and below tests don't even seem to launch (VM blank)
+  // ["Windows 10", "Chrome", "29"],
+  ["Windows 10", "Chrome", "latest"]
 
-  ["Windows 10", "MicrosoftEdge", "13"], // Earliest available version
-  ["Windows 10", "MicrosoftEdge", "latest"],
+  // ["Windows 10", "MicrosoftEdge", "13"], // Earliest available version
+  // ["Windows 10", "MicrosoftEdge", "latest"],
 
-  // IE 9 does not support Jasmine
-  // ["Windows 7", "Internet Explorer", "9"],
+  // // IE 9 does not support Jasmine
+  // // ["Windows 7", "Internet Explorer", "9"],
 
-  // IE 10 prevents more than six WebSocket connections from being established
-  // by one browser instance, apparently even sequentially
-  // ["Windows 8", "Internet Explorer", "10"],
+  // // IE 10 prevents more than six WebSocket connections from being established
+  // // by one browser instance, apparently even sequentially
+  // // ["Windows 8", "Internet Explorer", "10"],
 
-  ["Windows 10", "Internet Explorer", "11"],
+  // ["Windows 10", "Internet Explorer", "11"],
 
-  // Same issue was Win 10 FF 56+ - tests seem to pass but don't return results
-  // ["macOS 10.14", "Safari", "latest"],
-  // ["macOS 10.14", "Firefox", "latest"],
+  // // Same issue was Win 10 FF 56+ - tests seem to pass but don't return results
+  // // ["macOS 10.14", "Safari", "latest"],
+  // // ["macOS 10.14", "Firefox", "latest"],
 
-  ["macOS 10.14", "Chrome", "latest"],
+  // ["macOS 10.14", "Chrome", "latest"],
 
-  /*
+  // /*
 
-  macOS 10.13
+  // macOS 10.13
 
-  */
+  // */
 
-  // 55 works - how early can I go on this? And all others?
-  // 56+ tests pass but don't return
-  ["macOS 10.13", "Firefox", "55"],
+  // // 55 works - how early can I go on this? And all others?
+  // // 56+ tests pass but don't return
+  // ["macOS 10.13", "Firefox", "55"],
 
-  // Tests pass but don't return
-  //["macOS 10.13", "Firefox", "latest"],
+  // // Tests pass but don't return
+  // //["macOS 10.13", "Firefox", "latest"],
 
-  ["macOS 10.13", "Chrome", "latest"],
+  // ["macOS 10.13", "Chrome", "latest"],
 
-  // Safari tests all pass but don't return
-  // ["macOS 10.13", "Safari", "latest"],
-  // ["macOS 10.13", "Safari", "11"],
+  // // Safari tests all pass but don't return
+  // // ["macOS 10.13", "Safari", "latest"],
+  // // ["macOS 10.13", "Safari", "11"],
 
-  /*
+  // /*
 
-  macOS 10.12
+  // macOS 10.12
 
-  */
+  // */
 
-  // Safari tests pass but don't return
-  //["macOS 10.12", "Safari", "10"],
+  // // Safari tests pass but don't return
+  // //["macOS 10.12", "Safari", "10"],
 
-  /*
+  // /*
 
-  Platforms macOS 10.10 and 10.11 report unsupported OS/browser/version combo
+  // Platforms macOS 10.10 and 10.11 report unsupported OS/browser/version combo
 
-  */
+  // */
 
-  /*
+  // /*
 
-  Platform: LINUX
+  // Platform: LINUX
 
-  */
+  // */
 
-  // Firefox 15 and below fail with 1006 error
-  ["Linux", "Firefox", "16"],
-  ["Linux", "Firefox", "latest"],
+  // // Firefox 15 and below fail with 1006 error
+  // ["Linux", "Firefox", "16"],
+  // ["Linux", "Firefox", "latest"],
 
-  // Chrome 29 and below tests won't even start
-  ["Linux", "Chrome", "30"],
-  ["Linux", "Chrome", "latest"]
+  // // Chrome 29 and below tests won't even start
+  // ["Linux", "Chrome", "30"],
+  // ["Linux", "Chrome", "latest"]
 ];
 
 // Run the tests

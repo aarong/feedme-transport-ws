@@ -272,15 +272,15 @@ proto.connect = function connect() {
     throw new Error("INVALID_STATE: Already connecting or connected.");
   }
 
-  // Update state and emit
+  // Update state and emit asynchronously
   this._state = "connecting";
-  this.emit("connecting");
+  this._emitAsync("connecting");
 
   // If the ws client is disconnected then start connecting, otherwise wait for ws event
   if (!this._wsClient) {
     dbg("Initializing ws client");
 
-    // Try to create the WebSocket client and emit disconnect if constructor throws
+    // Try to create the WebSocket client and emit disconnect asynchronously if constructor throws
     try {
       this._wsClient = new this._wsConstructor(
         this._address,
@@ -294,7 +294,7 @@ proto.connect = function connect() {
       );
       err.wsError = e;
       this._state = "disconnected";
-      this.emit("disconnect", err);
+      this._emitAsync("disconnect", err);
       return; // Stop
     }
 
@@ -353,12 +353,12 @@ proto.disconnect = function disconnect(...args) {
     this._wsPreviousState = "disconnecting";
   }
 
-  // Update state and emit
+  // Update state and emit disconnect asynchronously
   this._state = "disconnected";
   if (err) {
-    this.emit("disconnect", err);
+    this._emitAsync("disconnect", err);
   } else {
-    this.emit("disconnect");
+    this._emitAsync("disconnect");
   }
 };
 
@@ -457,7 +457,7 @@ proto._processWsOpen = function _processWsOpen() {
     // Update state and emit
     this._wsPreviousState = "connected";
     this._state = "connected";
-    this.emit("connect");
+    this._emitAsync("connect");
   }
 };
 
@@ -484,7 +484,7 @@ proto._processWsMessage = function _processWsMessage(data) {
     return; // Stop
   }
 
-  this.emit("message", data);
+  this._emitAsync("message", data);
 };
 
 /**
@@ -564,7 +564,7 @@ proto._processWsClose = function _processWsClose(code, reason) {
         "DISCONNECTED: Could not initialize the WebSocket client."
       );
       err.wsError = e;
-      this.emit("disconnect", err);
+      this._emitAsync("disconnect", err);
       return; // Stop
     }
 
@@ -591,7 +591,7 @@ proto._processWsClose = function _processWsClose(code, reason) {
     const err = new Error(errMsg);
     err.wsCode = code;
     err.wsReason = reason;
-    this.emit("disconnect", err);
+    this._emitAsync("disconnect", err);
   }
 };
 
@@ -650,9 +650,26 @@ proto._connectionFailure = function _connectionFailure(err) {
     this._wsPreviousState = "disconnecting";
   }
 
-  // Update state and emit synchronously
+  // Update state and emit
   if (this._state !== "disconnected") {
     this._state = "disconnected";
-    this.emit("disconnect", err);
+    this._emitAsync("disconnect", err);
   }
+};
+
+/**
+ * Emits an event asynchronously during the next run around the event loop
+ * @memberof Client
+ * @instance
+ * @private
+ * @param {*} ...args
+ * @returns {void}
+ */
+proto._emitAsync = function _emitAsync(...args) {
+  dbg(`Scheduling asynchronous emission: ${args[0]}`);
+
+  process.nextTick(() => {
+    dbg(`Asynchronous emission: ${args[0]}`);
+    this.emit(...args);
+  });
 };
