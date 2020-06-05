@@ -658,7 +658,13 @@ proto._connectionFailure = function _connectionFailure(err) {
 };
 
 /**
- * Emits an event asynchronously during the next run around the event loop
+ * Emits an event asynchronously during the next run around the event loop.
+ *
+ * The library only cares that events triggered by the library-facing API
+ * (i.e. methods) are emitted asynchronously. But it is not clear whether ws
+ * may in some cases call back or emit synchronously, so in order to ensure
+ * a correct sequence of transport events, all are emitted asynchronously via
+ * the nextTick queue.
  * @memberof Client
  * @instance
  * @private

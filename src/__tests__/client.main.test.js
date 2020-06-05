@@ -3,18 +3,7 @@ import check from "check-types";
 import emitter from "component-emitter";
 import client from "../client.main";
 import config from "../client.config";
-
-/*
-
-Jest's fake times do not execute functions scheduled using process.nextTick()
-So manually advance a tick as required.
-
-*/
-// Create a promise that resolves next tick
-const nextTick = () =>
-  new Promise(resolve => {
-    process.nextTick(resolve);
-  });
+import asyncUtil from "./asyncutil";
 
 /*
 
@@ -22,6 +11,9 @@ Testing strategy
 
 The ws module is mocked -- these are unit tests only. The integration tests that
 are run on the build ensure that the transport plays nicely with actual ws.
+
+Jest's fake times do not execute functions scheduled using process.nextTick(),
+so advance manually using use "await asyncUtil.nextTick()".
 
 1. Test state-modifying functionality
     For all outside function calls and ws events
@@ -126,14 +118,14 @@ harnessProto.getWs = function getWs() {
 
 harnessProto.makeWsConnecting = async function makeWsConnecting() {
   this.client.connect();
-  await nextTick(); // Move past queued events
+  await asyncUtil.nextTick(); // Move past queued events
 };
 
 harnessProto.makeWsConnected = async function makeWsConnected() {
   this.client.connect();
   this.getWs().readyState = this.getWs().OPEN;
   this.getWs().emit("open");
-  await nextTick(); // Move past queued events
+  await asyncUtil.nextTick(); // Move past queued events
 };
 
 harnessProto.makeWsDisconnecting = async function makeWsDisconnecting() {
@@ -142,7 +134,7 @@ harnessProto.makeWsDisconnecting = async function makeWsDisconnecting() {
   this.getWs().emit("open");
   this.client.disconnect();
   this.getWs().readyState = this.getWs().CLOSING;
-  await nextTick(); // Move past queued events
+  await asyncUtil.nextTick(); // Move past queued events
 };
 
 harnessProto.makeWsDisconnected = async function makeWsDisconnected() {
@@ -152,7 +144,7 @@ harnessProto.makeWsDisconnected = async function makeWsDisconnected() {
   this.client.disconnect();
   this.getWs().readyState = this.getWs().CLOSED;
   this.getWs().emit("close");
-  await nextTick(); // Move past queued events
+  await asyncUtil.nextTick(); // Move past queued events
 };
 
 harnessProto.createClientListener = function createClientListener() {
@@ -753,7 +745,7 @@ describe("The client.connect() function", () => {
         await harn.makeWsConnecting();
         harn.client.disconnect();
 
-        await nextTick(); // Move past queued events
+        await asyncUtil.nextTick(); // Move past queued events
 
         const listener = harn.createClientListener();
         harn.client.connect();
@@ -763,7 +755,7 @@ describe("The client.connect() function", () => {
         expect(listener.disconnect.mock.calls.length).toBe(0);
         expect(listener.message.mock.calls.length).toBe(0);
 
-        await nextTick();
+        await asyncUtil.nextTick();
 
         expect(listener.connecting.mock.calls.length).toBe(1);
         expect(listener.connecting.mock.calls[0].length).toBe(0);
@@ -836,7 +828,7 @@ describe("The client.connect() function", () => {
         expect(listener.disconnect.mock.calls.length).toBe(0);
         expect(listener.message.mock.calls.length).toBe(0);
 
-        await nextTick();
+        await asyncUtil.nextTick();
 
         expect(listener.connecting.mock.calls.length).toBe(1);
         expect(listener.connecting.mock.calls[0].length).toBe(0);
@@ -944,7 +936,7 @@ describe("The client.disconnect() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
       expect(listener.message.mock.calls.length).toBe(0);
 
-      await nextTick();
+      await asyncUtil.nextTick();
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -966,7 +958,7 @@ describe("The client.disconnect() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
       expect(listener.message.mock.calls.length).toBe(0);
 
-      await nextTick();
+      await asyncUtil.nextTick();
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -1101,7 +1093,7 @@ describe("The client.send() function", () => {
       const listener = harn.createClientListener();
       harn.client.send("msg");
 
-      await nextTick();
+      await asyncUtil.nextTick();
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -1160,7 +1152,7 @@ describe("The client.send() function", () => {
         expect(listener.disconnect.mock.calls.length).toBe(0);
         expect(listener.message.mock.calls.length).toBe(0);
 
-        await nextTick();
+        await asyncUtil.nextTick();
 
         expect(listener.connecting.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
@@ -1256,7 +1248,7 @@ describe("The client.send() function", () => {
         expect(listener.disconnect.mock.calls.length).toBe(0);
         expect(listener.message.mock.calls.length).toBe(0);
 
-        await nextTick();
+        await asyncUtil.nextTick();
 
         expect(listener.connecting.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
@@ -1344,7 +1336,7 @@ describe("The client._processWsOpen() function", () => {
     expect(listener.disconnect.mock.calls.length).toBe(0);
     expect(listener.message.mock.calls.length).toBe(0);
 
-    await nextTick();
+    await asyncUtil.nextTick();
 
     expect(listener.connecting.mock.calls.length).toBe(0);
     expect(listener.connect.mock.calls.length).toBe(1);
@@ -1358,13 +1350,13 @@ describe("The client._processWsOpen() function", () => {
     await harn.makeWsConnecting();
     harn.client.disconnect();
 
-    await nextTick(); // Move past queued events
+    await asyncUtil.nextTick(); // Move past queued events
 
     const listener = harn.createClientListener();
     harn.getWs().readyState = harn.getWs().OPEN;
     harn.getWs().emit("open");
 
-    await nextTick();
+    await asyncUtil.nextTick();
 
     expect(listener.connecting.mock.calls.length).toBe(0);
     expect(listener.connect.mock.calls.length).toBe(0);
@@ -1464,7 +1456,7 @@ describe("The client._processWsOpen() function", () => {
       const listener = harn.createClientListener();
       jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
 
-      await nextTick();
+      await asyncUtil.nextTick();
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -1521,7 +1513,7 @@ describe("The client._processWsOpen() function", () => {
         const listener = harn.createClientListener();
         cb();
 
-        await nextTick();
+        await asyncUtil.nextTick();
 
         expect(listener.connecting.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
@@ -1590,7 +1582,7 @@ describe("The client._processWsOpen() function", () => {
         expect(listener.disconnect.mock.calls.length).toBe(0);
         expect(listener.message.mock.calls.length).toBe(0);
 
-        await nextTick();
+        await asyncUtil.nextTick();
 
         expect(listener.connecting.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
@@ -1683,12 +1675,12 @@ describe("The client._processWsOpen() function", () => {
         harn.client.disconnect();
         harn.getWs().readyState = harn.getWs().readyState.CLOSING;
 
-        await nextTick(); // Move past queued events
+        await asyncUtil.nextTick(); // Move past queued events
 
         const listener = harn.createClientListener();
         cb(new Error("SOME_ERROR"));
 
-        await nextTick();
+        await asyncUtil.nextTick();
 
         expect(listener.connecting.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
@@ -1773,12 +1765,12 @@ describe("The client._processWsOpen() function", () => {
 
         harn.getWs().emit("close", 1000, "Close reason.");
 
-        await nextTick(); // Move past queued events
+        await asyncUtil.nextTick(); // Move past queued events
 
         const listener = harn.createClientListener();
         cb(new Error("SOME_ERROR"));
 
-        await nextTick();
+        await asyncUtil.nextTick();
 
         expect(listener.connecting.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
@@ -1840,7 +1832,7 @@ describe("The client._processWsOpen() function", () => {
         const listener = harn.createClientListener();
 
         jest.advanceTimersByTime(config.defaults.heartbeatTimeoutMs);
-        await nextTick();
+        await asyncUtil.nextTick();
 
         expect(listener.connecting.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
@@ -1909,7 +1901,7 @@ describe("The client._processWsMessage() function", () => {
     expect(listener.disconnect.mock.calls.length).toBe(0);
     expect(listener.message.mock.calls.length).toBe(0);
 
-    await nextTick();
+    await asyncUtil.nextTick();
 
     expect(listener.connecting.mock.calls.length).toBe(0);
     expect(listener.connect.mock.calls.length).toBe(0);
@@ -1931,7 +1923,7 @@ describe("The client._processWsMessage() function", () => {
     expect(listener.disconnect.mock.calls.length).toBe(0);
     expect(listener.message.mock.calls.length).toBe(0);
 
-    await nextTick();
+    await asyncUtil.nextTick();
 
     expect(listener.connecting.mock.calls.length).toBe(0);
     expect(listener.connect.mock.calls.length).toBe(0);
@@ -2017,7 +2009,7 @@ describe("The client._processWsPong() function", () => {
     const listener = harn.createClientListener();
     harn.getWs().emit("pong");
 
-    await nextTick();
+    await asyncUtil.nextTick();
 
     expect(listener.connecting.mock.calls.length).toBe(0);
     expect(listener.connect.mock.calls.length).toBe(0);
@@ -2078,13 +2070,13 @@ describe("The client._processWsClose() function", () => {
       await harn.makeWsConnected();
       harn.client.disconnect();
 
-      await nextTick(); // Move past queued events
+      await asyncUtil.nextTick(); // Move past queued events
 
       const listener = harn.createClientListener();
       harn.getWs().readyState = harn.getWs().OPENING;
       harn.getWs().emit("close");
 
-      await nextTick();
+      await asyncUtil.nextTick();
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -2142,13 +2134,13 @@ describe("The client._processWsClose() function", () => {
         config.defaults.heartbeatIntervalMs + config.defaults.heartbeatTimeoutMs
       );
 
-      await nextTick(); // Move past queued events
+      await asyncUtil.nextTick(); // Move past queued events
 
       const listener = harn.createClientListener();
       harn.getWs().readyState = harn.getWs().OPENING;
       harn.getWs().emit("close");
 
-      await nextTick();
+      await asyncUtil.nextTick();
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -2243,7 +2235,7 @@ describe("The client._processWsClose() function", () => {
       harn.client.disconnect();
       harn.client.connect();
 
-      await nextTick(); // Move past queued events
+      await asyncUtil.nextTick(); // Move past queued events
 
       const listener = harn.createClientListener();
       harn.getWs().readyState = harn.getWs().CLOSING;
@@ -2254,7 +2246,7 @@ describe("The client._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
       expect(listener.message.mock.calls.length).toBe(0);
 
-      await nextTick();
+      await asyncUtil.nextTick();
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -2387,13 +2379,13 @@ describe("The client._processWsClose() function", () => {
       harn.client.disconnect();
       harn.client.connect();
 
-      await nextTick(); // Move past queued events
+      await asyncUtil.nextTick(); // Move past queued events
 
       const listener = harn.createClientListener();
       harn.getWs().readyState = harn.getWs().CLOSING;
       harn.getWs().emit("close");
 
-      await nextTick();
+      await asyncUtil.nextTick();
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -2497,7 +2489,7 @@ describe("The client._processWsClose() function", () => {
       const harn = harness("ws://localhost");
       harn.client.connect();
 
-      await nextTick(); // Move past queued events
+      await asyncUtil.nextTick(); // Move past queued events
 
       const listener = harn.createClientListener();
       harn.getWs().readyState = harn.getWs().CLOSED;
@@ -2508,7 +2500,7 @@ describe("The client._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
       expect(listener.message.mock.calls.length).toBe(0);
 
-      await nextTick();
+      await asyncUtil.nextTick();
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -2570,7 +2562,7 @@ describe("The client._processWsClose() function", () => {
       const harn = harness("ws://localhost");
       harn.makeWsConnected();
 
-      await nextTick(); // Move past queued events
+      await asyncUtil.nextTick(); // Move past queued events
 
       const listener = harn.createClientListener();
       harn.getWs().readyState = harn.getWs().CLOSED;
@@ -2581,7 +2573,7 @@ describe("The client._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
       expect(listener.message.mock.calls.length).toBe(0);
 
-      await nextTick();
+      await asyncUtil.nextTick();
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -2668,7 +2660,7 @@ describe("The client._processWsError() function", () => {
     harn.getWs().readyState = harn.getWs().CLOSED;
     harn.getWs().emit("error", new Error());
 
-    await nextTick();
+    await asyncUtil.nextTick();
 
     expect(listener.connecting.mock.calls.length).toBe(0);
     expect(listener.connect.mock.calls.length).toBe(0);
