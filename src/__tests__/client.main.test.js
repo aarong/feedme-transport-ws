@@ -2,7 +2,8 @@ import _ from "lodash";
 import check from "check-types";
 import emitter from "component-emitter";
 import client from "../client.main";
-import config from "../client.config";
+import clientConfig from "../client.config";
+import config from "../config";
 import asyncUtil from "./asyncutil";
 
 /*
@@ -41,7 +42,6 @@ State: Object members
   ._wsPreviousState
   ._state
   ._address
-  ._protocols
   ._options
   ._heartbeatInterval
   ._heartbeatTimeout
@@ -71,15 +71,15 @@ jest.useFakeTimers();
 const harnessProto = {};
 
 const harness = function harness(...args) {
-  // Arguments: address, protocols, options, wsConstructor
-  // Last three are optional
+  // Arguments: address, options, wsConstructor
+  // Last two are optional
 
   const h = Object.create(harnessProto);
 
   // Create mock wsConstructor (if not overridden)
   let constructor;
-  if (args.length === 4) {
-    constructor = args[3]; // eslint-disable-line prefer-destructuring
+  if (args.length === 3) {
+    constructor = args[2]; // eslint-disable-line prefer-destructuring
   } else {
     constructor = function c() {
       emitter(this);
@@ -101,12 +101,11 @@ const harness = function harness(...args) {
     };
   }
 
+  // Store a reference to the client on the harness object
   if (args.length === 1) {
     h.client = client(constructor, args[0]);
-  } else if (args.length === 2) {
-    h.client = client(constructor, args[0], args[1]);
   } else {
-    h.client = client(constructor, args[0], args[1], args[2], args[3]);
+    h.client = client(constructor, args[0], args[1]);
   }
   return h;
 };
@@ -174,7 +173,6 @@ harnessProto.getClientState = function getClientState() {
   state._wsPreviousState = this.client._wsPreviousState; // String or null
   state._state = this.client._state; // String
   state._address = this.client._address; // String
-  state._protocols = _.clone(this.client._protocols); // Object copy
   state._options = _.clone(this.client._options); // Object copy
   state._heartbeatInterval = !!this.client._heartbeatInterval; // Boolean
   state._heartbeatTimeout = !!this.client._heartbeatTimeout; // Boolean
@@ -235,16 +233,6 @@ const toHaveState = function toHaveState(receivedClient, expectedState) {
       pass: false,
       message() {
         return "expected ._address to match, but they didn't";
-      }
-    };
-  }
-
-  // Check _protocols
-  if (!_.isEqual(receivedClient._protocols, expectedState._protocols)) {
-    return {
-      pass: false,
-      message() {
-        return "expected ._protocols to match, but they didn't";
       }
     };
   }
@@ -353,22 +341,6 @@ describe("The toHaveState() function", () => {
       );
     });
 
-    it("should fail if _protocols values don't match - string", () => {
-      const result = toHaveState({ _protocols: "123" }, { _protocols: "456" });
-      expect(result.pass).toBe(false);
-      expect(result.message()).toBe(
-        "expected ._protocols to match, but they didn't"
-      );
-    });
-
-    it("should fail if _protocols values don't match - array", () => {
-      const result = toHaveState({ _protocols: ["123"] }, { _protocols: [] });
-      expect(result.pass).toBe(false);
-      expect(result.message()).toBe(
-        "expected ._protocols to match, but they didn't"
-      );
-    });
-
     it("should fail if _options values don't match", () => {
       const result = toHaveState(
         { _options: {} },
@@ -444,19 +416,6 @@ describe("The toHaveState() function", () => {
       expect(result.pass).toBe(true);
     });
 
-    it("should pass if _protocols matches - string", () => {
-      const result = toHaveState({ _protocols: "123" }, { _protocols: "123" });
-      expect(result.pass).toBe(true);
-    });
-
-    it("should pass if _protocols matches - array", () => {
-      const result = toHaveState(
-        { _protocols: ["123"] },
-        { _protocols: ["123"] }
-      );
-      expect(result.pass).toBe(true);
-    });
-
     it("should pass if _options matches - array", () => {
       const result = toHaveState(
         { _options: { some: "thing" } },
@@ -507,27 +466,15 @@ describe("The client() factory function", () => {
       }).toThrow(new Error("INVALID_ARGUMENT: Invalid address argument."));
     });
 
-    it("should throw on invalid protocols", () => {
-      expect(() => {
-        client(() => {}, "ws://localhost", 123);
-      }).toThrow(new Error("INVALID_ARGUMENT: Invalid protocols argument."));
-    });
-
-    it("should throw on invalid protocols element", () => {
-      expect(() => {
-        client(() => {}, "ws://localhost", [123]);
-      }).toThrow(new Error("INVALID_ARGUMENT: Invalid protocols argument."));
-    });
-
     it("should throw on invalid options", () => {
       expect(() => {
-        client(() => {}, "ws://localhost", "protocol", "junk");
+        client(() => {}, "ws://localhost", "junk");
       }).toThrow(new Error("INVALID_ARGUMENT: Invalid options argument."));
     });
 
     it("should throw on invalid options.heartbeatIntervalMs - type", () => {
       expect(() => {
-        client(() => {}, "ws://localhost", "protocol", {
+        client(() => {}, "ws://localhost", {
           heartbeatIntervalMs: "junk"
         });
       }).toThrow(
@@ -539,7 +486,7 @@ describe("The client() factory function", () => {
 
     it("should throw on invalid options.heartbeatIntervalMs - range", () => {
       expect(() => {
-        client(() => {}, "ws://localhost", "protocol", {
+        client(() => {}, "ws://localhost", {
           heartbeatIntervalMs: -1
         });
       }).toThrow(
@@ -551,7 +498,7 @@ describe("The client() factory function", () => {
 
     it("should throw on invalid options.heartbeatTimeoutMs - type", () => {
       expect(() => {
-        client(() => {}, "ws://localhost", "protocol", {
+        client(() => {}, "ws://localhost", {
           heartbeatTimeoutMs: "junk"
         });
       }).toThrow(
@@ -563,7 +510,7 @@ describe("The client() factory function", () => {
 
     it("should throw on invalid options.heartbeatTimeoutMs - range low", () => {
       expect(() => {
-        client(() => {}, "ws://localhost", "protocol", {
+        client(() => {}, "ws://localhost", {
           heartbeatTimeoutMs: 0
         });
       }).toThrow(
@@ -575,7 +522,7 @@ describe("The client() factory function", () => {
 
     it("should throw on invalid options.heartbeatTimeoutMs - range high", () => {
       expect(() => {
-        client(() => {}, "ws://localhost", "protocol", {
+        client(() => {}, "ws://localhost", {
           heartbeatIntervalMs: 5,
           heartbeatTimeoutMs: 5
         });
@@ -588,7 +535,7 @@ describe("The client() factory function", () => {
 
     it("should throw on invalid options.heartbeatTimeoutMs - heartbeat disabled", () => {
       expect(() => {
-        client(() => {}, "ws://localhost", "protocol", {
+        client(() => {}, "ws://localhost", {
           heartbeatIntervalMs: 0,
           heartbeatTimeoutMs: 5
         });
@@ -604,7 +551,7 @@ describe("The client() factory function", () => {
     // Events - N/A
     // State
 
-    it("should initialize the state correctly - no protocols/options", () => {
+    it("should initialize the state correctly - no options", () => {
       const f = () => {};
       const c = client(f, "ws://localhost");
       expect(c).toHaveState({
@@ -613,58 +560,19 @@ describe("The client() factory function", () => {
         _wsPreviousState: null,
         _state: "disconnected",
         _address: "ws://localhost",
-        _protocols: "",
         _options: {
-          heartbeatIntervalMs: config.defaults.heartbeatIntervalMs,
-          heartbeatTimeoutMs: config.defaults.heartbeatTimeoutMs
+          heartbeatIntervalMs: clientConfig.defaults.heartbeatIntervalMs,
+          heartbeatTimeoutMs: clientConfig.defaults.heartbeatTimeoutMs
         },
         _heartbeatInterval: null,
         _heartbeatTimeout: null
       });
     });
 
-    it("should initialize the state correctly - with protocols string but no options", () => {
+    it("should initialize the state correctly - with options (no transport options)", () => {
       const f = () => {};
-      const c = client(f, "ws://localhost", "protocol");
-      expect(c).toHaveState({
-        _wsConstructor: f,
-        _wsClient: null,
-        _wsPreviousState: null,
-        _state: "disconnected",
-        _address: "ws://localhost",
-        _protocols: "protocol",
-        _options: {
-          heartbeatIntervalMs: config.defaults.heartbeatIntervalMs,
-          heartbeatTimeoutMs: config.defaults.heartbeatTimeoutMs
-        },
-        _heartbeatInterval: null,
-        _heartbeatTimeout: null
-      });
-    });
-
-    it("should initialize the state correctly - with protocols array but no options", () => {
-      const f = () => {};
-      const c = client(f, "ws://localhost", ["protocol"]);
-      expect(c).toHaveState({
-        _wsConstructor: f,
-        _wsClient: null,
-        _wsPreviousState: null,
-        _state: "disconnected",
-        _address: "ws://localhost",
-        _protocols: ["protocol"],
-        _options: {
-          heartbeatIntervalMs: config.defaults.heartbeatIntervalMs,
-          heartbeatTimeoutMs: config.defaults.heartbeatTimeoutMs
-        },
-        _heartbeatInterval: null,
-        _heartbeatTimeout: null
-      });
-    });
-
-    it("should initialize the state correctly - with protocols and options (no transport options)", () => {
-      const f = () => {};
-      const c = client(f, "ws://localhost", ["protocol"], {
-        someOption: "someValue"
+      const c = client(f, "ws://localhost", {
+        someWsOption: "someValue"
       });
       expect(c).toHaveState({
         _wsConstructor: f,
@@ -672,21 +580,20 @@ describe("The client() factory function", () => {
         _wsPreviousState: null,
         _state: "disconnected",
         _address: "ws://localhost",
-        _protocols: ["protocol"],
         _options: {
-          heartbeatIntervalMs: config.defaults.heartbeatIntervalMs,
-          heartbeatTimeoutMs: config.defaults.heartbeatTimeoutMs,
-          someOption: "someValue"
+          heartbeatIntervalMs: clientConfig.defaults.heartbeatIntervalMs,
+          heartbeatTimeoutMs: clientConfig.defaults.heartbeatTimeoutMs,
+          someWsOption: "someValue"
         },
         _heartbeatInterval: null,
         _heartbeatTimeout: null
       });
     });
 
-    it("should initialize the state correctly - with protocols and options (all transport options)", () => {
+    it("should initialize the state correctly - with options (all transport options)", () => {
       const f = () => {};
-      const c = client(f, "ws://localhost", ["protocol"], {
-        someOption: "someValue",
+      const c = client(f, "ws://localhost", {
+        someWsOption: "someValue",
         heartbeatIntervalMs: 2,
         heartbeatTimeoutMs: 1
       });
@@ -696,11 +603,10 @@ describe("The client() factory function", () => {
         _wsPreviousState: null,
         _state: "disconnected",
         _address: "ws://localhost",
-        _protocols: ["protocol"],
         _options: {
           heartbeatIntervalMs: 2,
           heartbeatTimeoutMs: 1,
-          someOption: "someValue"
+          someWsOption: "someValue"
         },
         _heartbeatInterval: null,
         _heartbeatTimeout: null
@@ -859,7 +765,6 @@ describe("The client.connect() function", () => {
         };
         const harn = harness(
           "ws://localhost",
-          "prot",
           {
             heartbeatIntervalMs: 123,
             heartbeatTimeoutMs: 12,
@@ -871,7 +776,6 @@ describe("The client.connect() function", () => {
         expect(check.array(constructorArgs)).toBe(true);
         expect(constructorArgs.length).toBe(3);
         expect(constructorArgs[0]).toBe("ws://localhost");
-        expect(constructorArgs[1]).toBe("prot");
         expect(constructorArgs[2]).toEqual({
           heartbeatIntervalMs: 123,
           heartbeatTimeoutMs: 12,
@@ -999,7 +903,7 @@ describe("The client.disconnect() function", () => {
     it("should clear the heartbeatInterval and heartbeatTimeout, if present", () => {
       const harn = harness("ws://localhost");
       harn.makeWsConnected();
-      jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs); // Send a ping - creates timer
+      jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs); // Send a ping - creates timer
       clearInterval.mockClear();
       clearTimeout.mockClear();
       harn.client.disconnect();
@@ -1012,7 +916,7 @@ describe("The client.disconnect() function", () => {
     });
 
     it("should not clear the heartbeatInterval and heartbeatTimeout, if not present", () => {
-      const harn = harness("ws://localhost", "", { heartbeatIntervalMs: 0 });
+      const harn = harness("ws://localhost", { heartbeatIntervalMs: 0 });
       harn.makeWsConnected();
       clearInterval.mockClear();
       clearTimeout.mockClear();
@@ -1171,7 +1075,7 @@ describe("The client.send() function", () => {
       it("should update the state appropriately", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs); // Create heartbeat timeout
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs); // Create heartbeat timeout
         harn.client.send("msg");
         const cb = harn.getWs().send.mock.calls[0][1];
         const err = new Error("SOME_ERROR");
@@ -1190,7 +1094,7 @@ describe("The client.send() function", () => {
       it("should call clearInterval and clearTimeout", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs); // Create heartbeat timeout
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs); // Create heartbeat timeout
         harn.client.send("msg");
         const cb = harn.getWs().send.mock.calls[0][1];
         const err = new Error("SOME_ERROR");
@@ -1211,7 +1115,7 @@ describe("The client.send() function", () => {
       it("should call ws.terminate()", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs); // Create heartbeat timeout
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs); // Create heartbeat timeout
         harn.client.send("msg");
         const cb = harn.getWs().send.mock.calls[0][1];
         const err = new Error("SOME_ERROR");
@@ -1243,11 +1147,6 @@ describe("The client.send() function", () => {
 
         cb();
 
-        expect(listener.connecting.mock.calls.length).toBe(0);
-        expect(listener.connect.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(0);
-        expect(listener.message.mock.calls.length).toBe(0);
-
         await asyncUtil.nextTick();
 
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1261,7 +1160,7 @@ describe("The client.send() function", () => {
       it("should not change the state", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs); // Create heartbeat timeout
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs); // Create heartbeat timeout
         harn.client.send("msg");
         const cb = harn.getWs().send.mock.calls[0][1];
 
@@ -1275,7 +1174,7 @@ describe("The client.send() function", () => {
       it("should not call clearInterval and clearTimeout", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs); // Create heartbeat timeout
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs); // Create heartbeat timeout
         harn.client.send("msg");
         const cb = harn.getWs().send.mock.calls[0][1];
 
@@ -1291,7 +1190,7 @@ describe("The client.send() function", () => {
       it("should call nothing on ws", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs); // Create heartbeat timeout
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs); // Create heartbeat timeout
         harn.client.send("msg");
         const cb = harn.getWs().send.mock.calls[0][1];
 
@@ -1393,7 +1292,7 @@ describe("The client._processWsOpen() function", () => {
   });
 
   it("if not closing the ws connection and heartbeat is not enabled, should update state appropriately", () => {
-    const harn = harness("ws://localhost", "", { heartbeatIntervalMs: 0 });
+    const harn = harness("ws://localhost", { heartbeatIntervalMs: 0 });
     harn.makeWsConnecting();
     const newState = harn.getClientState();
     newState._wsPreviousState = "connected";
@@ -1454,7 +1353,7 @@ describe("The client._processWsOpen() function", () => {
       await harn.makeWsConnected();
 
       const listener = harn.createClientListener();
-      jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+      jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
 
       await asyncUtil.nextTick();
 
@@ -1472,7 +1371,7 @@ describe("The client._processWsOpen() function", () => {
 
       const newState = harn.getClientState();
       newState._heartbeatTimeout = 123;
-      jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+      jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
       expect(harn.client).toHaveState(newState);
     });
 
@@ -1485,7 +1384,7 @@ describe("The client._processWsOpen() function", () => {
       harn.makeWsConnected();
 
       harn.getWs().mockClear();
-      jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+      jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
 
       expect(harn.getWs().ping.mock.calls.length).toBe(1);
       expect(harn.getWs().ping.mock.calls[0].length).toBe(1);
@@ -1507,7 +1406,7 @@ describe("The client._processWsOpen() function", () => {
         await harn.makeWsConnected();
 
         harn.getWs().mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         const listener = harn.createClientListener();
@@ -1528,7 +1427,7 @@ describe("The client._processWsOpen() function", () => {
         harn.makeWsConnected();
 
         harn.getWs().mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         const newState = harn.getClientState();
@@ -1545,7 +1444,7 @@ describe("The client._processWsOpen() function", () => {
         harn.makeWsConnected();
 
         harn.getWs().mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         harn.getWs().mockClear();
@@ -1570,7 +1469,7 @@ describe("The client._processWsOpen() function", () => {
         await harn.makeWsConnected();
 
         harn.getWs().mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         const listener = harn.createClientListener();
@@ -1603,7 +1502,7 @@ describe("The client._processWsOpen() function", () => {
         harn.makeWsConnected();
 
         harn.getWs().mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         const newState = harn.getClientState();
@@ -1622,7 +1521,7 @@ describe("The client._processWsOpen() function", () => {
         harn.makeWsConnected();
 
         harn.getWs().mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         clearInterval.mockClear();
@@ -1643,7 +1542,7 @@ describe("The client._processWsOpen() function", () => {
         harn.makeWsConnected();
 
         harn.getWs().mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         harn.getWs().mockClear();
@@ -1669,7 +1568,7 @@ describe("The client._processWsOpen() function", () => {
         await harn.makeWsConnected();
 
         harn.getWs().mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         harn.client.disconnect();
@@ -1695,7 +1594,7 @@ describe("The client._processWsOpen() function", () => {
         harn.makeWsConnected();
 
         harn.getWs().mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         harn.client.disconnect();
@@ -1713,7 +1612,7 @@ describe("The client._processWsOpen() function", () => {
         harn.makeWsConnected();
 
         harn.getWs().mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         harn.client.disconnect();
@@ -1733,7 +1632,7 @@ describe("The client._processWsOpen() function", () => {
         harn.makeWsConnected();
 
         harn.getWs().mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         harn.client.disconnect();
@@ -1760,7 +1659,7 @@ describe("The client._processWsOpen() function", () => {
         await harn.makeWsConnected();
 
         harn.getWs().mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         harn.getWs().emit("close", 1000, "Close reason.");
@@ -1785,7 +1684,7 @@ describe("The client._processWsOpen() function", () => {
         harn.makeWsConnected();
 
         harn.getWs().mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         harn.getWs().emit("close", 1000, "Close reason.");
@@ -1802,7 +1701,7 @@ describe("The client._processWsOpen() function", () => {
         harn.makeWsConnected();
 
         harn.getWs().mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         harn.getWs().emit("close", 1000, "Close reason.");
@@ -1827,11 +1726,11 @@ describe("The client._processWsOpen() function", () => {
       it("should emit disconnect next tick", async () => {
         const harn = harness("ws://localhost");
         await harn.makeWsConnected();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
 
         const listener = harn.createClientListener();
 
-        jest.advanceTimersByTime(config.defaults.heartbeatTimeoutMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatTimeoutMs);
         await asyncUtil.nextTick();
 
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1851,14 +1750,14 @@ describe("The client._processWsOpen() function", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
 
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
 
         const newState = harn.getClientState();
         newState._wsPreviousState = "disconnecting";
         newState._state = "disconnected";
         newState._heartbeatInterval = null;
         newState._heartbeatTimeout = null;
-        jest.advanceTimersByTime(config.defaults.heartbeatTimeoutMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatTimeoutMs);
         expect(harn.client).toHaveState(newState);
       });
 
@@ -1869,9 +1768,9 @@ describe("The client._processWsOpen() function", () => {
       it("should call ws.terminate()", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
         harn.getWs().mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatTimeoutMs);
+        jest.advanceTimersByTime(clientConfig.defaults.heartbeatTimeoutMs);
         expect(harn.getWs().ping.mock.calls.length).toBe(0);
         expect(harn.getWs().send.mock.calls.length).toBe(0);
         expect(harn.getWs().close.mock.calls.length).toBe(0);
@@ -1911,7 +1810,7 @@ describe("The client._processWsMessage() function", () => {
     expect(listener.message.mock.calls[0][0]).toBe("some_msg");
   });
 
-  it("should asynchronously emit disconnect if invalid data type", async () => {
+  it("should emit disconnect next tick if invalid data type", async () => {
     const harn = harness("ws://localhost");
     await harn.makeWsConnected();
 
@@ -1931,7 +1830,7 @@ describe("The client._processWsMessage() function", () => {
     expect(listener.disconnect.mock.calls[0].length).toBe(1);
     expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
     expect(listener.disconnect.mock.calls[0][0].message).toBe(
-      "DISCONNECTED: Received invalid message type on WebSocket connection."
+      "FAILURE: Received non-string message on WebSocket connection."
     );
     expect(listener.message.mock.calls.length).toBe(0);
   });
@@ -2004,7 +1903,7 @@ describe("The client._processWsPong() function", () => {
     const harn = harness("ws://localhost");
     await harn.makeWsConnected();
 
-    jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+    jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
 
     const listener = harn.createClientListener();
     harn.getWs().emit("pong");
@@ -2022,7 +1921,7 @@ describe("The client._processWsPong() function", () => {
   it("should update the state appropriately", () => {
     const harn = harness("ws://localhost");
     harn.makeWsConnected();
-    jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+    jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
     const newState = harn.getClientState();
     newState._heartbeatTimeout = null;
     harn.getWs().emit("pong");
@@ -2034,7 +1933,7 @@ describe("The client._processWsPong() function", () => {
   it("should clear the heartbeat timeout", () => {
     const harn = harness("ws://localhost");
     harn.makeWsConnected();
-    jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+    jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
     clearTimeout.mockClear();
     harn.getWs().emit("pong");
     expect(clearTimeout.mock.calls.length).toBe(1);
@@ -2047,7 +1946,7 @@ describe("The client._processWsPong() function", () => {
   it("should do nothing on ws", () => {
     const harn = harness("ws://localhost");
     harn.makeWsConnected();
-    jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+    jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
     harn.getWs().mockClear();
     harn.getWs().emit("pong");
     expect(harn.getWs().ping.mock.calls.length).toBe(0);
@@ -2131,7 +2030,8 @@ describe("The client._processWsClose() function", () => {
       await harn.makeWsConnected();
 
       jest.advanceTimersByTime(
-        config.defaults.heartbeatIntervalMs + config.defaults.heartbeatTimeoutMs
+        clientConfig.defaults.heartbeatIntervalMs +
+          clientConfig.defaults.heartbeatTimeoutMs
       );
 
       await asyncUtil.nextTick(); // Move past queued events
@@ -2154,7 +2054,8 @@ describe("The client._processWsClose() function", () => {
       const harn = harness("ws://localhost");
       harn.makeWsConnected();
       jest.advanceTimersByTime(
-        config.defaults.heartbeatIntervalMs + config.defaults.heartbeatTimeoutMs
+        clientConfig.defaults.heartbeatIntervalMs +
+          clientConfig.defaults.heartbeatTimeoutMs
       );
 
       const newState = harn.getClientState();
@@ -2173,7 +2074,8 @@ describe("The client._processWsClose() function", () => {
       const harn = harness("ws://localhost");
       harn.makeWsConnected();
       jest.advanceTimersByTime(
-        config.defaults.heartbeatIntervalMs + config.defaults.heartbeatTimeoutMs
+        clientConfig.defaults.heartbeatIntervalMs +
+          clientConfig.defaults.heartbeatTimeoutMs
       );
 
       const prevWs = harn.getWs();
@@ -2223,7 +2125,6 @@ describe("The client._processWsClose() function", () => {
       };
       const harn = harness(
         "ws://localhost",
-        "prot",
         {
           heartbeatIntervalMs: 123,
           heartbeatTimeoutMs: 12,
@@ -2254,7 +2155,7 @@ describe("The client._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "DISCONNECTED: Could not initialize the WebSocket client."
+        "FAILURE: Could not initialize the WebSocket client."
       );
       expect(listener.disconnect.mock.calls[0][0].wsError).toBe(err);
       expect(listener.message.mock.calls.length).toBe(0);
@@ -2290,7 +2191,6 @@ describe("The client._processWsClose() function", () => {
       };
       const harn = harness(
         "ws://localhost",
-        "prot",
         {
           heartbeatIntervalMs: 123,
           heartbeatTimeoutMs: 12,
@@ -2343,7 +2243,6 @@ describe("The client._processWsClose() function", () => {
       };
       const harn = harness(
         "ws://localhost",
-        "prot",
         {
           heartbeatIntervalMs: 123,
           heartbeatTimeoutMs: 12,
@@ -2433,7 +2332,6 @@ describe("The client._processWsClose() function", () => {
       };
       const harn = harness(
         "ws://localhost",
-        "prot",
         {
           heartbeatIntervalMs: 123,
           heartbeatTimeoutMs: 12,
@@ -2451,7 +2349,7 @@ describe("The client._processWsClose() function", () => {
       expect(check.array(constructorArgs)).toBe(true);
       expect(constructorArgs.length).toBe(3);
       expect(constructorArgs[0]).toBe("ws://localhost");
-      expect(constructorArgs[1]).toBe("prot");
+      expect(constructorArgs[1]).toBe(config.wsSubprotocol);
       expect(constructorArgs[2]).toEqual({
         heartbeatIntervalMs: 123,
         heartbeatTimeoutMs: 12,
@@ -2508,7 +2406,7 @@ describe("The client._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "DISCONNECTED: The WebSocket could not be opened."
+        "FAILURE: The WebSocket could not be opened."
       );
       expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1234);
       expect(listener.disconnect.mock.calls[0][0].wsReason).toBe(
@@ -2581,7 +2479,7 @@ describe("The client._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "DISCONNECTED: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly."
       );
       expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1234);
       expect(listener.disconnect.mock.calls[0][0].wsReason).toBe(
@@ -2595,7 +2493,7 @@ describe("The client._processWsClose() function", () => {
     it("should update the state appropriately", () => {
       const harn = harness("ws://localhost");
       harn.makeWsConnected();
-      jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+      jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
 
       const newState = harn.getClientState();
       newState._state = "disconnected";
@@ -2613,7 +2511,7 @@ describe("The client._processWsClose() function", () => {
     it("should call clearInterval and clearTimeout", () => {
       const harn = harness("ws://localhost");
       harn.makeWsConnected();
-      jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+      jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
 
       clearInterval.mockClear();
       clearTimeout.mockClear();

@@ -1,6 +1,7 @@
 import emitter from "component-emitter";
 import check from "check-types";
 import debug from "debug";
+import config from "./config";
 
 const dbg = debug("feedme-transport-ws:browser");
 
@@ -24,7 +25,6 @@ emitter(proto);
  * quick sequence of calls to transport.disconnect() and transport.connect().
  * @param {Function} wsConstructor WebSocket client constructor
  * @param {string} address Endpoint address for WebSocket
- * @param {?string|Array} protocols Protocols for WebSocket
  * @throws {Error} "INVALID_ARGUMENT: ..."
  * @returns {Browser}
  */
@@ -50,25 +50,6 @@ export default function browserFactory(...args) {
     const err = new Error("INVALID_ARGUMENT: Invalid address argument.");
     err.urlError = e;
     throw err;
-  }
-
-  // Check protocols (if specified)
-  let protocols;
-  if (args.length > 2) {
-    if (check.string(args[2])) {
-      protocols = args[2]; // eslint-disable-line prefer-destructuring
-    } else if (check.array(args[2])) {
-      args[2].forEach(protocol => {
-        if (!check.string(protocol)) {
-          throw new Error("INVALID_ARGUMENT: Invalid protocols argument.");
-        }
-      });
-      protocols = args[2].join(",");
-    } else {
-      throw new Error("INVALID_ARGUMENT: Invalid protocols argument.");
-    }
-  } else {
-    protocols = "";
   }
 
   // Success
@@ -133,16 +114,6 @@ export default function browserFactory(...args) {
    */
   browser._address = address;
 
-  /**
-   * Protocols passed to ws. Must be a string for browsers, unlike ws, which
-   * also accepts arrays.
-   * @memberof Browser
-   * @instance
-   * @private
-   * @type {string}
-   */
-  browser._protocols = protocols;
-
   return browser;
 }
 
@@ -171,7 +142,7 @@ export default function browserFactory(...args) {
  * @event disconnect
  * @memberof Browser
  * @instance
- * @param {?Error} err "DISCONNECTED: ..." if not due to call to client.disconnect()
+ * @param {?Error} err "FAILURE: ..." if not due to call to client.disconnect()
  */
 
 // Public API
@@ -216,13 +187,13 @@ proto.connect = function connect() {
     try {
       this._wsClient = new this._wsConstructor(
         this._address,
-        this._protocols ? this._protocols : undefined
+        config.wsSubprotocol
       );
     } catch (e) {
       dbg("Failed to initialize WebSocket client");
       dbg(e);
       const err = new Error(
-        "DISCONNECTED: Could not initialize the WebSocket client."
+        "FAILURE: Could not initialize the WebSocket client."
       );
       err.wsError = e;
       this._state = "disconnected";
@@ -365,9 +336,7 @@ proto._processWsMessage = function _processWsMessage(evt) {
     dbg("Unexpected WebSocket message type");
     dbg(evt.data);
     this.disconnect(
-      new Error(
-        "DISCONNECTED: Received invalid message type on WebSocket connection."
-      )
+      new Error("FAILURE: Received non-string message on WebSocket connection.")
     );
     return; // Stop
   }
@@ -417,7 +386,7 @@ proto._processWsClose = function _processWsClose(evt) {
     try {
       this._wsClient = new this._wsConstructor(
         this._address,
-        this._protocols ? this._protocols : undefined
+        config.wsSubprotocol
       );
     } catch (e) {
       dbg("Failed to initialize ws client");
@@ -426,7 +395,7 @@ proto._processWsClose = function _processWsClose(evt) {
       this._wsPreviousState = null;
       this._state = "disconnected";
       const err = new Error(
-        "DISCONNECTED: Could not initialize the WebSocket client."
+        "FAILURE: Could not initialize the WebSocket client."
       );
       err.wsError = e;
       this.emit("disconnect", err);
@@ -447,8 +416,8 @@ proto._processWsClose = function _processWsClose(evt) {
     dbg("Transport connection failed unexpectedly");
     const errMsg =
       this._state === "connecting"
-        ? "DISCONNECTED: The WebSocket could not be opened."
-        : "DISCONNECTED: The WebSocket closed unexpectedly.";
+        ? "FAILURE: The WebSocket could not be opened."
+        : "FAILURE: The WebSocket closed unexpectedly.";
     this._wsClient = null;
     this._wsPreviousState = null;
     this._state = "disconnected";

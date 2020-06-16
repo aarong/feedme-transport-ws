@@ -11,27 +11,32 @@ Check:
 
   - Errors and return values
   - State functions:  transport.state()
-  - Client transport events
+  - transport client events
   - WS server events
 
-Does not test argument validity (done in unit tests) or that return
+Does not test argument validitation (done in unit tests) or that return
 values are empty (only state() returns a value and it's checked everywhere).
 
-Does not use Jest fake timers, which do not result in communications being sent
-through the actual WebSocket. Uses real timers configured to time out quickly.
+Can not use Jest fake timers, as they do not result in communications being sent
+through the actual WebSocket. Instead, uses real timers configured to time out
+quickly.
 
 With real timers, if the transport does setTimeout() for X ms, you can not
 ensure that it has fired by simply doing a setTimeout() for X ms in the tests.
 The test timer needs to wait an additional few milliseconds to ensure that the
-tranport timer has fired, which is configured using EPSILON. EPSILON is also
-used to account for latency between the server and the client and needs to be set
-conservatively (high), otherwise tests will intermittently pass/fail.
+tranport timer has fired, which is configured using EPSILON.
+
+There is latency when interacting across the WebSocket connection, so test
+timers need to wait an additional period to ensure that a communcation is
+complete. The length of this period is configured using LATENCY, which needs to
+be set conservatively (high), otherwise tests will intermittently pass/fail.
 
 */
 
-const EPSILON = 100;
+const EPSILON = 20;
+const LATENCY = 50;
 
-let nextPortNumber = 3000;
+let nextPortNumber = 3000; // Do not interfere with other test suites
 const getNextPortNumber = () => {
   // Avoid server port conflicts across tests
   nextPortNumber += 1;
@@ -112,7 +117,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
         heartbeatTimeoutMs
       });
@@ -124,7 +129,7 @@ describe("The transport client configuration options", () => {
       // Disable ws server ping listener and wait for the heartbeat to timeout
       wsServerClient._receiver._events.ping = () => {};
       await asyncUtil.setTimeout(
-        heartbeatIntervalMs + heartbeatTimeoutMs + EPSILON
+        heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON
       );
 
       expect(transportClient.state()).toBe("disconnected");
@@ -134,9 +139,9 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
-    it("should emit correctly on the client transport", async () => {
+    it("should emit correctly on the transport client", async () => {
       let wsServerClient;
       const port = getNextPortNumber();
 
@@ -148,7 +153,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
         heartbeatTimeoutMs
       });
@@ -160,7 +165,7 @@ describe("The transport client configuration options", () => {
       // Disable ws server ping listener and wait for the heartbeat to timeout
       wsServerClient._receiver._events.ping = () => {};
       await asyncUtil.setTimeout(
-        heartbeatIntervalMs + heartbeatTimeoutMs + EPSILON
+        heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON
       );
 
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -178,7 +183,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events
+    // WS server events
 
     it("should emit correctly on the server", async () => {
       let wsServerClient;
@@ -192,7 +197,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
         heartbeatTimeoutMs
       });
@@ -205,7 +210,7 @@ describe("The transport client configuration options", () => {
       // Disable ws server ping listener and wait for the heartbeat to timeout
       wsServerClient._receiver._events.ping = () => {};
       await asyncUtil.setTimeout(
-        heartbeatIntervalMs + heartbeatTimeoutMs + EPSILON
+        heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON
       );
 
       expect(sListener.close.mock.calls.length).toBe(0);
@@ -246,7 +251,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
         heartbeatTimeoutMs
       });
@@ -256,14 +261,14 @@ describe("The transport client configuration options", () => {
       expect(transportClient.state()).toBe("connected");
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + EPSILON));
+      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(transportClient.state()).toBe("connected");
 
       // Disable ws server ping listener and wait for the heartbeat to timeout
       wsServerClient._receiver._events.ping = () => {};
       await asyncUtil.setTimeout(
-        heartbeatIntervalMs + heartbeatTimeoutMs + EPSILON
+        heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON
       );
 
       expect(transportClient.state()).toBe("disconnected");
@@ -273,9 +278,9 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
-    it("should emit correctly on the client transport", async () => {
+    it("should emit correctly on the transport client", async () => {
       let wsServerClient;
       const port = getNextPortNumber();
 
@@ -287,7 +292,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
         heartbeatTimeoutMs
       });
@@ -297,7 +302,7 @@ describe("The transport client configuration options", () => {
       const listener = createClientListener(transportClient);
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + EPSILON));
+      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -307,7 +312,7 @@ describe("The transport client configuration options", () => {
       // Disable ws server ping listener and wait for the heartbeat to timeout
       wsServerClient._receiver._events.ping = () => {};
       await asyncUtil.setTimeout(
-        heartbeatIntervalMs + heartbeatTimeoutMs + EPSILON
+        heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON
       );
 
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -325,7 +330,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events
+    // WS server events
 
     it("should emit correctly on the server", async () => {
       let wsServerClient;
@@ -339,7 +344,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
         heartbeatTimeoutMs
       });
@@ -350,7 +355,7 @@ describe("The transport client configuration options", () => {
       const cListener = createWsServerClientListener(wsServerClient);
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + EPSILON));
+      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -369,7 +374,7 @@ describe("The transport client configuration options", () => {
       // Disable ws server ping listener and wait for the heartbeat to timeout
       wsServerClient._receiver._events.ping = () => {};
       await asyncUtil.setTimeout(
-        heartbeatIntervalMs + heartbeatTimeoutMs + EPSILON
+        heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON
       );
 
       expect(sListener.close.mock.calls.length).toBe(0);
@@ -406,7 +411,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
         heartbeatTimeoutMs
       });
@@ -429,9 +434,9 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
-    it("should emit correctly on the client transport", async () => {
+    it("should emit correctly on the transport client", async () => {
       const port = getNextPortNumber();
 
       // Start a ws server and wait for it to start listening
@@ -439,7 +444,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
         heartbeatTimeoutMs
       });
@@ -470,7 +475,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events - N/A (ping callback error induced by connection closure)
+    // WS server events - N/A (ping callback error induced by connection closure)
   });
 
   describe("If the heartbeat is enabled and ws.ping() calls back failure eventually", () => {
@@ -486,7 +491,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
         heartbeatTimeoutMs
       });
@@ -496,7 +501,7 @@ describe("The transport client configuration options", () => {
       expect(transportClient.state()).toBe("connected");
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + EPSILON));
+      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(transportClient.state()).toBe("connected");
 
@@ -514,9 +519,9 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
-    it("should emit correctly on the client transport", async () => {
+    it("should emit correctly on the transport client", async () => {
       const port = getNextPortNumber();
 
       // Start a ws server and wait for it to start listening
@@ -524,7 +529,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
         heartbeatTimeoutMs
       });
@@ -534,7 +539,7 @@ describe("The transport client configuration options", () => {
       const listener = createClientListener(transportClient);
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + EPSILON));
+      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -563,7 +568,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events - N/A (ping failure induced by secret connection closure)
+    // WS server events - N/A (ping failure induced by secret connection closure)
   });
 
   describe("If the heartbeat is enabled and server is always responsive to pings", () => {
@@ -579,7 +584,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
         heartbeatTimeoutMs
       });
@@ -589,7 +594,7 @@ describe("The transport client configuration options", () => {
       expect(transportClient.state()).toBe("connected");
 
       // Run through the ping/pong cycle a bunch of times
-      await asyncUtil.setTimeout(20 * (heartbeatIntervalMs + EPSILON));
+      await asyncUtil.setTimeout(20 * (heartbeatIntervalMs + LATENCY));
 
       expect(transportClient.state()).toBe("connected");
 
@@ -598,9 +603,9 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
-    it("should emit correctly on the client transport", async () => {
+    it("should emit correctly on the transport client", async () => {
       const port = getNextPortNumber();
 
       // Start a ws server and wait for it to start listening
@@ -608,7 +613,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
         heartbeatTimeoutMs
       });
@@ -618,7 +623,7 @@ describe("The transport client configuration options", () => {
       const listener = createClientListener(transportClient);
 
       // Run through the ping/pong cycle a bunch of times
-      await asyncUtil.setTimeout(20 * (heartbeatIntervalMs + EPSILON));
+      await asyncUtil.setTimeout(20 * (heartbeatIntervalMs + LATENCY));
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -630,7 +635,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events
+    // WS server events
 
     it("should emit correctly on the server", async () => {
       let wsServerClient;
@@ -644,7 +649,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
         heartbeatTimeoutMs
       });
@@ -655,7 +660,7 @@ describe("The transport client configuration options", () => {
       const cListener = createWsServerClientListener(wsServerClient);
 
       // Run through the ping/pong cycle a bunch of times
-      await asyncUtil.setTimeout(20 * (heartbeatIntervalMs + EPSILON));
+      await asyncUtil.setTimeout(20 * (heartbeatIntervalMs + LATENCY));
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -692,7 +697,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs: 0
       });
       transportClient.connect();
@@ -701,7 +706,7 @@ describe("The transport client configuration options", () => {
       expect(transportClient.state()).toBe("connected");
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + EPSILON));
+      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(transportClient.state()).toBe("connected");
 
@@ -709,7 +714,7 @@ describe("The transport client configuration options", () => {
       // few more times
       wsServerClient._receiver._events.ping = () => {};
       await asyncUtil.setTimeout(
-        5 * (heartbeatIntervalMs + heartbeatTimeoutMs + EPSILON)
+        5 * (heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON)
       );
 
       expect(transportClient.state()).toBe("connected");
@@ -719,9 +724,9 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
-    it("should emit correctly on the client transport", async () => {
+    it("should emit correctly on the transport client", async () => {
       let wsServerClient;
       const port = getNextPortNumber();
 
@@ -733,7 +738,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs: 0
       });
       transportClient.connect();
@@ -742,7 +747,7 @@ describe("The transport client configuration options", () => {
       const listener = createClientListener(transportClient);
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + EPSILON));
+      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -753,7 +758,7 @@ describe("The transport client configuration options", () => {
       // few more times
       wsServerClient._receiver._events.ping = () => {};
       await asyncUtil.setTimeout(
-        5 * (heartbeatIntervalMs + heartbeatTimeoutMs + EPSILON)
+        5 * (heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON)
       );
 
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -766,7 +771,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events
+    // WS server events
 
     it("should emit correctly on the server", async () => {
       let wsServerClient;
@@ -780,7 +785,7 @@ describe("The transport client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs: 0
       });
       transportClient.connect();
@@ -790,7 +795,7 @@ describe("The transport client configuration options", () => {
       const cListener = createWsServerClientListener(wsServerClient);
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + EPSILON));
+      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -813,6 +818,7 @@ describe("The transport client configuration options", () => {
 
 describe("Key ws client configuration options", () => {
   describe("The maxPayload setting, if exceeded", () => {
+    const maxPayload = 100;
     // Errors and return values - N/A
 
     // State functions
@@ -829,17 +835,23 @@ describe("Key ws client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
-        maxPayload: 100
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
+        maxPayload
       });
       transportClient.connect();
       await asyncUtil.once(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
+      // Have the server not violate max payload
+      wsServerClient.send("z".repeat(maxPayload));
+      await asyncUtil.setTimeout(LATENCY);
+
+      expect(transportClient.state()).toBe("connected");
+
       // Have the server violate max payload
-      wsServerClient.send("z".repeat(101));
-      await asyncUtil.setTimeout(EPSILON);
+      wsServerClient.send("z".repeat(maxPayload + 1));
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(transportClient.state()).toBe("disconnected");
 
@@ -848,9 +860,9 @@ describe("Key ws client configuration options", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // Transport client events
 
-    it("should emit correctly on the client transport", async () => {
+    it("should emit correctly on the transport client", async () => {
       let wsServerClient;
       const port = getNextPortNumber();
 
@@ -862,7 +874,7 @@ describe("Key ws client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         maxPayload: 100
       });
       transportClient.connect();
@@ -870,9 +882,22 @@ describe("Key ws client configuration options", () => {
 
       const listener = createClientListener(transportClient);
 
+      // Have the server not violate max payload
+      wsServerClient.send("z".repeat(maxPayload));
+      await asyncUtil.setTimeout(LATENCY);
+
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.connecting.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(1);
+      expect(listener.message.mock.calls[0].length).toBe(1);
+      expect(listener.message.mock.calls[0][0]).toBe("z".repeat(maxPayload));
+
+      listener.mockClear();
+
       // Have the server violate max payload
-      wsServerClient.send("z".repeat(101));
-      await asyncUtil.setTimeout(EPSILON);
+      wsServerClient.send("z".repeat(maxPayload + 1));
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -880,7 +905,7 @@ describe("Key ws client configuration options", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "DISCONNECTED: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly."
       );
       expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1009); // Message too big
       expect(listener.message.mock.calls.length).toBe(0);
@@ -890,7 +915,7 @@ describe("Key ws client configuration options", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events
+    // WS server events
 
     it("should emit close on ws server", async () => {
       let wsServerClient;
@@ -904,7 +929,7 @@ describe("Key ws client configuration options", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
+      const transportClient = transportWsClient(`ws://localhost:${port}`, {
         maxPayload: 100
       });
       transportClient.connect();
@@ -913,9 +938,25 @@ describe("Key ws client configuration options", () => {
       const sListener = createWsServerListener(wsServer);
       const cListener = createWsServerClientListener(wsServerClient);
 
+      // Have the server not violate max payload
+      wsServerClient.send("z".repeat(maxPayload));
+      await asyncUtil.setTimeout(LATENCY);
+
+      expect(sListener.close.mock.calls.length).toBe(0);
+      expect(sListener.connection.mock.calls.length).toBe(0);
+      expect(sListener.error.mock.calls.length).toBe(0);
+      expect(sListener.listening.mock.calls.length).toBe(0);
+
+      expect(cListener.close.mock.calls.length).toBe(0);
+      expect(cListener.error.mock.calls.length).toBe(0);
+      expect(cListener.message.mock.calls.length).toBe(0);
+      expect(cListener.open.mock.calls.length).toBe(0);
+      expect(cListener.ping.mock.calls.length).toBe(0);
+      expect(cListener.pong.mock.calls.length).toBe(0);
+
       // Have the server violate max payload
-      wsServerClient.send("z".repeat(101));
-      await asyncUtil.setTimeout(EPSILON);
+      wsServerClient.send("z".repeat(maxPayload + 1));
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -954,9 +995,9 @@ describe("The factory function", () => {
     expect(transportWsClient("ws://localhost").state()).toBe("disconnected");
   });
 
-  // Client transport events - N/A
+  // transport client events - N/A
 
-  // Server events - N/A
+  // WS server events - N/A
 });
 
 describe("The transport.connect() function", () => {
@@ -969,9 +1010,7 @@ describe("The transport.connect() function", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Create a transport client and confirm failure on double-call to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
-        maxPayload: 100
-      });
+      const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
       expect(() => {
         transportClient.connect();
@@ -990,9 +1029,7 @@ describe("The transport.connect() function", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
-        maxPayload: 100
-      });
+      const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
       await asyncUtil.once(transportClient, "connect");
 
@@ -1016,9 +1053,7 @@ describe("The transport.connect() function", () => {
       await asyncUtil.once(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, "", {
-        maxPayload: 100
-      });
+      const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
       await asyncUtil.once(transportClient, "connect");
 
@@ -1040,7 +1075,7 @@ describe("The transport.connect() function", () => {
         // Provide a valid URL so the transport constructor doesn't throw,
         // but an invalid ws option to make its constructor throw
         // State should become disconnected synchronously
-        const transportClient = transportWsClient("ws://localhost", "", {
+        const transportClient = transportWsClient("ws://localhost", {
           protocolVersion: "junk"
         });
         expect(transportClient.state()).toBe("disconnected");
@@ -1048,12 +1083,12 @@ describe("The transport.connect() function", () => {
         expect(transportClient.state()).toBe("disconnected");
       });
 
-      // Client transport events
+      // transport client events
 
       it("should asynchronously emit transport connecting and then disconnect", async () => {
         // Provide a valid URL so the transport constructor doesn't throw,
         // but an invalid ws option to make its constructor throw
-        const transportClient = transportWsClient("ws://localhost", "", {
+        const transportClient = transportWsClient("ws://localhost", {
           protocolVersion: "junk"
         });
 
@@ -1085,7 +1120,7 @@ describe("The transport.connect() function", () => {
         expect(listener.disconnect.mock.calls[0].length).toBe(1);
         expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
         expect(listener.disconnect.mock.calls[0][0].message).toBe(
-          "DISCONNECTED: Could not initialize the WebSocket client."
+          "FAILURE: Could not initialize the WebSocket client."
         );
         expect(listener.disconnect.mock.calls[0][0].wsError).toBeInstanceOf(
           Error
@@ -1094,7 +1129,7 @@ describe("The transport.connect() function", () => {
         expect(eventOrder).toEqual(["connecting", "disconnect"]);
       });
 
-      // Server events - N/A
+      // WS server events - N/A
     });
 
     describe("If transport is disconnected and ws is disconnected - ws constructor succeeds", () => {
@@ -1116,7 +1151,7 @@ describe("The transport.connect() function", () => {
         expect(transportClient.state()).toBe("connecting");
 
         // State should become connected later
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
         expect(transportClient.state()).toBe("connected");
 
         // Clean up
@@ -1124,7 +1159,7 @@ describe("The transport.connect() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Client transport events
+      // transport client events
 
       it("should asynchronously emit transport connecting and then connect", async () => {
         const port = getNextPortNumber();
@@ -1154,7 +1189,7 @@ describe("The transport.connect() function", () => {
         listener.mockClear();
 
         // Emit connect later
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
         expect(listener.connecting.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(1);
         expect(listener.connect.mock.calls[0].length).toBe(0);
@@ -1166,7 +1201,7 @@ describe("The transport.connect() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Server events
+      // WS server events
 
       it("should emit ws server connection", async () => {
         const port = getNextPortNumber();
@@ -1180,7 +1215,7 @@ describe("The transport.connect() function", () => {
         // Connect a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
         transportClient.connect();
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         expect(sListener.close.mock.calls.length).toBe(0);
         expect(sListener.connection.mock.calls.length).toBe(1);
@@ -1214,7 +1249,7 @@ describe("The transport.connect() function", () => {
 
         expect(transportClient.state()).toBe("connecting");
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         expect(transportClient.state()).toBe("connected");
 
@@ -1223,7 +1258,7 @@ describe("The transport.connect() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Client transport events
+      // transport client events
 
       it("should asynchronously emit transport connecting and then connect", async () => {
         const port = getNextPortNumber();
@@ -1259,7 +1294,7 @@ describe("The transport.connect() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         listener.mockClear();
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         // Emit connect later
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1273,7 +1308,7 @@ describe("The transport.connect() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Server events
+      // WS server events
 
       it("should emit one ws server connection", async () => {
         const port = getNextPortNumber();
@@ -1290,7 +1325,7 @@ describe("The transport.connect() function", () => {
         transportClient.disconnect(); // ws is still connecting
         transportClient.connect();
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         expect(sListener.close.mock.calls.length).toBe(0);
         expect(sListener.connection.mock.calls.length).toBe(1);
@@ -1328,7 +1363,7 @@ describe("The transport.connect() function", () => {
 
         expect(transportClient.state()).toBe("connecting");
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         expect(transportClient.state()).toBe("connected");
 
@@ -1337,7 +1372,7 @@ describe("The transport.connect() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Client transport events
+      // transport client events
 
       it("should asynchronously emit transport connecting and then connect", async () => {
         const port = getNextPortNumber();
@@ -1373,7 +1408,7 @@ describe("The transport.connect() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         listener.mockClear();
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         // Emit connect later
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1387,7 +1422,7 @@ describe("The transport.connect() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Server events
+      // WS server events
 
       it("should emit one ws server connection", async () => {
         const port = getNextPortNumber();
@@ -1406,7 +1441,7 @@ describe("The transport.connect() function", () => {
 
         transportClient.connect();
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         expect(sListener.close.mock.calls.length).toBe(0);
         expect(sListener.connection.mock.calls.length).toBe(1);
@@ -1452,7 +1487,7 @@ describe("The transport.disconnect() function", () => {
 
         expect(transportClient.state()).toBe("disconnected");
 
-        await asyncUtil.setTimeout(EPSILON); // ws has disconnected
+        await asyncUtil.setTimeout(LATENCY); // ws has disconnected
 
         expect(transportClient.state()).toBe("disconnected");
 
@@ -1461,7 +1496,7 @@ describe("The transport.disconnect() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Client transport events
+      // transport client events
 
       it("should asynchronously emit disconnect - with err", async () => {
         const port = getNextPortNumber();
@@ -1498,7 +1533,7 @@ describe("The transport.disconnect() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         listener.mockClear();
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         // Emit nothing when ws actually disconnects
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1544,7 +1579,7 @@ describe("The transport.disconnect() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         listener.mockClear();
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         // Emit nothing when ws actually disconnects
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1557,7 +1592,7 @@ describe("The transport.disconnect() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Server events
+      // WS server events
 
       it("should emit ws server connection and then close", async () => {
         const port = getNextPortNumber();
@@ -1578,7 +1613,7 @@ describe("The transport.disconnect() function", () => {
 
         transportClient.disconnect();
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         // Don't worry about event ordering, since server connection event
         // must fire before client close event in order to register a listener
@@ -1631,7 +1666,7 @@ describe("The transport.disconnect() function", () => {
 
         expect(transportClient.state()).toBe("disconnected");
 
-        await asyncUtil.setTimeout(EPSILON); // ws actually disconnected
+        await asyncUtil.setTimeout(LATENCY); // ws actually disconnected
 
         expect(transportClient.state()).toBe("disconnected");
 
@@ -1640,7 +1675,7 @@ describe("The transport.disconnect() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Client transport events
+      // transport client events
 
       it("should asynchronously emit disconnect - with err", async () => {
         const port = getNextPortNumber();
@@ -1681,7 +1716,7 @@ describe("The transport.disconnect() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         listener.mockClear();
 
-        await asyncUtil.setTimeout(EPSILON); // ws actually disconnected
+        await asyncUtil.setTimeout(LATENCY); // ws actually disconnected
 
         // Emit nothing on actual ws disconnect
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1731,7 +1766,7 @@ describe("The transport.disconnect() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         listener.mockClear();
 
-        await asyncUtil.setTimeout(EPSILON); // ws actually disconnected
+        await asyncUtil.setTimeout(LATENCY); // ws actually disconnected
 
         // Emit nothing on actual ws disconnect
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1744,7 +1779,7 @@ describe("The transport.disconnect() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Server events
+      // WS server events
 
       it("should emit ws server close", async () => {
         const port = getNextPortNumber();
@@ -1772,7 +1807,7 @@ describe("The transport.disconnect() function", () => {
 
         transportClient.disconnect(); // ws still disconnecting
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         expect(sListener.close.mock.calls.length).toBe(0);
         expect(sListener.connection.mock.calls.length).toBe(0);
@@ -1813,7 +1848,7 @@ describe("The transport.disconnect() function", () => {
 
         expect(transportClient.state()).toBe("disconnected");
 
-        await asyncUtil.setTimeout(EPSILON); // ws actually disconnected
+        await asyncUtil.setTimeout(LATENCY); // ws actually disconnected
 
         expect(transportClient.state()).toBe("disconnected");
 
@@ -1822,7 +1857,7 @@ describe("The transport.disconnect() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Client transport events
+      // transport client events
 
       it("should asynchronously emit disconnect - with err", async () => {
         const port = getNextPortNumber();
@@ -1858,9 +1893,9 @@ describe("The transport.disconnect() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         listener.mockClear();
 
-        await asyncUtil.setTimeout(EPSILON); // ws actually disconnected
+        await asyncUtil.setTimeout(LATENCY); // ws actually disconnected
 
-        // Emit nothign when ws actually disconnects
+        // Emit nothing when ws actually disconnects
         expect(listener.connecting.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
         expect(listener.disconnect.mock.calls.length).toBe(0);
@@ -1903,7 +1938,7 @@ describe("The transport.disconnect() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         listener.mockClear();
 
-        await asyncUtil.setTimeout(EPSILON); // ws actually disconnected
+        await asyncUtil.setTimeout(LATENCY); // ws actually disconnected
 
         // Emit nothign when ws actually disconnects
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1916,7 +1951,7 @@ describe("The transport.disconnect() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Server events
+      // WS server events
 
       it("should emit ws server close", async () => {
         const port = getNextPortNumber();
@@ -1942,7 +1977,7 @@ describe("The transport.disconnect() function", () => {
 
         transportClient.disconnect();
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         expect(sListener.close.mock.calls.length).toBe(0);
         expect(sListener.connection.mock.calls.length).toBe(0);
@@ -1996,7 +2031,7 @@ describe("The transport.send() function", () => {
 
         expect(transportClient.state()).toBe("connected");
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         expect(transportClient.state()).toBe("connected");
 
@@ -2005,7 +2040,7 @@ describe("The transport.send() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Client transport events
+      // transport client events
 
       it("should emit nothing on the transport", async () => {
         const port = getNextPortNumber();
@@ -2023,7 +2058,7 @@ describe("The transport.send() function", () => {
 
         transportClient.send("msg");
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         expect(listener.connecting.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
@@ -2035,7 +2070,7 @@ describe("The transport.send() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Server events
+      // WS server events
 
       it("should emit message on ws server", async () => {
         const port = getNextPortNumber();
@@ -2061,7 +2096,8 @@ describe("The transport.send() function", () => {
 
         transportClient.send("msg");
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
+
         expect(sListener.close.mock.calls.length).toBe(0);
         expect(sListener.connection.mock.calls.length).toBe(0);
         expect(sListener.error.mock.calls.length).toBe(0);
@@ -2108,7 +2144,7 @@ describe("The transport.send() function", () => {
 
         expect(transportClient.state()).toBe("disconnected");
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         expect(transportClient.state()).toBe("disconnected");
 
@@ -2117,7 +2153,7 @@ describe("The transport.send() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Client transport events
+      // transport client events
 
       it("should asynchronously emit transport disconnect", async () => {
         const port = getNextPortNumber();
@@ -2163,7 +2199,7 @@ describe("The transport.send() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         listener.mockClear();
 
-        await asyncUtil.setTimeout(EPSILON);
+        await asyncUtil.setTimeout(LATENCY);
 
         // Emit nothing when ws actually disconnects
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2176,7 +2212,7 @@ describe("The transport.send() function", () => {
         await asyncUtil.once(wsServer, "close");
       });
 
-      // Server events - N/A
+      // WS server events - N/A
     });
   });
 });
@@ -2201,7 +2237,7 @@ describe("The transport._processWsOpen() function", () => {
 
       expect(transportClient.state()).toBe("disconnected");
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(transportClient.state()).toBe("disconnected");
 
@@ -2210,7 +2246,7 @@ describe("The transport._processWsOpen() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
     it("should emit nothing on the transport", async () => {
       const port = getNextPortNumber();
@@ -2228,7 +2264,7 @@ describe("The transport._processWsOpen() function", () => {
 
       const listener = createClientListener(transportClient);
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2240,7 +2276,7 @@ describe("The transport._processWsOpen() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events
+    // WS server events
 
     it("should emit server connection and then client close on the ws server", async () => {
       const port = getNextPortNumber();
@@ -2264,7 +2300,7 @@ describe("The transport._processWsOpen() function", () => {
 
       transportClient.disconnect(); // ws still connecting
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(1);
@@ -2300,7 +2336,7 @@ describe("The transport._processWsOpen() function", () => {
 
       expect(transportClient.state()).toBe("connecting");
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(transportClient.state()).toBe("connected");
 
@@ -2309,7 +2345,7 @@ describe("The transport._processWsOpen() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
     it("should emit connect", async () => {
       const port = getNextPortNumber();
@@ -2326,7 +2362,8 @@ describe("The transport._processWsOpen() function", () => {
 
       const listener = createClientListener(transportClient);
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
+
       expect(listener.connect.mock.calls.length).toBe(1);
       expect(listener.connect.mock.calls[0].length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2338,7 +2375,7 @@ describe("The transport._processWsOpen() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events
+    // WS server events
 
     it("should emit connection on the server", async () => {
       const port = getNextPortNumber();
@@ -2360,7 +2397,7 @@ describe("The transport._processWsOpen() function", () => {
 
       sListener.mockClear();
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(1);
@@ -2406,7 +2443,7 @@ describe("The transport._processWsMessage() function", () => {
       // Send a message from the server and await response
       wsServerClient.send(new Float32Array(5));
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(transportClient.state()).toBe("disconnected");
 
@@ -2415,7 +2452,7 @@ describe("The transport._processWsMessage() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
     it("should emit disconnect", async () => {
       const port = getNextPortNumber();
@@ -2437,7 +2474,7 @@ describe("The transport._processWsMessage() function", () => {
 
       wsServerClient.send(new Float32Array(5));
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2445,7 +2482,7 @@ describe("The transport._processWsMessage() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "DISCONNECTED: Received invalid message type on WebSocket connection."
+        "FAILURE: Received non-string message on WebSocket connection."
       );
       expect(listener.message.mock.calls.length).toBe(0);
 
@@ -2454,7 +2491,7 @@ describe("The transport._processWsMessage() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events
+    // WS server events
 
     it("should emit client close on the ws server", async () => {
       const port = getNextPortNumber();
@@ -2477,7 +2514,7 @@ describe("The transport._processWsMessage() function", () => {
 
       wsServerClient.send(new Float32Array(5));
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -2521,7 +2558,7 @@ describe("The transport._processWsMessage() function", () => {
       // Send a message from the server and await response
       wsServerClient.send("msg");
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(transportClient.state()).toBe("connected");
 
@@ -2530,7 +2567,7 @@ describe("The transport._processWsMessage() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
     it("should emit message", async () => {
       const port = getNextPortNumber();
@@ -2552,7 +2589,7 @@ describe("The transport._processWsMessage() function", () => {
 
       wsServerClient.send("msg");
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2566,7 +2603,7 @@ describe("The transport._processWsMessage() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events
+    // WS server events
 
     it("should emit nothing on the ws server", async () => {
       const port = getNextPortNumber();
@@ -2589,7 +2626,7 @@ describe("The transport._processWsMessage() function", () => {
 
       wsServerClient.send("msg");
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -2634,7 +2671,7 @@ describe("The transport._processWsClose() function", () => {
 
       expect(transportClient.state()).toBe("disconnected");
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(transportClient.state()).toBe("disconnected");
 
@@ -2643,7 +2680,7 @@ describe("The transport._processWsClose() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
     it("should emit nothing", async () => {
       const port = getNextPortNumber();
@@ -2663,7 +2700,7 @@ describe("The transport._processWsClose() function", () => {
 
       const listener = createClientListener(transportClient);
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2675,7 +2712,7 @@ describe("The transport._processWsClose() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events
+    // WS server events
 
     it("should emit nothing on the server", async () => {
       const port = getNextPortNumber();
@@ -2693,7 +2730,7 @@ describe("The transport._processWsClose() function", () => {
 
       const sListener = createWsServerListener(wsServer);
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -2730,7 +2767,7 @@ describe("The transport._processWsClose() function", () => {
 
       expect(transportClient.state()).toBe("connecting");
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(transportClient.state()).toBe("disconnected");
 
@@ -2739,7 +2776,7 @@ describe("The transport._processWsClose() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
     it("should emit disconnect", async () => {
       const port = getNextPortNumber();
@@ -2764,7 +2801,7 @@ describe("The transport._processWsClose() function", () => {
 
       const listener = createClientListener(transportClient);
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2772,7 +2809,7 @@ describe("The transport._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "DISCONNECTED: Could not initialize the WebSocket client."
+        "FAILURE: Could not initialize the WebSocket client."
       );
       expect(listener.message.mock.calls.length).toBe(0);
 
@@ -2781,7 +2818,7 @@ describe("The transport._processWsClose() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events
+    // WS server events
 
     it("should emit nothing on the server", async () => {
       const port = getNextPortNumber();
@@ -2804,7 +2841,7 @@ describe("The transport._processWsClose() function", () => {
         throw new Error("FAILURE");
       };
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -2837,7 +2874,7 @@ describe("The transport._processWsClose() function", () => {
 
       expect(transportClient.state()).toBe("connecting");
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(transportClient.state()).toBe("connected");
 
@@ -2846,7 +2883,7 @@ describe("The transport._processWsClose() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
     it("should eventually emit connect", async () => {
       const port = getNextPortNumber();
@@ -2867,7 +2904,7 @@ describe("The transport._processWsClose() function", () => {
 
       const listener = createClientListener(transportClient);
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(1);
       expect(listener.connect.mock.calls[0].length).toBe(0);
@@ -2880,7 +2917,7 @@ describe("The transport._processWsClose() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events
+    // WS server events
 
     it("should emit connection on the server", async () => {
       const port = getNextPortNumber();
@@ -2899,7 +2936,7 @@ describe("The transport._processWsClose() function", () => {
 
       const sListener = createWsServerListener(wsServer);
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(1);
@@ -2931,7 +2968,7 @@ describe("The transport._processWsClose() function", () => {
       expect(transportClient.state()).toBe("disconnected");
     });
 
-    // Client transport events
+    // transport client events
 
     it("should emit disconnect", async () => {
       const port = getNextPortNumber();
@@ -2954,14 +2991,14 @@ describe("The transport._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "DISCONNECTED: The WebSocket could not be opened."
+        "FAILURE: The WebSocket could not be opened."
       );
       expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1006);
 
       expect(listener.message.mock.calls.length).toBe(0);
     });
 
-    // Server events - N/A (there is no server)
+    // WS server events - N/A (there is no server)
   });
 
   describe("If the transport state is connected and the ws client had been connected - server does wsServer.close()", () => {
@@ -2983,7 +3020,7 @@ describe("The transport._processWsClose() function", () => {
 
       wsServer.close();
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(transportClient.state()).toBe("disconnected");
 
@@ -2992,7 +3029,7 @@ describe("The transport._processWsClose() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
     it("should emit disconnect", async () => {
       const port = getNextPortNumber();
@@ -3010,7 +3047,7 @@ describe("The transport._processWsClose() function", () => {
 
       wsServer.close();
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -3018,7 +3055,7 @@ describe("The transport._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "DISCONNECTED: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly."
       );
       expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1006);
 
@@ -3029,7 +3066,7 @@ describe("The transport._processWsClose() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events - N/A (ws server is stopping)
+    // WS server events - N/A (ws server is stopping)
   });
 
   describe("If the transport state is connected and the ws client had been connected - server does wsClient.close()", () => {
@@ -3055,7 +3092,7 @@ describe("The transport._processWsClose() function", () => {
 
       wsServerClient.close(1000);
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(transportClient.state()).toBe("disconnected");
 
@@ -3064,7 +3101,7 @@ describe("The transport._processWsClose() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
     it("should emit disconnect", async () => {
       const port = getNextPortNumber();
@@ -3086,7 +3123,7 @@ describe("The transport._processWsClose() function", () => {
 
       wsServerClient.close(1000);
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -3094,7 +3131,7 @@ describe("The transport._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "DISCONNECTED: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly."
       );
       expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1000);
 
@@ -3105,7 +3142,7 @@ describe("The transport._processWsClose() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events
+    // WS server events
 
     it("should emit nothing on the server", async () => {
       const port = getNextPortNumber();
@@ -3127,7 +3164,7 @@ describe("The transport._processWsClose() function", () => {
 
       wsServerClient.close(1000);
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -3163,7 +3200,7 @@ describe("The transport._processWsClose() function", () => {
 
       wsServerClient.terminate();
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(transportClient.state()).toBe("disconnected");
 
@@ -3172,7 +3209,7 @@ describe("The transport._processWsClose() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Client transport events
+    // transport client events
 
     it("should emit disconnect", async () => {
       const port = getNextPortNumber();
@@ -3194,7 +3231,7 @@ describe("The transport._processWsClose() function", () => {
 
       wsServerClient.terminate();
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -3202,7 +3239,7 @@ describe("The transport._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "DISCONNECTED: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly."
       );
       expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1006);
 
@@ -3213,7 +3250,7 @@ describe("The transport._processWsClose() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    // Server events
+    // WS server events
 
     it("should emit nothing on the server", async () => {
       const port = getNextPortNumber();
@@ -3235,7 +3272,7 @@ describe("The transport._processWsClose() function", () => {
 
       wsServerClient.terminate();
 
-      await asyncUtil.setTimeout(EPSILON);
+      await asyncUtil.setTimeout(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -3275,13 +3312,13 @@ describe("The transport should operate correctly through multiple connection cyc
 
     expect(transportClient.state()).toBe("connecting");
 
-    await asyncUtil.setTimeout(EPSILON);
+    await asyncUtil.setTimeout(LATENCY);
 
     expect(transportClient.state()).toBe("connected");
 
     transportClient.disconnect();
 
-    await asyncUtil.setTimeout(EPSILON);
+    await asyncUtil.setTimeout(LATENCY);
 
     expect(transportClient.state()).toBe("disconnected");
 
@@ -3289,13 +3326,13 @@ describe("The transport should operate correctly through multiple connection cyc
 
     expect(transportClient.state()).toBe("connecting");
 
-    await asyncUtil.setTimeout(EPSILON);
+    await asyncUtil.setTimeout(LATENCY);
 
     expect(transportClient.state()).toBe("connected");
 
     transportClient.disconnect();
 
-    await asyncUtil.setTimeout(EPSILON);
+    await asyncUtil.setTimeout(LATENCY);
 
     expect(transportClient.state()).toBe("disconnected");
 
@@ -3304,7 +3341,7 @@ describe("The transport should operate correctly through multiple connection cyc
     await asyncUtil.once(wsServer, "close");
   });
 
-  // Client transport events
+  // transport client events
 
   it("should emit events appropriately through the cycle", async () => {
     const port = getNextPortNumber();
@@ -3337,7 +3374,7 @@ describe("The transport should operate correctly through multiple connection cyc
     expect(listener.message.mock.calls.length).toBe(0);
     listener.mockClear();
 
-    await asyncUtil.setTimeout(EPSILON);
+    await asyncUtil.setTimeout(LATENCY);
 
     // Emit connect asynchronously
     expect(listener.connecting.mock.calls.length).toBe(0);
@@ -3383,7 +3420,7 @@ describe("The transport should operate correctly through multiple connection cyc
     expect(listener.message.mock.calls.length).toBe(0);
     listener.mockClear();
 
-    await asyncUtil.setTimeout(EPSILON);
+    await asyncUtil.setTimeout(LATENCY);
 
     // Emit connect asynchronously
     expect(listener.connecting.mock.calls.length).toBe(0);
@@ -3415,7 +3452,7 @@ describe("The transport should operate correctly through multiple connection cyc
     await asyncUtil.once(wsServer, "close");
   });
 
-  // Server events
+  // WS server events
 
   it("should emit server events appropriately through the cycle", async () => {
     const port = getNextPortNumber();
@@ -3437,7 +3474,7 @@ describe("The transport should operate correctly through multiple connection cyc
 
     transportClient.connect();
 
-    await asyncUtil.setTimeout(EPSILON);
+    await asyncUtil.setTimeout(LATENCY);
 
     // Emit connection
     expect(sListener.close.mock.calls.length).toBe(0);
@@ -3448,7 +3485,7 @@ describe("The transport should operate correctly through multiple connection cyc
 
     transportClient.disconnect();
 
-    await asyncUtil.setTimeout(EPSILON);
+    await asyncUtil.setTimeout(LATENCY);
 
     // Emit client close
     expect(cListener.close.mock.calls.length).toBe(1);
@@ -3460,7 +3497,7 @@ describe("The transport should operate correctly through multiple connection cyc
 
     transportClient.connect();
 
-    await asyncUtil.setTimeout(EPSILON);
+    await asyncUtil.setTimeout(LATENCY);
 
     // Emit connection
     expect(sListener.close.mock.calls.length).toBe(0);
@@ -3471,7 +3508,7 @@ describe("The transport should operate correctly through multiple connection cyc
 
     transportClient.disconnect();
 
-    await asyncUtil.setTimeout(EPSILON);
+    await asyncUtil.setTimeout(LATENCY);
 
     // Emit client close
     expect(cListener.close.mock.calls.length).toBe(1);

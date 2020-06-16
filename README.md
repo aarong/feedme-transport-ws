@@ -5,7 +5,7 @@
 
 # Feedme Javascript WebSocket Transport
 
-WebSocket client and server transports for the
+WebSocket transports for the
 [Feedme Javascript Client](https://github.com/aarong/feedme-client) and
 [Feedme Node.js Server Core](https://github.com/aarong/feedme-server-core)
 libraries.
@@ -19,14 +19,20 @@ project.
 <!-- TOC depthFrom:2 -->
 
 - [Server](#server)
+  - [Installation](#installation)
   - [Initialization](#initialization)
-  - [Transport-Specific Information](#transport-specific-information)
-- [Client](#client)
-  - [In Node.js](#in-nodejs)
-    - [Connection Issues with ws (what to call this section??)](#connection-issues-with-ws-what-to-call-this-section)
-  - [In the Browser](#in-the-browser)
-    - [NPM](#npm)
-    - [CDN](#cdn)
+  - [Usage: Feedme API on a Stand-Alone WebSocket Server](#usage-feedme-api-on-a-stand-alone-websocket-server)
+  - [Usage: Feedme API on an Existing HTTP/S Server](#usage-feedme-api-on-an-existing-https-server)
+  - [Usage: Multiple Feedme APIs on a Single HTTP/S Server](#usage-multiple-feedme-apis-on-a-single-https-server)
+  - [WebSocket Errors](#websocket-errors)
+- [Node.js Client](#nodejs-client)
+  - [Installation](#installation-1)
+  - [Initialization](#initialization-1)
+  - [WebSocket Errors](#websocket-errors-1)
+- [Browser Client](#browser-client)
+  - [Installation](#installation-2)
+  - [Initialization](#initialization-2)
+  - [WebSocket Errors](#websocket-errors-2)
 - [Compatibility](#compatibility)
 
 <!-- /TOC -->
@@ -35,11 +41,14 @@ project.
 
 The server transport lets you serve a Feedme API over WebSockets in Node.js.
 
-Depends on the [ws](https://github.com/websockets/ws) module and supports
-everything that it does, including HTTPS, stand-alone WebSocket servers,
-external HTTP servers. Uses ws version 6.2.x to retain Node 6 support.
+The server transport is built on top of the
+[ws module](https://github.com/websockets/ws) and supports everything that it
+does, including HTTPS and compression. The transport depends on ws version 6.2.x
+in order to retain Node 6 support.
 
-To install the Feedme Server Core library and the WebSocket transport:
+### Installation
+
+To install the NPM package:
 
 `npm install feedme-server-core feedme-transport-ws`
 
@@ -52,14 +61,15 @@ const feedmeServerCore = require("feedme-server-core");
 const feedmeTransportWs = require("feedme-transport-ws/server");
 
 const server = feedmeServerCore({
-  transport: feedmeTransportWs(options)
+  transport: feedmeTransportWs(options),
 });
 ```
 
-The `options` argument is passed to the ws module and can be used to configure
-the underlying WebSocket server. See the
-([ws documentation](https://github.com/websockets/ws/blob/master/doc/ws.md#new-websocketserveroptions-callback))
-for options.
+The `options` argument is passed internally to the ws module and can be used to
+configure the underlying WebSocket server. See the
+[ws documentation](https://github.com/websockets/ws/blob/master/doc/ws.md#new-websocketserveroptions-callback)
+for options. The application must not specify the `handleProtocols` option,
+which is used internally by the transport.
 
 The transport also incorporates a heartbeat system, which can be confired using:
 
@@ -67,18 +77,27 @@ The transport also incorporates a heartbeat system, which can be confired using:
   to 5000.
 
   Specifies how often to send a WebSocket ping to each client to ensure
-  responsiveness.
+  continued responsiveness.
 
   If set to 0, then the server will not ping clients.
 
-- `options.heartbeatTimeoutMs` - Optional positive integer. Defaults to 4999.
+- `options.heartbeatTimeoutMs` - Optional positive integer. Defaults to 4500.
 
   Specifies how long to wait after pinging a client until the connection is
   considered to have been lost and the WebSocket is terminated.
 
   Must be strictly less than `options.heartbeatIntervalMs` if specified.
 
-Example: To serve a Feedme API on a stand-alone WebSocket server:
+Errors thrown:
+
+- `err.message === "INVALID_ARGUMENT"`
+
+  There was a problem with one or more of the supplied arguments.
+
+### Usage: Feedme API on a Stand-Alone WebSocket Server
+
+To serve a Feedme API on a single-purpose WebSocket server accepting connections
+on all paths:
 
 ```javascript
 const feedmeServerCore = require("feedme-server-core");
@@ -86,12 +105,15 @@ const feedmeTransportWs = require("feedme-transport-ws/server");
 
 const server = feedmeServerCore({
   transport: feedmeTransportWs({
-    port: 8080
-  })
+    port: 8080,
+  }),
 });
+server.start();
 ```
 
-Example: To serve a Feedme API on an existing HTTP server:
+### Usage: Feedme API on an Existing HTTP/S Server
+
+To serve a Feedme API on a specific path of an existing HTTP/S server:
 
 ```javascript
 const http = require("http");
@@ -113,26 +135,38 @@ const feedmeServer = feedmeServerCore({
 feedmeServer.start();
 ```
 
-A few considerations when serving an API on an existing HTTP server:
+When serving a Feedme API on an existing HTTP/S server:
 
-- The HTTP server need not be listening in order to construct the Feedme
-  transport and server. If there is a call to `feedmeServer.start()` and the
-  external HTTP server is not listening, then the Feedme transport/server will
-  emit `starting` and will then wait for the HTTP server to be started by the
-  application (the library/transport will not attempt to start it), at which
-  point the Feedme transport/server will emit `start`. If the HTTP server is
-  already listening when the application calls `feedmeServer.start()`, then the
-  Feedme transport/server emit `starting` and `start` immediately.
+- The external HTTP server is not required to be listening in order to
+  initialize the Feedme transport and server. The transport does not attempt to
+  start or stop the external HTTP server.
 
-- Once the server has started, calling `feedmeServer.stop()` will not close the
-  external HTTP server, but will close the WebSocket layer on top of it. If the
-  external HTTP server is closed by the application then the Feedme
-  transport/server will become `stopped` and will emit `stopping` and `stop`, so
-  the application should not also call `feedmeServer.stop()`.
+- If there is a call to `feedmeServer.start()` and the external HTTP server is
+  not already listening, then `feedmeServer` will become `starting` and wait for
+  the HTTP server to be started by the application, at which point
+  `feedmeServer` will become `started`. If the HTTP server is already listening
+  when the application calls `feedmeServer.start()`, then `feedmeServer` will
+  become `started` immediately.
 
-Example: To serve multiple Feedme APIs on a single HTTP server:
+- If the external HTTP server stops listening for new connections, either due to
+  a failure or an application call to `httpServer.close()`, then `feedmeServer`
+  will automatically become `stopped` and any existing clients will be
+  disconnected. If the external HTTP server is subsequently restarted then the
+  application must call `feedmeServer.start()` to re-launch the Feedme server.
+
+- If there is a call to `feedmeServer.stop()` while the external HTTP server is
+  running then the WebSocket endpoint is removed and the external server is left
+  running.
+
+### Usage: Multiple Feedme APIs on a Single HTTP/S Server
+
+To serve multiple Feedme APIs on a single HTTP/S server:
 
 ```javascript
+const http = require("http");
+const feedmeServerCore = require("feedme-server-core");
+const feedmeTransportWs = require("feedme-transport-ws/server");
+
 // Create the basic HTTP server
 const httpServer = http.createServer((req, res) => {
   res.writeHead(200);
@@ -142,32 +176,25 @@ httpServer.listen(port);
 
 // Create the first Feedme server
 const feedmeTransport1 = feedmeTransportWs({
-  noServer: true
+  noServer: true,
 });
 const feedmeServer1 = feedmeServerCore({
-  transport: feedmeTransport1
-});
-feedmeServer1.on("connect", clientId => {
-  // Got a Feedme API client on /feedme1
+  transport: feedmeTransport1,
 });
 feedmeServer1.start();
 
 // Create the second Feedme server
 const feedmeTransport2 = feedmeTransportWs({
-  noServer: true
+  noServer: true,
 });
 const feedmeServer2 = feedmeServerCore({
-  transport: feedmeTransport2
-});
-feedmeServer2.on("connect", clientId => {
-  // Got a Feedme API client on /feedme2
+  transport: feedmeTransport2,
 });
 feedmeServer2.start();
 
-// Route WebSocket upgrade requests to the appropriate Feedme server
+// Route WebSocket upgrade requests to the appropriate Feedme transport
 httpServer.on("upgrade", (request, socket, head) => {
   const { pathname } = url.parse(request.url);
-
   if (pathname === "/feedme1") {
     feedmeTransport1.handleUpgrade(request, socket, head);
   } else if (pathname === "/feedme2") {
@@ -178,91 +205,61 @@ httpServer.on("upgrade", (request, socket, head) => {
 });
 ```
 
-A few considerations when serving a Feedme API in `noServer` mode:
+When serving a Feedme API in `noServer` mode:
 
-- The application still needs to call `feedmeServer.start()` and the transport
-  will throw an error if the application calls `feedmeTransport.handleUpgrade()`
-  when the server is not started.
+- The transport has no way of knowing whether the external HTTP server is
+  listening for connections. It is up to the application to start and stop the
+  Feedme server as appropriate.
 
-- The transport will not automatically know if the HTTP server stops, though it
-  will observe that existing clients disconnect. If the HTTP server stops, the
-  application should call `feedmeServer.stop()`.
+- The application must call `feedmeServerX.start()` before making calls to
+  `feedmeTransportX.handleUpgrade()`. The Feedme server will immediately become
+  `started`.
 
-Example: To run a Feedme API alongside an existing WebSocket service on the same
-HTTP server:
+- A call to `httpServer.close()` will cause the external HTTP server to stop
+  listening for new connections, but it will not terminate existing connections
+  and `httpServer` will not emit close until all WebSocket clients have
+  disconnected. If the application closes the external HTTP server, it should
+  also call `feedmeServerX.stop()`, which will cause the transport to close all
+  existing WebSocket connections.
 
-```javascript
-// Create the basic HTTP server
-const httpServer = http.createServer((req, res) => {
-  res.writeHead(200);
-  res.end("Welcome");
-});
-httpServer.listen(port);
+### WebSocket Errors
 
-// Create a raw WebSocket server
-const wsServer = new WebSocket.Server({ noServer: true });
-wsServer.on("connection", ws => {
-  // Got a raw WebSocket connection on /ws
-});
+The transport makes the following ws-level error information available via the
+Feedme server library.
 
-// Create a Feedme server
-const feedmeTransport = feedmeTransportWs({
-  noServer: true
-});
-const feedmeServer = feedmeServerCore({
-  transport: feedmeTransport
-});
-feedmeServer.on("connect", clientId => {
-  // Got a Feedme API client on /feedme
-});
-feedmeServer.start();
+- If there is a problem initializing the ws module then the error thrown by ws
+  is made available to server library
+  [stopping](https://github.com/aarong/feedme-server-core#stopping) and
+  [stop](https://github.com/aarong/feedme-server-core#stop) event handlers as
+  `err.wsError`.
 
-// Route upgrade requests to WebSocket or Feedme server as appropriate
-httpServer.on("upgrade", (request, socket, head) => {
-  const { pathname } = url.parse(request.url);
+- When a client connection closes unexpectedly, the WebSocket disconnect code
+  and reason are made available to server library
+  [disconnect](https://github.com/aarong/feedme-server-core#disconnectg) event
+  handlers as `err.wsCode` and `err.wsReason`.
 
-  if (pathname === "/ws") {
-    wsServer.handleUpgrade(request, socket, head, ws => {
-      wsServer.emit("connection", ws, request);
-    });
-  } else if (pathname === "/feedme") {
-    feedmeTransport.handleUpgrade(request, socket, head);
-  } else {
-    socket.destroy();
-  }
-});
-```
+- If the ws module calls back an error when attempting to send a message or a
+  ping to a client then the error is made available to server library
+  [disconnect](https://github.com/aarong/feedme-server-core#disconnectg) event
+  handlers as `err.wsError`.
 
-### Transport-Specific Information
+## Node.js Client
 
-The following transport-specific information is made available to the
-application via the library:
+The Node.js client transport lets you connect to a Feedme API server over
+Webockets from Node.js.
 
-- If `ws` throws an error on initialization, then the `err` argument passed with
-  the library `stopping` and `stopped` events have a `err.wsError` property
-  referencing the error thrown by `ws`.
+The Node.js client is built on top of the
+[ws module](https://github.com/websockets/ws) and supports everything it does,
+including HTTPS and compression. The client depends on ws version 6.2.x in order
+to retain Node 6 support.
 
-- If `ws` indicates that an active connection was terminated unexpectedly, then
-  the `err` argument passed with the transport `disconnect` event has
-  `err.wsCode` and `err.wsReason` properties containing the code and reason
-  specified by `ws`.
+### Installation
 
-- When the application server calls `server.transportClient(cid)` (??) it gets
-  an object with a remoteHost property?
+To install the NPM package:
 
-## Client
+`npm install feedme-transport-ws`
 
-Client transport lets you connect to a Feedme API server over Webockets from
-Node.js and from the browser.
-
-### In Node.js
-
-The Node.js client depends on the [ws](https://github.com/websockets/ws) module
-and supports everything it does. Uses ws version 6.2.x to retain Node 6 support.
-
-To install the Feedme client library and the WebSocket tranport:
-
-`npm install feedme-client feedme-transport-ws`
+### Initialization
 
 To initialize a Feedme client:
 
@@ -271,23 +268,21 @@ const feedmeClient = require("feedme-client");
 const feedmeTransportWs = require("feedme-transport-ws/client");
 
 const client = feedmeClient({
-  transport: feedmeTransportWs(address, protocols, options);
+  transport: feedmeTransportWs(address, options);
 });
 ```
 
-Arguments:
+Transport factory function arguments:
 
-- `address` - Required string. The transport server WebSocket URL.
-
-- `protocols` Optional string or array. Protocols passed to the ws module.
+- `address` - Required string. The server WebSocket URL (ws://...)
 
 - `options` Optional object. The object is passed to the ws module and can be
   used to configure the underlying WebSocket client. See the
-  ([ws documentation](https://github.com/websockets/ws/blob/master/doc/ws.md#new-websocketaddress-protocols-options))
+  [ws documentation](https://github.com/websockets/ws/blob/master/doc/ws.md#new-websocketaddress-protocols-options)
   for options.
 
   The Node transport client also incorporates a heartbeat system, which can be
-  confired using:
+  configured using:
 
   - `options.heartbeatIntervalMs` - Optional non-negative integer. Defaults
     to 5000.
@@ -304,75 +299,59 @@ Arguments:
 
     Must be strictly less than `options.heartbeatIntervalMs` if specified.
 
-Example: Connect to a the WebSocket API server on _localhost:8080_:
+Errors thrown:
 
-```javascript
-const feedmeClient = require("feedme-client");
-const feedmeTransportWs = require("feedme-transport-ws/client");
+- `err.message === "INVALID_ARGUMENT"`
 
-const client = feedmeClient({
-  transport: feedmeTransportWs("ws://localhost:8080");
-});
-```
+  There was a problem with one or more of the supplied arguments.
 
-#### Connection Issues with ws (what to call this section??)
+### WebSocket Errors
 
-If `ws` throws an error on initialization, then the `err` argument passed with
-the transport `disconnect` event has a `err.wsError` property referencing the
-error thrown by `ws`.
+The transport makes the following ws-level error information available via the
+Feedme client library.
 
-If `ws` indicates that an active connection was terminated unexpectedly, then
-the `err` argument passed with the transport `disconnect` event has `err.wsCode`
-and `err.wsReason` properties containing the code and reason specified by `ws`.
+- If there is a problem initializing the ws module then the error thrown by ws
+  is made available to client library
+  [disconnect]((https://github.com/aarong/feedme-client#disconnect) event
+  handlers as `err.wsError`.
 
-### In the Browser
+- If the connection closes unexpectedly, the WebSocket disconnect code and
+  reason are made available to client library
+  [disconnect](https://github.com/aarong/feedme-client#disconnect) event
+  handlers as `err.wsCode` and `err.wsReason`.
 
-The browser client uses the native WebSocket implementation available in the
-browser.
+- If the ws module calls back an error when attempting to send a message or a
+  ping to the server then the error is made available to client library
+  [disconnect]((https://github.com/aarong/feedme-client#disconnect) event
+  handlers as `err.wsError`.
 
-The browser client can be installed using NPM and bundled into a Node web
-application, or retrieved on a web page using a CDN.
+## Browser Client
 
-The browser client has the same API as the Node client except that it does not
-accept an `options` object.
+The browser client transport lets you connect to a Feedme API server over
+Webockets using the native WebSocket implementation available in the browser.
 
-The browser client does not have a heartbeat feature because browser WebSocket
-implementations don't expose a ping API.
+Unlike the Node.js client, the browser client does not have a heartbeat feature
+because browser WebSocket implementations do not expose a ping API. Heartbeat
+functionality is left to the browser.
 
-#### NPM
+### Installation
 
-To install the Feedme Client library and WebSocket tranport:
+To install the NPM package:
 
-`npm install feedme-client feedme-transport-ws`
+`npm install feedme-transport-ws`
 
-To initialize a Feedme client:
-
-```javascript
-const feedmeClient = require("feedme-client");
-const feedmeTransportWs = require("feedme-transport-ws/browser");
-
-const client = feedmeClient({
-  transport: feedmeTransportWs(address, protocols);
-});
-```
-
-#### CDN
-
-To load the Feedme Client library and WebSocket transport:
+To access using a CDN:
 
 ```html
-<script
-  type="text/javascript"
-  src="https://cdn.jsdelivr.net/npm/feedme-client"
-></script>
 <script
   type="text/javascript"
   src="https://cdn.jsdelivr.net/npm/feedme-transport-ws"
 ></script>
 ```
 
-The module is bundled in UMD format and is named `feedmeTransportWs` in the
-global scope.
+The module is named `feedmeTransportWs` in the global scope.
+
+### Initialization
 
 To initialize a Feedme client:
 
@@ -381,13 +360,61 @@ const feedmeClient = require("feedme-client");
 const feedmeTransportWs = require("feedme-transport-ws/browser");
 
 const client = feedmeClient({
-  transport: feedmeTransportWs(address, protocols);
+  transport: feedmeTransportWs(address);
 });
+client.connect();
 ```
+
+Transport factory function arguments:
+
+- `address` - Required string. The server WebSocket URL.
+
+Errors thrown:
+
+- `err.message === "INVALID_ARGUMENT"`
+
+  There was a problem with one or more of the supplied arguments.
+
+- `err.message === "NO_WEBSOCKETS"`
+
+  There is no WebSocket implementation available.
+
+### WebSocket Errors
+
+The transport makes the following WebSocket-level error information available
+via the Feedme client library.
+
+- If an error is thrown when initializing a WebSocket object then the error is
+  made available to client library
+  [disconnect]((https://github.com/aarong/feedme-client#disconnect) event
+  handlers as `err.wsError`.
+
+- If the connection closes unexpectedly, the WebSocket disconnect code and
+  reason are made available to client library
+  [disconnect](https://github.com/aarong/feedme-client#disconnect) event
+  handlers as `err.wsCode` and `err.wsReason`.
+
+- If an error is thrown when attempting to send a message to the server then the
+  error is made available to client library
+  [disconnect]((https://github.com/aarong/feedme-client#disconnect) event
+  handlers as `err.wsError`.
 
 ## Compatibility
 
-These modules should compatible be with other WebSocket Feedme transport
-implementations, provided that (1) they transmit Feedme messages using
-single-string WebSocket messages, and (2) do not transmit anything else on the
-WebSocket.
+The server module should be compatible be with third-party WebSocket client
+transports that:
+
+1. Specify either no WebSocket subprotocol or a `feedme` subprotocol.
+
+2. Transmit Feedme messages by sending a single string across the WebSocket.
+
+3. Do not transmit anything else on the WebSocket.
+
+The client module should be compatible with third-party WebSocket server
+transports that:
+
+1. Accept connections with a `feedme` WebSocket subprotocol.
+
+2. Transmit Feedme messages by sending a single string across the WebSocket.
+
+3. Do not transmit anything else on the WebSocket.

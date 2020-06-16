@@ -16,10 +16,23 @@ const nextTick = () =>
     process.nextTick(resolve);
   });
 
+// Create a promise that resolves/rejects on callback
+const callback = (fn, ...args) =>
+  new Promise((resolve, reject) => {
+    fn(...args, (err, ...cbArgs) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve([...cbArgs]);
+      }
+    });
+  });
+
 const exp = {
   once,
   setTimeout: aSetTimeout,
-  nextTick
+  nextTick,
+  callback
 };
 
 export default exp;

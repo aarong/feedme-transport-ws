@@ -4,7 +4,8 @@ import emitter from "component-emitter";
 import http from "http";
 import stream from "stream";
 import server from "../server.main";
-import config from "../server.config";
+import serverConfig from "../server.config";
+import asyncUtil from "./asyncutil";
 
 /*
 
@@ -41,6 +42,8 @@ State: Object members
   ._heartbeatIntervals
   ._heartbeatTimeouts
   ._options
+  ._httpHandlers
+  ._httpPollingInterval
 
 1. State-modifying functionality
   Triggered by library
@@ -50,20 +53,24 @@ State: Object members
     server.send(cid, msg)
     server.disconnect(cid, [err])
   Triggered by ws
-    _processWsServerListening()
-    _processWsServerClose()
+    _processServerListening()
+    _processServerClose()
+    _processServerError()
     _processWsServerConnection()
     _processWsClientMessage()
     _processWsClientPong()
     _processWsClientClose()
+    _processWsClientError()
 
 2. State-getting functionality
     .state()
 
+3. Stateless functionality
+    ._processHandleProtocols()
+
 */
 
 const PORT = 3000;
-const EPSILON = 1;
 
 jest.useFakeTimers();
 
@@ -168,7 +175,8 @@ harnessProto.getServerState = function getServerState() {
     state._heartbeatTimeouts[cid] = true; // Boolean - checking keys only
   });
   state._options = _.clone(this.server._options); // Object copy
-  state._httpCloseHandler = this.server._httpCloseHandler; // Function reference
+  state._httpHandlers = this.server._httpHandlers; // Null or object with three fn references
+  state._httpPollingInterval = check.number(this.server._httpPollingInterval); // Boolean
   return state;
 };
 
@@ -265,21 +273,38 @@ const toHaveState = function toHaveState(receivedServer, expectedState) {
     };
   }
 
-  // Check ._httpCloseHandler (both functions or both null)
+  // Check ._httpHandlers (both null or both objects with three fn references)
+
   if (
-    (check.function(receivedServer._httpCloseHandler) &&
-      !check.function(expectedState._httpCloseHandler)) ||
-    (!check.function(receivedServer._httpCloseHandler) &&
-      check.function(expectedState._httpCloseHandler)) ||
-    (receivedServer._httpCloseHandler === null &&
-      expectedState._httpCloseHandler !== null) ||
-    (receivedServer._httpCloseHandler !== null &&
-      expectedState._httpCloseHandler === null)
+    !(
+      receivedServer._httpHandlers === expectedState._httpHandlers ||
+      (check.object(receivedServer._httpHandlers) &&
+        check.object(expectedState._httpHandlers) &&
+        check.function(receivedServer._httpHandlers.listening) &&
+        check.function(expectedState._httpHandlers.listening) &&
+        check.function(receivedServer._httpHandlers.close) &&
+        check.function(expectedState._httpHandlers.close) &&
+        check.function(receivedServer._httpHandlers.error) &&
+        check.function(expectedState._httpHandlers.error))
+    )
   ) {
     return {
       pass: false,
       message() {
-        return "expected ._httpCloseHandler to match, but they didn't";
+        return "expected ._httpHandlers to match, but they didn't";
+      }
+    };
+  }
+
+  // Check ._httpPollingInterval (both null or both numbers)
+  if (
+    !!receivedServer._httpPollingInterval !==
+    !!expectedState._httpPollingInterval
+  ) {
+    return {
+      pass: false,
+      message() {
+        return "expected ._httpPollingInterval to match, but they didn't";
       }
     };
   }
@@ -289,8 +314,6 @@ const toHaveState = function toHaveState(receivedServer, expectedState) {
 };
 
 expect.extend({ toHaveState });
-
-// Harness tests
 
 describe("The toHaveState() function", () => {
   describe("can fail", () => {
@@ -373,25 +396,55 @@ describe("The toHaveState() function", () => {
       );
     });
 
-    it("should fail if _httpCloseHandler values don't match - case 1", () => {
+    it("should fail if _httpHandlers values don't match - case 1", () => {
       const result = toHaveState(
-        { _httpCloseHandler: null },
-        { _httpCloseHandler: () => {} }
+        { _httpHandlers: null },
+        { _httpHandlers: {} }
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._httpCloseHandler to match, but they didn't"
+        "expected ._httpHandlers to match, but they didn't"
       );
     });
 
-    it("should fail if _httpCloseHandler values don't match - case 2", () => {
+    it("should fail if _httpHandlers values don't match - case 2", () => {
       const result = toHaveState(
-        { _httpCloseHandler: () => {} },
-        { _httpCloseHandler: null }
+        { _httpHandlers: {} },
+        { _httpHandlers: null }
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._httpCloseHandler to match, but they didn't"
+        "expected ._httpHandlers to match, but they didn't"
+      );
+    });
+
+    it("should fail if _httpHandlers values don't match - case 3", () => {
+      const result = toHaveState({ _httpHandlers: {} }, { _httpHandlers: {} });
+      expect(result.pass).toBe(false);
+      expect(result.message()).toBe(
+        "expected ._httpHandlers to match, but they didn't"
+      );
+    });
+
+    it("should fail if _httpPollingInterval values don't match - case 1", () => {
+      const result = toHaveState(
+        { _httpPollingInterval: true },
+        { _httpPollingInterval: false }
+      );
+      expect(result.pass).toBe(false);
+      expect(result.message()).toBe(
+        "expected ._httpPollingInterval to match, but they didn't"
+      );
+    });
+
+    it("should fail if _httpPollingInterval values don't match - case 2", () => {
+      const result = toHaveState(
+        { _httpPollingInterval: false },
+        { _httpPollingInterval: true }
+      );
+      expect(result.pass).toBe(false);
+      expect(result.message()).toBe(
+        "expected ._httpPollingInterval to match, but they didn't"
       );
     });
   });
@@ -450,18 +503,46 @@ describe("The toHaveState() function", () => {
       expect(result.pass).toBe(true);
     });
 
-    it("should pass if _httpCloseHandler matches - case 1", () => {
+    it("should pass if _httpHandlers matches - case 1", () => {
       const result = toHaveState(
-        { _httpCloseHandler: () => {} },
-        { _httpCloseHandler: () => {} }
+        {
+          _httpHandlers: {
+            listening: () => {},
+            close: () => {},
+            error: () => {}
+          }
+        },
+        {
+          _httpHandlers: {
+            listening: () => {},
+            close: () => {},
+            error: () => {}
+          }
+        }
       );
       expect(result.pass).toBe(true);
     });
 
-    it("should pass if _httpCloseHandler matches - case 2", () => {
+    it("should pass if _httpHandlers matches - case 2", () => {
       const result = toHaveState(
-        { _httpCloseHandler: null },
-        { _httpCloseHandler: null }
+        { _httpHandlers: null },
+        { _httpHandlers: null }
+      );
+      expect(result.pass).toBe(true);
+    });
+
+    it("should pass if _httpPollingInterval matches - case 1", () => {
+      const result = toHaveState(
+        { _httpPollingInterval: 123 },
+        { _httpPollingInterval: true }
+      );
+      expect(result.pass).toBe(true);
+    });
+
+    it("should pass if _httpPollingInterval matches - case 2", () => {
+      const result = toHaveState(
+        { _httpPollingInterval: null },
+        { _httpPollingInterval: false }
       );
       expect(result.pass).toBe(true);
     });
@@ -544,6 +625,14 @@ describe("The server() function", () => {
       );
     });
 
+    it("should throw if handleProtocols is present", () => {
+      expect(() => {
+        harness({ port: 123, handleProtocols: () => {} });
+      }).toThrow(
+        new Error("INVALID_ARGUMENT: Must not specify options.handleProtocols.")
+      );
+    });
+
     it("should throw on invalid options.heartbeatIntervalMs - type", () => {
       expect(() => {
         harness({ port: PORT, heartbeatIntervalMs: "junk" });
@@ -613,10 +702,11 @@ describe("The server() function", () => {
         _heartbeatTimeouts: {},
         _options: {
           port: PORT,
-          heartbeatIntervalMs: config.defaults.heartbeatIntervalMs,
-          heartbeatTimeoutMs: config.defaults.heartbeatTimeoutMs
+          heartbeatIntervalMs: serverConfig.defaults.heartbeatIntervalMs,
+          heartbeatTimeoutMs: serverConfig.defaults.heartbeatTimeoutMs
         },
-        _httpCloseHandler: null
+        _httpHandlers: null,
+        _httpPollingInterval: false
       });
     });
 
@@ -638,7 +728,8 @@ describe("The server() function", () => {
           heartbeatIntervalMs: 456,
           heartbeatTimeoutMs: 123
         },
-        _httpCloseHandler: null
+        _httpHandlers: null,
+        _httpPollingInterval: false
       });
     });
 
@@ -674,10 +765,21 @@ describe("The server.start() function", () => {
   describe("can succeed", () => {
     // Events
 
-    it("should emit starting if the ws constructor succeeds - standalone server", () => {
+    it("stand-alone server - ws constructor succeeds - should asynchronously emit starting", async () => {
       const harn = harness({ port: PORT });
       const listener = harn.createServerListener();
       harn.server.start();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -688,12 +790,31 @@ describe("The server.start() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
     });
 
-    it("should emit starting, stopping, stopped if the ws constructor throws - standalone server", () => {
+    it("stand-alone server - if the ws constructor throws - should asynchronously emit starting, stopping, stopped", async () => {
+      const err = new Error("SOME_ERROR");
       const harn = harness({ port: PORT }, () => {
-        throw new Error("SOME_ERROR");
+        throw err;
       });
       const listener = harn.createServerListener();
       harn.server.start();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      const eventOrder = [];
+      ["starting", "stopping", "stop"].forEach(evt => {
+        harn.server.on(evt, () => {
+          eventOrder.push(evt);
+        });
+      });
+
+      await asyncUtil.nextTick();
+
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -703,27 +824,35 @@ describe("The server.start() function", () => {
       expect(listener.stopping.mock.calls[0][0].message).toBe(
         "FAILURE: Could not initialize WebSocket server."
       );
-      expect(listener.stopping.mock.calls[0][0].wsError).toBeInstanceOf(Error);
-      expect(listener.stopping.mock.calls[0][0].wsError.message).toBe(
-        "SOME_ERROR"
-      );
+      expect(listener.stopping.mock.calls[0][0].wsError).toBe(err);
       expect(listener.stop.mock.calls.length).toBe(1);
       expect(listener.stop.mock.calls[0].length).toBe(1);
       expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stop.mock.calls[0][0].message).toBe(
         "FAILURE: Could not initialize WebSocket server."
       );
-      expect(listener.stop.mock.calls[0][0].wsError).toBeInstanceOf(Error);
-      expect(listener.stop.mock.calls[0][0].wsError.message).toBe("SOME_ERROR");
+      expect(listener.stop.mock.calls[0][0].wsError).toBe(err);
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      expect(eventOrder).toEqual(["starting", "stopping", "stop"]);
     });
 
-    it("should emit starting if the ws constructor succeeds - standalone server not listening", () => {
+    it("external server not listening - if the ws constructor succeeds - should asynchronously emit starting", async () => {
       const harn = harness({ server: emitter({}) });
       const listener = harn.createServerListener();
       harn.server.start();
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -734,10 +863,77 @@ describe("The server.start() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
     });
 
-    it("should emit starting and start if the ws constructor succeeds - standalone server already listening", () => {
+    it("external server not listening - if the ws constructor fails - should asynchronously emit starting, stopping, stopped", async () => {
+      const err = new Error("SOME_ERROR");
+      const harn = harness({ server: emitter({}) }, () => {
+        throw err;
+      });
+
+      const listener = harn.createServerListener();
+
+      const eventOrder = [];
+      ["starting", "stopping", "stop"].forEach(evt => {
+        harn.server.on(evt, () => {
+          eventOrder.push(evt);
+        });
+      });
+
+      harn.server.start();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      expect(listener.starting.mock.calls.length).toBe(1);
+      expect(listener.starting.mock.calls[0].length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(1);
+      expect(listener.stopping.mock.calls[0].length).toBe(1);
+      expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stopping.mock.calls[0][0].message).toBe(
+        "FAILURE: Could not initialize WebSocket server."
+      );
+      expect(listener.stopping.mock.calls[0][0].wsError).toBe(err);
+      expect(listener.stop.mock.calls.length).toBe(1);
+      expect(listener.stop.mock.calls[0].length).toBe(1);
+      expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stop.mock.calls[0][0].message).toBe(
+        "FAILURE: Could not initialize WebSocket server."
+      );
+      expect(listener.stop.mock.calls[0][0].wsError).toBe(err);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+      expect(eventOrder).toEqual(["starting", "stopping", "stop"]);
+    });
+
+    it("external server already listening - if the ws constructor succeeds - should asynchronously emit starting and start", async () => {
       const harn = harness({ server: emitter({ listening: true }) });
       const listener = harn.createServerListener();
       harn.server.start();
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      const eventOrder = [];
+      ["starting", "start"].forEach(evt => {
+        harn.server.on(evt, () => {
+          eventOrder.push(evt);
+        });
+      });
+
+      await asyncUtil.nextTick();
+
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(1);
@@ -747,12 +943,81 @@ describe("The server.start() function", () => {
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
+      expect(eventOrder).toEqual(["starting", "start"]);
     });
 
-    it("should emit starting and start if the ws constructor succeeds - noServer mode", () => {
+    it("external server already listening - if the ws constructor fails - should asynchronously emit starting, stopping, stop", async () => {
+      const err = new Error("SOME_ERROR");
+      const harn = harness({ server: emitter({ listening: true }) }, () => {
+        throw err;
+      });
+
+      const listener = harn.createServerListener();
+
+      const eventOrder = [];
+      ["starting", "stopping", "stop"].forEach(evt => {
+        harn.server.on(evt, () => {
+          eventOrder.push(evt);
+        });
+      });
+
+      harn.server.start();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      expect(listener.starting.mock.calls.length).toBe(1);
+      expect(listener.starting.mock.calls[0].length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(1);
+      expect(listener.stopping.mock.calls[0].length).toBe(1);
+      expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stopping.mock.calls[0][0].message).toBe(
+        "FAILURE: Could not initialize WebSocket server."
+      );
+      expect(listener.stopping.mock.calls[0][0].wsError).toBe(err);
+      expect(listener.stop.mock.calls.length).toBe(1);
+      expect(listener.stop.mock.calls[0].length).toBe(1);
+      expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stop.mock.calls[0][0].message).toBe(
+        "FAILURE: Could not initialize WebSocket server."
+      );
+      expect(listener.stop.mock.calls[0][0].wsError).toBe(err);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+      expect(eventOrder).toEqual(["starting", "stopping", "stop"]);
+    });
+
+    it("noServer mode - if the ws constructor succeeds - should asynchronously emit starting and start", async () => {
       const harn = harness({ noServer: true });
       const listener = harn.createServerListener();
       harn.server.start();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      const eventOrder = [];
+      ["starting", "start"].forEach(evt => {
+        harn.server.on(evt, () => {
+          eventOrder.push(evt);
+        });
+      });
+
+      await asyncUtil.nextTick();
+
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(1);
@@ -762,11 +1027,62 @@ describe("The server.start() function", () => {
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
+      expect(eventOrder).toEqual(["starting", "start"]);
+    });
+
+    it("noServer mode - if the ws constructor fails - should asynchronously emit starting and start", async () => {
+      const err = new Error("SOME_ERROR");
+      const harn = harness({ noServer: true }, () => {
+        throw err;
+      });
+
+      const listener = harn.createServerListener();
+
+      const eventOrder = [];
+      ["starting", "stopping", "stop"].forEach(evt => {
+        harn.server.on(evt, () => {
+          eventOrder.push(evt);
+        });
+      });
+
+      harn.server.start();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      expect(listener.starting.mock.calls.length).toBe(1);
+      expect(listener.starting.mock.calls[0].length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(1);
+      expect(listener.stopping.mock.calls[0].length).toBe(1);
+      expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stopping.mock.calls[0][0].message).toBe(
+        "FAILURE: Could not initialize WebSocket server."
+      );
+      expect(listener.stopping.mock.calls[0][0].wsError).toBe(err);
+      expect(listener.stop.mock.calls.length).toBe(1);
+      expect(listener.stop.mock.calls[0].length).toBe(1);
+      expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stop.mock.calls[0][0].message).toBe(
+        "FAILURE: Could not initialize WebSocket server."
+      );
+      expect(listener.stop.mock.calls[0][0].wsError).toBe(err);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+      expect(eventOrder).toEqual(["starting", "stopping", "stop"]);
     });
 
     // State
 
-    it("should update the state correctly if the transport constructor succeeds", () => {
+    it("stand-alone server - ws constructor succeeds - should update the state correctly", () => {
       const harn = harness({ port: PORT });
       const newState = harn.getServerState();
       harn.server.start();
@@ -775,7 +1091,7 @@ describe("The server.start() function", () => {
       expect(harn.server).toHaveState(newState);
     });
 
-    it("should not change the state if the transport constructor throws", () => {
+    it("stand-alone server - ws constructor throws - should not change the state", () => {
       const harn = harness({ port: PORT }, () => {
         throw new Error("SOME_ERROR");
       });
@@ -784,27 +1100,58 @@ describe("The server.start() function", () => {
       expect(harn.server).toHaveState(newState);
     });
 
-    it("should update the state correctly if the transport constructor succeeds in external server mode - server not listening", () => {
+    it("external server not listening - the ws constructor succeeds - should update the state correctly", () => {
       const harn = harness({ server: emitter({}) });
       const newState = harn.getServerState();
       newState._wsServer = {};
       newState._state = "starting";
-      newState._httpCloseHandler = () => {};
+      newState._httpHandlers = {
+        listening: () => {},
+        close: () => {},
+        error: () => {}
+      };
       harn.server.start();
       expect(harn.server).toHaveState(newState);
     });
 
-    it("should update the state correctly if the transport constructor succeeds in external server mode - server listening", () => {
+    it("external server not listening - the ws constructor throws - should update the state correctly", () => {
+      const harn = harness({ server: emitter({}) }, () => {
+        throw new Error("SOME_ERROR");
+      });
+      const newState = harn.getServerState();
+      newState._wsServer = null;
+      newState._state = "stopped";
+      harn.server.start();
+      expect(harn.server).toHaveState(newState);
+    });
+
+    it("external server already listening - ws constructor succeeds - should update the state correctly", () => {
       const harn = harness({ server: emitter({ listening: true }) });
       const newState = harn.getServerState();
       newState._wsServer = {};
       newState._state = "started";
-      newState._httpCloseHandler = () => {};
+      newState._httpHandlers = {
+        listening: () => {},
+        close: () => {},
+        error: () => {}
+      };
+      newState._httpPollingInterval = true;
       harn.server.start();
       expect(harn.server).toHaveState(newState);
     });
 
-    it("should update the state correctly if the transport constructor succeeds in noServer mode", () => {
+    it("external server already listening - ws constructor fails - should update the state correctly", () => {
+      const harn = harness({ server: emitter({ listening: true }) }, () => {
+        throw new Error("SOME_ERROR");
+      });
+      const newState = harn.getServerState();
+      newState._wsServer = null;
+      newState._state = "stopped";
+      harn.server.start();
+      expect(harn.server).toHaveState(newState);
+    });
+
+    it("noServer mode - ws constructor succeeds - should update the state correctly", () => {
       const harn = harness({ noServer: true });
       const newState = harn.getServerState();
       newState._wsServer = {};
@@ -813,9 +1160,20 @@ describe("The server.start() function", () => {
       expect(harn.server).toHaveState(newState);
     });
 
+    it("noServer mode - ws constructor fails - should update the state correctly", () => {
+      const harn = harness({ noServer: true }, () => {
+        throw new Error("SOME_ERROR");
+      });
+      const newState = harn.getServerState();
+      newState._wsServer = null;
+      newState._state = "stopped";
+      harn.server.start();
+      expect(harn.server).toHaveState(newState);
+    });
+
     // Function calls
 
-    it("should initialize the ws server with correct options", () => {
+    it("stand-alone server - should initialize the ws server with correct options", () => {
       // Manual mock constructor - can't use jest.fn()
       const opts = { port: PORT };
       let calledTimes = 0;
@@ -827,12 +1185,56 @@ describe("The server.start() function", () => {
       };
       const harn = harness(opts, WsCon);
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       expect(calledTimes).toBe(1);
-      expect(calledOpts).toBe(opts);
+      expect(calledOpts).toBeInstanceOf(Object);
+      expect(_.keys(calledOpts).sort()).toEqual(["handleProtocols", "port"]);
+      expect(calledOpts.handleProtocols).toBeInstanceOf(Function);
+      expect(calledOpts.port).toBe(PORT);
     });
 
-    // Calls on ws - N/A (not initialized until next tick)
+    it("external server - should initialize the ws server with correct options", () => {
+      // Manual mock constructor - can't use jest.fn()
+      const s = emitter({ listening: true });
+      const opts = { server: s };
+      let calledTimes = 0;
+      let calledOpts = null;
+      const WsCon = function wsCon(o) {
+        emitter(this);
+        calledTimes += 1;
+        calledOpts = o;
+      };
+      const harn = harness(opts, WsCon);
+      harn.server.start();
+      expect(calledTimes).toBe(1);
+      expect(calledOpts).toBeInstanceOf(Object);
+      expect(_.keys(calledOpts).sort()).toEqual(["handleProtocols", "server"]);
+      expect(calledOpts.handleProtocols).toBeInstanceOf(Function);
+      expect(calledOpts.server).toBe(s);
+    });
+
+    it("noServer mode - should initialize the ws server with correct options", () => {
+      // Manual mock constructor - can't use jest.fn()
+      const opts = { noServer: true };
+      let calledTimes = 0;
+      let calledOpts = null;
+      const WsCon = function wsCon(o) {
+        emitter(this);
+        calledTimes += 1;
+        calledOpts = o;
+      };
+      const harn = harness(opts, WsCon);
+      harn.server.start();
+      expect(calledTimes).toBe(1);
+      expect(calledOpts).toBeInstanceOf(Object);
+      expect(_.keys(calledOpts).sort()).toEqual([
+        "handleProtocols",
+        "noServer"
+      ]);
+      expect(calledOpts.handleProtocols).toBeInstanceOf(Function);
+      expect(calledOpts.noServer).toBe(true);
+    });
+
+    // Calls on ws - N/A (initialized on start())
 
     // Outbound callbacks - N/A
 
@@ -858,26 +1260,44 @@ describe("The server.stop() function", () => {
   });
 
   describe("can succeed", () => {
-    let harn;
-    beforeEach(() => {
+    // Events
+
+    it("stand-alone server - should asynchronously emit disconnect for both clients, then stopping", async () => {
       // Set up two connected clients
-      // One with no heartbeat timeout and one with
-      harn = harness({ port: PORT });
+      const harn = harness({ port: PORT });
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
       const mockWs1 = harn.createMockWs();
       harn.getWs().emit("connection", mockWs1);
-      jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
       const mockWs2 = harn.createMockWs();
       harn.getWs().emit("connection", mockWs2);
-    });
 
-    // Events
+      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
 
-    it("should emit disconnect for both clients, then stopping", () => {
       const listener = harn.createServerListener();
+
+      const mockWs = harn.getWs();
+      mockWs.mockClear();
+
       harn.server.stop();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      const eventOrder = [];
+      ["stopping", "disconnect"].forEach(evt => {
+        harn.server.on(evt, () => {
+          eventOrder.push(evt);
+        });
+      });
+
+      await asyncUtil.nextTick();
+
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
       expect(listener.stopping.mock.calls.length).toBe(1);
@@ -892,11 +1312,157 @@ describe("The server.stop() function", () => {
       expect(listener.disconnect.mock.calls[0][1].message).toBe(
         "STOPPING: The server is stopping."
       );
+      expect(listener.disconnect.mock.calls[1].length).toBe(2);
+      expect(check.string(listener.disconnect.mock.calls[0][0])).toBe(true);
+      expect(listener.disconnect.mock.calls[1][1]).toBeInstanceOf(Error);
+      expect(listener.disconnect.mock.calls[1][1].message).toBe(
+        "STOPPING: The server is stopping."
+      );
+      expect(eventOrder).toEqual(["disconnect", "disconnect", "stopping"]);
+
+      listener.mockClear();
+
+      const cb = mockWs.close.mock.calls[0][0];
+      cb();
+
+      await asyncUtil.nextTick();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(1);
+      expect(listener.stop.mock.calls[0].length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+    });
+
+    it("external server - should asynchronously emit disconnect for both clients, then stopping", async () => {
+      // Set up two connected clients
+      const harn = harness({ server: emitter({ listening: true }) });
+      harn.server.start();
+      const mockWs1 = harn.createMockWs();
+      harn.getWs().emit("connection", mockWs1);
+      const mockWs2 = harn.createMockWs();
+      harn.getWs().emit("connection", mockWs2);
+
+      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+
+      const listener = harn.createServerListener();
+
+      harn.server.stop();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      const eventOrder = [];
+      ["stopping", "disconnect"].forEach(evt => {
+        harn.server.on(evt, () => {
+          eventOrder.push(evt);
+        });
+      });
+
+      await asyncUtil.nextTick();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(1);
+      expect(listener.stopping.mock.calls[0].length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(2);
+      expect(listener.disconnect.mock.calls[0].length).toBe(2);
+      expect(check.string(listener.disconnect.mock.calls[0][0])).toBe(true);
+      expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
+      expect(listener.disconnect.mock.calls[0][1].message).toBe(
+        "STOPPING: The server is stopping."
+      );
+      expect(listener.disconnect.mock.calls[1].length).toBe(2);
+      expect(check.string(listener.disconnect.mock.calls[0][0])).toBe(true);
+      expect(listener.disconnect.mock.calls[1][1]).toBeInstanceOf(Error);
+      expect(listener.disconnect.mock.calls[1][1].message).toBe(
+        "STOPPING: The server is stopping."
+      );
+      expect(eventOrder).toEqual(["disconnect", "disconnect", "stopping"]);
+    });
+
+    it("noServer mode - should asynchronously emit disconnect for both clients, then stopping", async () => {
+      // Set up two connected clients
+      const harn = harness({ noServer: true });
+      harn.server.start();
+      const mockWs1 = harn.createMockWs();
+      harn.getWs().emit("connection", mockWs1);
+      const mockWs2 = harn.createMockWs();
+      harn.getWs().emit("connection", mockWs2);
+
+      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+
+      const listener = harn.createServerListener();
+
+      harn.server.stop();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      const eventOrder = [];
+      ["stopping", "disconnect"].forEach(evt => {
+        harn.server.on(evt, () => {
+          eventOrder.push(evt);
+        });
+      });
+
+      await asyncUtil.nextTick();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(1);
+      expect(listener.stopping.mock.calls[0].length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(2);
+      expect(listener.disconnect.mock.calls[0].length).toBe(2);
+      expect(check.string(listener.disconnect.mock.calls[0][0])).toBe(true);
+      expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
+      expect(listener.disconnect.mock.calls[0][1].message).toBe(
+        "STOPPING: The server is stopping."
+      );
+      expect(listener.disconnect.mock.calls[1].length).toBe(2);
+      expect(check.string(listener.disconnect.mock.calls[0][0])).toBe(true);
+      expect(listener.disconnect.mock.calls[1][1]).toBeInstanceOf(Error);
+      expect(listener.disconnect.mock.calls[1][1].message).toBe(
+        "STOPPING: The server is stopping."
+      );
+      expect(eventOrder).toEqual(["disconnect", "disconnect", "stopping"]);
     });
 
     // State
 
-    it("should update the state appropriately - standalone http server", () => {
+    it("stand-alone server - should update the state appropriately", async () => {
+      // Set up two connected clients
+      // One with no heartbeat timeout and one with
+      const harn = harness({ port: PORT });
+      harn.server.start();
+      harn.getWs().emit("listening");
+      const mockWs1 = harn.createMockWs();
+      harn.getWs().emit("connection", mockWs1);
+      jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
+      const mockWs2 = harn.createMockWs();
+      harn.getWs().emit("connection", mockWs2);
+
+      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+
       const newState = harn.getServerState();
       newState._wsServer = null;
       newState._state = "stopping";
@@ -907,31 +1473,92 @@ describe("The server.stop() function", () => {
       expect(harn.server).toHaveState(newState);
     });
 
-    it("should update the state appropriately - external http server", () => {
-      const harnInner = harness({ server: emitter({ listening: true }) });
-      harnInner.server.start();
-      harnInner.getWs().emit("listening");
-      const newState = harnInner.getServerState();
+    it("external http server - should update the state appropriately", async () => {
+      // Set up two connected clients
+      const harn = harness({ server: emitter({ listening: true }) });
+      harn.server.start();
+      const mockWs1 = harn.createMockWs();
+      harn.getWs().emit("connection", mockWs1);
+      jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
+      const mockWs2 = harn.createMockWs();
+      harn.getWs().emit("connection", mockWs2);
+
+      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+
+      const newState = harn.getServerState();
       newState._wsServer = null;
       newState._state = "stopping";
-      newState._httpCloseHandler = null;
-      harnInner.server.stop();
-      expect(harnInner.server).toHaveState(newState);
+      newState._wsClients = {};
+      newState._heartbeatIntervals = {};
+      newState._heartbeatTimeouts = {};
+      newState._httpHandlers = null;
+      newState._httpPollingInterval = false;
+      harn.server.stop();
+      expect(harn.server).toHaveState(newState);
+    });
+
+    it("noServer mode - should update the state appropriately", async () => {
+      // Set up two connected clients
+      const harn = harness({ noServer: true });
+      harn.server.start();
+      const mockWs1 = harn.createMockWs();
+      harn.getWs().emit("connection", mockWs1);
+      jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
+      const mockWs2 = harn.createMockWs();
+      harn.getWs().emit("connection", mockWs2);
+
+      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+
+      const newState = harn.getServerState();
+      newState._wsServer = null;
+      newState._state = "stopping";
+      newState._wsClients = {};
+      newState._heartbeatIntervals = {};
+      newState._heartbeatTimeouts = {};
+      harn.server.stop();
+      expect(harn.server).toHaveState(newState);
     });
 
     // Function calls
 
-    it("should call clearInterval on client heartbeat", () => {
+    it("should call clearInterval on client heartbeat intervals and http polling interval", async () => {
+      // Set up two connected clients
+      // One with no heartbeat timeout and one with
+      const harn = harness({ port: PORT });
+      harn.server.start();
+      harn.getWs().emit("listening");
+      const mockWs1 = harn.createMockWs();
+      harn.getWs().emit("connection", mockWs1);
+      jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
+      const mockWs2 = harn.createMockWs();
+      harn.getWs().emit("connection", mockWs2);
+
+      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+
       clearInterval.mockClear();
       harn.server.stop();
-      expect(clearInterval.mock.calls.length).toBe(2);
+      expect(clearInterval.mock.calls.length).toBe(3);
       expect(clearInterval.mock.calls[0].length).toBe(1);
-      expect(check.integer(clearInterval.mock.calls[0][0])).toBe(true);
       expect(clearInterval.mock.calls[1].length).toBe(1);
       expect(check.integer(clearInterval.mock.calls[1][0])).toBe(true);
+      expect(clearInterval.mock.calls[2].length).toBe(1);
+      expect(check.integer(clearInterval.mock.calls[2][0])).toBe(true);
     });
 
-    it("should call clearTimeout on client heartbeat timeout", () => {
+    it("should call clearTimeout on client heartbeat timeout", async () => {
+      // Set up two connected clients
+      // One with no heartbeat timeout and one with
+      const harn = harness({ port: PORT });
+      harn.server.start();
+      harn.getWs().emit("listening");
+      const mockWs1 = harn.createMockWs();
+      harn.getWs().emit("connection", mockWs1);
+      jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
+      const mockWs2 = harn.createMockWs();
+      harn.getWs().emit("connection", mockWs2);
+
+      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+
       clearTimeout.mockClear();
       harn.server.stop();
       expect(clearTimeout.mock.calls.length).toBe(1);
@@ -941,7 +1568,43 @@ describe("The server.stop() function", () => {
 
     // Calls on ws
 
-    it("should call ws.close()", () => {
+    it("stand-alone server - should call ws.close()", async () => {
+      const harn = harness({ port: PORT });
+      harn.server.start();
+      harn.getWs().emit("listening");
+
+      await asyncUtil.nextTick(); // Get past emitted events
+
+      const prevWs = harn.getWs();
+      harn.getWs().mockClear();
+      harn.server.stop();
+      expect(prevWs.close.mock.calls.length).toBe(1);
+      expect(prevWs.close.mock.calls[0].length).toBe(1);
+      expect(prevWs.close.mock.calls[0][0]).toBeInstanceOf(Function);
+      expect(prevWs.handleUpgrade.mock.calls.length).toBe(0);
+    });
+
+    it("external http server - should call ws.close()", async () => {
+      const harn = harness({ server: emitter({ listening: true }) });
+      harn.server.start();
+
+      await asyncUtil.nextTick(); // Get past emitted events
+
+      const prevWs = harn.getWs();
+      harn.getWs().mockClear();
+      harn.server.stop();
+      expect(prevWs.close.mock.calls.length).toBe(1);
+      expect(prevWs.close.mock.calls[0].length).toBe(1);
+      expect(prevWs.close.mock.calls[0][0]).toBeInstanceOf(Function);
+      expect(prevWs.handleUpgrade.mock.calls.length).toBe(0);
+    });
+
+    it("noServer mode - should call ws.close()", async () => {
+      const harn = harness({ noServer: true });
+      harn.server.start();
+
+      await asyncUtil.nextTick(); // Get past emitted events
+
       const prevWs = harn.getWs();
       harn.getWs().mockClear();
       harn.server.stop();
@@ -955,13 +1618,32 @@ describe("The server.stop() function", () => {
 
     // Inbound callbacks (events, state, ws, callbacks)
 
-    describe("on ws.close() callback", () => {
-      it("should emit stop", () => {
+    describe("on ws.close() callback - stand-alone server", () => {
+      it("should emit stop next tick", async () => {
+        const harn = harness({ port: PORT });
+        harn.server.start();
+        harn.getWs().emit("listening");
+
         const prevWs = harn.getWs();
         harn.getWs().mockClear();
+
         harn.server.stop();
+
+        await asyncUtil.nextTick(); // Move past queued events
+
         const listener = harn.createServerListener();
         prevWs.close.mock.calls[0][0](); // fire ws.close callback
+
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
+        expect(listener.stop.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+
+        await asyncUtil.nextTick();
+
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
         expect(listener.stopping.mock.calls.length).toBe(0);
@@ -972,20 +1654,161 @@ describe("The server.stop() function", () => {
         expect(listener.disconnect.mock.calls.length).toBe(0);
       });
 
-      it("should update the state appropriately", () => {
+      it("should update the state appropriately", async () => {
+        // Set up two connected clients
+        const harn = harness({ port: PORT });
+        harn.server.start();
+        harn.getWs().emit("listening");
+        const mockWs1 = harn.createMockWs();
+        harn.getWs().emit("connection", mockWs1);
+        jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
+        const mockWs2 = harn.createMockWs();
+        harn.getWs().emit("connection", mockWs2);
+
+        await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+
         const prevWs = harn.getWs();
         harn.getWs().mockClear();
+
         harn.server.stop();
+
         const newState = harn.getServerState();
         newState._state = "stopped";
+
         prevWs.close.mock.calls[0][0](); // fire ws.close callback
+
+        expect(harn.server).toHaveState(newState);
+      });
+    });
+
+    describe("on ws.close() callback - external server", () => {
+      it("should emit stop next tick", async () => {
+        const harn = harness({ server: emitter({ listening: true }) });
+        harn.server.start();
+
+        const prevWs = harn.getWs();
+        harn.getWs().mockClear();
+
+        harn.server.stop();
+
+        await asyncUtil.nextTick(); // Move past queued events
+
+        const listener = harn.createServerListener();
+        prevWs.close.mock.calls[0][0](); // fire ws.close callback
+
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
+        expect(listener.stop.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+
+        await asyncUtil.nextTick();
+
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
+        expect(listener.stop.mock.calls.length).toBe(1);
+        expect(listener.stop.mock.calls[0].length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+      });
+
+      it("should update the state appropriately", async () => {
+        // Set up two connected clients
+        const harn = harness({ server: emitter({ listening: true }) });
+        harn.server.start();
+        const mockWs1 = harn.createMockWs();
+        harn.getWs().emit("connection", mockWs1);
+        jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
+        const mockWs2 = harn.createMockWs();
+        harn.getWs().emit("connection", mockWs2);
+
+        await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+
+        const prevWs = harn.getWs();
+        harn.getWs().mockClear();
+
+        harn.server.stop();
+
+        const newState = harn.getServerState();
+        newState._state = "stopped";
+
+        prevWs.close.mock.calls[0][0](); // fire ws.close callback
+
+        expect(harn.server).toHaveState(newState);
+      });
+    });
+
+    describe("on ws.close() callback - noServer mode", () => {
+      it("should emit stop next tick", async () => {
+        const harn = harness({ noServer: true });
+        harn.server.start();
+
+        const prevWs = harn.getWs();
+        harn.getWs().mockClear();
+
+        harn.server.stop();
+
+        await asyncUtil.nextTick(); // Move past queued events
+
+        const listener = harn.createServerListener();
+        prevWs.close.mock.calls[0][0](); // fire ws.close callback
+
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
+        expect(listener.stop.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+
+        await asyncUtil.nextTick();
+
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
+        expect(listener.stop.mock.calls.length).toBe(1);
+        expect(listener.stop.mock.calls[0].length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+      });
+
+      it("should update the state appropriately", async () => {
+        // Set up two connected clients
+        const harn = harness({ noServer: true });
+        harn.server.start();
+        const mockWs1 = harn.createMockWs();
+        harn.getWs().emit("connection", mockWs1);
+        jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
+        const mockWs2 = harn.createMockWs();
+        harn.getWs().emit("connection", mockWs2);
+
+        await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+
+        const prevWs = harn.getWs();
+        harn.getWs().mockClear();
+
+        harn.server.stop();
+
+        const newState = harn.getServerState();
+        newState._state = "stopped";
+
+        prevWs.close.mock.calls[0][0](); // fire ws.close callback
+
         expect(harn.server).toHaveState(newState);
       });
     });
 
     // Return value
 
-    it("should return nothing", () => {
+    it("should return nothing", async () => {
+      const harn = harness({ port: PORT });
+      harn.server.start();
+      harn.getWs().emit("listening");
       expect(harn.server.stop()).toBe(undefined);
     });
   });
@@ -996,7 +1819,6 @@ describe("The server.send() function", () => {
     it("should throw on invalid client id", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
       expect(() => {
         harn.server.send(123, "msg");
@@ -1006,7 +1828,6 @@ describe("The server.send() function", () => {
     it("should throw on invalid message", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
       expect(() => {
         harn.server.send("cid", 123);
@@ -1023,7 +1844,6 @@ describe("The server.send() function", () => {
     it("should throw if client not connected", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
       expect(() => {
         harn.server.send("cid", "msg");
@@ -1035,10 +1855,9 @@ describe("The server.send() function", () => {
     describe("the ws.send() callback may return success", () => {
       // Events
 
-      it("should emit nothing", () => {
+      it("should emit nothing next tick", async () => {
         const harn = harness({ port: PORT });
         harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
@@ -1047,10 +1866,15 @@ describe("The server.send() function", () => {
         });
         harn.getWs().emit("connection", ws);
 
+        await asyncUtil.nextTick(); // Move past starting, start, connect events
+
         const listener = harn.createServerListener();
         harn.server.send(cid, "msg");
         const cb = ws.send.mock.calls[0][1];
         cb();
+
+        await asyncUtil.nextTick();
+
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
         expect(listener.stopping.mock.calls.length).toBe(0);
@@ -1062,10 +1886,9 @@ describe("The server.send() function", () => {
 
       // State
 
-      it("should not change the state", () => {
+      it("should not change the state", async () => {
         const harn = harness({ port: PORT });
         harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
@@ -1073,6 +1896,8 @@ describe("The server.send() function", () => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
+
+        await asyncUtil.nextTick(); // Move past queued events
 
         const newState = harn.getServerState();
         harn.server.send(cid, "msg");
@@ -1085,10 +1910,9 @@ describe("The server.send() function", () => {
 
       // Calls on ws
 
-      it("should call ws ws.send()", () => {
+      it("should call ws ws.send()", async () => {
         const harn = harness({ port: PORT });
         harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
@@ -1098,6 +1922,9 @@ describe("The server.send() function", () => {
         harn.getWs().emit("connection", ws);
 
         ws.mockClear();
+
+        await asyncUtil.nextTick(); // Move past queued events
+
         harn.server.send(cid, "msg");
         const cb = ws.send.mock.calls[0][1];
         cb();
@@ -1116,10 +1943,9 @@ describe("The server.send() function", () => {
 
       // Return value
 
-      it("should return nothing", () => {
+      it("should return nothing", async () => {
         const harn = harness({ port: PORT });
         harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
@@ -1127,6 +1953,8 @@ describe("The server.send() function", () => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
+
+        await asyncUtil.nextTick(); // Move past queued events
 
         expect(harn.server.send(cid, "msg")).toBe(undefined);
       });
@@ -1135,10 +1963,9 @@ describe("The server.send() function", () => {
     describe("the ws.send() callback may return failure and the client is still present", () => {
       // Events
 
-      it("should emit disconnect", () => {
+      it("should emit disconnect next tick", async () => {
         const harn = harness({ port: PORT });
         harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
@@ -1147,11 +1974,24 @@ describe("The server.send() function", () => {
         });
         harn.getWs().emit("connection", ws);
 
+        await asyncUtil.nextTick(); // Move past queued events
+
         const listener = harn.createServerListener();
         harn.server.send(cid, "msg");
         const cb = ws.send.mock.calls[0][1];
         const err = new Error("SOME_ERROR");
         cb(err);
+
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
+        expect(listener.stop.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+
+        await asyncUtil.nextTick();
+
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
         expect(listener.stopping.mock.calls.length).toBe(0);
@@ -1170,10 +2010,9 @@ describe("The server.send() function", () => {
 
       // State
 
-      it("should update the state appropriately", () => {
+      it("should update the state appropriately", async () => {
         const harn = harness({ port: PORT });
         harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
@@ -1181,6 +2020,8 @@ describe("The server.send() function", () => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
+
+        await asyncUtil.nextTick(); // Move past queued events
 
         const newState = harn.getServerState();
         delete newState._wsClients[cid];
@@ -1195,10 +2036,9 @@ describe("The server.send() function", () => {
 
       // Calls on ws
 
-      it("should call ws ws.send() and ws.terminate()", () => {
+      it("should call ws ws.send() and ws.terminate()", async () => {
         const harn = harness({ port: PORT });
         harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
@@ -1206,6 +2046,8 @@ describe("The server.send() function", () => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
+
+        await asyncUtil.nextTick(); // Move past queued events
 
         ws.mockClear();
         harn.server.send(cid, "msg");
@@ -1227,10 +2069,9 @@ describe("The server.send() function", () => {
 
       // Return value
 
-      it("should return nothing", () => {
+      it("should return nothing", async () => {
         const harn = harness({ port: PORT });
         harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
@@ -1238,6 +2079,8 @@ describe("The server.send() function", () => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
+
+        await asyncUtil.nextTick(); // Move past queued events
 
         expect(harn.server.send(cid, "msg")).toBe(undefined);
       });
@@ -1246,10 +2089,9 @@ describe("The server.send() function", () => {
     describe("the ws.send() callback may return failure and the client has disconnected", () => {
       // Events
 
-      it("should emit nothing", () => {
+      it("should emit nothing next tick", async () => {
         const harn = harness({ port: PORT });
         harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
@@ -1258,15 +2100,22 @@ describe("The server.send() function", () => {
         });
         harn.getWs().emit("connection", ws);
 
+        await asyncUtil.nextTick(); // Move past queued events
+
         harn.server.send(cid, "msg");
         const cb = ws.send.mock.calls[0][1];
 
         ws.readyState = ws.CLOSING;
         ws.emit("close");
 
+        await asyncUtil.nextTick(); // Move past queued events
+
         const err = new Error("SOME_ERROR");
         const listener = harn.createServerListener();
         cb(err);
+
+        await asyncUtil.nextTick();
+
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
         expect(listener.stopping.mock.calls.length).toBe(0);
@@ -1278,10 +2127,9 @@ describe("The server.send() function", () => {
 
       // State
 
-      it("should not change the state", () => {
+      it("should not change the state", async () => {
         const harn = harness({ port: PORT });
         harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
@@ -1289,6 +2137,8 @@ describe("The server.send() function", () => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
+
+        await asyncUtil.nextTick(); // Move past queued events
 
         harn.server.send(cid, "msg");
         const cb = ws.send.mock.calls[0][1];
@@ -1305,10 +2155,9 @@ describe("The server.send() function", () => {
 
       // Calls on ws
 
-      it("should call ws ws.send() only", () => {
+      it("should call ws ws.send() only", async () => {
         const harn = harness({ port: PORT });
         harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
@@ -1316,6 +2165,8 @@ describe("The server.send() function", () => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
+
+        await asyncUtil.nextTick(); // Move past queued events
 
         ws.mockClear();
         harn.server.send(cid, "msg");
@@ -1369,7 +2220,6 @@ describe("The server.disconnect() function", () => {
     it("should throw if client not connected", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
       expect(() => {
         harn.server.disconnect("cid");
@@ -1380,10 +2230,9 @@ describe("The server.disconnect() function", () => {
   describe("can succeed", () => {
     // Events
 
-    it("should emit disconnect - no error", () => {
+    it("should emit disconnect on next tick - no error", async () => {
       const harn = harness({ port: PORT });
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
@@ -1392,8 +2241,21 @@ describe("The server.disconnect() function", () => {
       });
       harn.getWs().emit("connection", mockWs);
 
+      await asyncUtil.nextTick(); // Move past queued events
+
       const listener = harn.createServerListener();
       harn.server.disconnect(cid);
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
       expect(listener.stopping.mock.calls.length).toBe(0);
@@ -1405,10 +2267,9 @@ describe("The server.disconnect() function", () => {
       expect(listener.disconnect.mock.calls[0][0]).toBe(cid);
     });
 
-    it("should emit disconnect - with error", () => {
+    it("should emit disconnect on next tick - with error", async () => {
       const harn = harness({ port: PORT });
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
@@ -1418,8 +2279,20 @@ describe("The server.disconnect() function", () => {
       harn.getWs().emit("connection", mockWs);
       const err = new Error("SOMETHING");
 
+      await asyncUtil.nextTick(); // Move past queued events
+
       const listener = harn.createServerListener();
       harn.server.disconnect(cid, err);
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
       expect(listener.stopping.mock.calls.length).toBe(0);
@@ -1434,10 +2307,9 @@ describe("The server.disconnect() function", () => {
 
     // State
 
-    it("should update the state appropriately", () => {
+    it("should update the state appropriately", async () => {
       const harn = harness({ port: PORT });
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
@@ -1445,7 +2317,9 @@ describe("The server.disconnect() function", () => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
-      jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
+      jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
+
+      await asyncUtil.nextTick(); // Move past queued events
 
       const newState = harn.getServerState();
       delete newState._wsClients[cid];
@@ -1457,10 +2331,9 @@ describe("The server.disconnect() function", () => {
 
     // Function calls
 
-    it("should clear the heartbeat interval and timeout", () => {
+    it("should clear the heartbeat interval and timeout", async () => {
       const harn = harness({ port: PORT });
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
@@ -1468,7 +2341,9 @@ describe("The server.disconnect() function", () => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
-      jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
+      jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
+
+      await asyncUtil.nextTick(); // Move past queued events
 
       clearInterval.mockClear();
       clearTimeout.mockClear();
@@ -1483,10 +2358,9 @@ describe("The server.disconnect() function", () => {
 
     // Calls on ws
 
-    it("should call socket.close()", () => {
+    it("should call socket.close()", async () => {
       const harn = harness({ port: PORT });
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
@@ -1494,6 +2368,8 @@ describe("The server.disconnect() function", () => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
+
+      await asyncUtil.nextTick(); // Move past queued events
 
       harn.server.disconnect(cid);
       expect(mockWs.ping.mock.calls.length).toBe(0);
@@ -1501,22 +2377,19 @@ describe("The server.disconnect() function", () => {
       expect(mockWs.close.mock.calls.length).toBe(1);
       expect(mockWs.close.mock.calls[0].length).toBe(2);
       expect(mockWs.close.mock.calls[0][0]).toBe(1000);
-      expect(mockWs.close.mock.calls[0][1]).toBe(
-        "Connection closed by the server."
-      );
+      expect(mockWs.close.mock.calls[0][1]).toBe("");
       expect(mockWs.terminate.mock.calls.length).toBe(0);
     });
 
     // Outbound callbacks - N/A
 
-    // Inbound callbacks (events, state, ws, callbacks)
+    // Inbound callbacks (events, state, ws, callbacks) - N/A
 
     // Return value
 
-    it("should return nothing", () => {
+    it("should return nothing", async () => {
       const harn = harness({ port: PORT });
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
@@ -1524,6 +2397,8 @@ describe("The server.disconnect() function", () => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
+
+      await asyncUtil.nextTick(); // Move past queued events
 
       expect(harn.server.disconnect(cid)).toBe(undefined);
     });
@@ -1599,9 +2474,11 @@ describe("The server.handleUpgrade() function", () => {
   describe("can succeed", () => {
     // Events
 
-    it("should emit nothing", () => {
+    it("should emit nothing next tick", async () => {
       const harn = harness({ noServer: true });
       harn.server.start();
+
+      await asyncUtil.nextTick(); // Move past queued events
 
       const listener = harn.createServerListener();
       harn.server.handleUpgrade(
@@ -1609,6 +2486,8 @@ describe("The server.handleUpgrade() function", () => {
         new stream.Duplex(),
         Buffer.from("abc")
       );
+
+      await asyncUtil.nextTick();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -1663,7 +2542,7 @@ describe("The server.handleUpgrade() function", () => {
     // Inbound callbacks (events, state, ws, callbacks)
 
     describe("The ws.handleUpgrade() callback", () => {
-      it("should emit connect", () => {
+      it("should emit connect next tick", async () => {
         const harn = harness({ noServer: true });
         harn.server.start();
         harn.getWs().mockClear();
@@ -1674,8 +2553,21 @@ describe("The server.handleUpgrade() function", () => {
         );
         const cb = harn.getWs().handleUpgrade.mock.calls[0][3];
 
+        await asyncUtil.nextTick(); // Move past queued events
+
         const listener = harn.createServerListener();
         cb(harn.createMockWs());
+
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
+        expect(listener.stop.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+
+        await asyncUtil.nextTick();
+
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
         expect(listener.stopping.mock.calls.length).toBe(0);
@@ -1687,7 +2579,7 @@ describe("The server.handleUpgrade() function", () => {
         expect(listener.disconnect.mock.calls.length).toBe(0);
       });
 
-      it("should update the state appropriately", () => {
+      it("should update the state appropriately", async () => {
         const harn = harness({ noServer: true });
         let cid;
         harn.server.once("connect", c => {
@@ -1701,9 +2593,11 @@ describe("The server.handleUpgrade() function", () => {
           Buffer.from("abc")
         );
         const cb = harn.getWs().handleUpgrade.mock.calls[0][3];
-
         const newState = harn.getServerState();
+
         cb(harn.createMockWs()); // Do this first to get clientId
+        await asyncUtil.nextTick(); // Move past queued events
+
         newState._wsClients[cid] = {};
         newState._heartbeatIntervals[cid] = 123;
         expect(harn.server).toHaveState(newState);
@@ -1748,18 +2642,61 @@ describe("The server.handleUpgrade() function", () => {
   });
 });
 
-// State-modifying functions -- triggered by ws
+// State-modifying functions -- triggered by ws, http, or http no longer listening
 
-describe("The server._processWsServerListening() function", () => {
+describe("The server._processServerListening() function", () => {
   // Events
 
-  it("should emit start", () => {
+  it("stand-alone mode triggered by ws - should emit start next tick", async () => {
     const harn = harness({ port: PORT });
     harn.server.start();
-    jest.advanceTimersByTime(EPSILON);
+
+    await asyncUtil.nextTick(); // Move past queued events
 
     const listener = harn.createServerListener();
     harn.getWs().emit("listening");
+
+    expect(listener.starting.mock.calls.length).toBe(0);
+    expect(listener.start.mock.calls.length).toBe(0);
+    expect(listener.stopping.mock.calls.length).toBe(0);
+    expect(listener.stop.mock.calls.length).toBe(0);
+    expect(listener.connect.mock.calls.length).toBe(0);
+    expect(listener.message.mock.calls.length).toBe(0);
+    expect(listener.disconnect.mock.calls.length).toBe(0);
+
+    await asyncUtil.nextTick();
+
+    expect(listener.starting.mock.calls.length).toBe(0);
+    expect(listener.start.mock.calls.length).toBe(1);
+    expect(listener.start.mock.calls[0].length).toBe(0);
+    expect(listener.stopping.mock.calls.length).toBe(0);
+    expect(listener.stop.mock.calls.length).toBe(0);
+    expect(listener.connect.mock.calls.length).toBe(0);
+    expect(listener.message.mock.calls.length).toBe(0);
+    expect(listener.disconnect.mock.calls.length).toBe(0);
+  });
+
+  it("external server mode triggered by http - should emit start next tick", async () => {
+    const httpServer = emitter({});
+    const harn = harness({ server: httpServer });
+    harn.server.start();
+
+    await asyncUtil.nextTick(); // Move past queued events
+
+    const listener = harn.createServerListener();
+
+    httpServer.emit("listening");
+
+    expect(listener.starting.mock.calls.length).toBe(0);
+    expect(listener.start.mock.calls.length).toBe(0);
+    expect(listener.stopping.mock.calls.length).toBe(0);
+    expect(listener.stop.mock.calls.length).toBe(0);
+    expect(listener.connect.mock.calls.length).toBe(0);
+    expect(listener.message.mock.calls.length).toBe(0);
+    expect(listener.disconnect.mock.calls.length).toBe(0);
+
+    await asyncUtil.nextTick();
+
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(1);
     expect(listener.start.mock.calls[0].length).toBe(0);
@@ -1772,10 +2709,9 @@ describe("The server._processWsServerListening() function", () => {
 
   // State
 
-  it("should change the state to started", () => {
+  it("stand-alone mode triggered by ws - should change the state to started", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
-    jest.advanceTimersByTime(EPSILON);
 
     const newState = harn.getServerState();
     newState._state = "started";
@@ -1783,31 +2719,289 @@ describe("The server._processWsServerListening() function", () => {
     expect(harn.server).toHaveState(newState);
   });
 
-  // Function calls - N/A
+  it("external server mode triggered by http - should change the state to started", () => {
+    const httpServer = emitter({});
+    const harn = harness({ server: httpServer });
+    harn.server.start();
 
-  // Calls on ws - N/A
+    const newState = harn.getServerState();
+    newState._state = "started";
+    newState._httpPollingInterval = true;
+
+    httpServer.emit("listening");
+
+    expect(harn.server).toHaveState(newState);
+  });
+
+  // Function calls
+
+  it("stand-alone mode triggered by ws - should not create http polling interval", () => {
+    const harn = harness({ port: PORT });
+    harn.server.start();
+
+    setInterval.mockClear();
+
+    harn.getWs().emit("listening");
+
+    expect(setInterval.mock.calls.length).toBe(0);
+  });
+
+  it("external server mode triggered by http - should create http polling interval", () => {
+    const httpServer = emitter({});
+    const harn = harness({ server: httpServer });
+    harn.server.start();
+
+    setInterval.mockClear();
+
+    httpServer.emit("listening");
+
+    expect(setInterval.mock.calls.length).toBe(1);
+    expect(setInterval.mock.calls[0].length).toBe(2);
+    expect(check.function(setInterval.mock.calls[0][0])).toBe(true);
+    expect(check.integer(setInterval.mock.calls[0][1])).toBe(true);
+  });
+
+  // Calls on ws
+
+  it("stand-alone mode triggered by ws - should do nothing on ws", () => {
+    const harn = harness({ port: PORT });
+    harn.server.start();
+
+    harn.getWs().mockClear();
+
+    harn.getWs().emit("listening");
+
+    expect(harn.getWs().close.mock.calls.length).toBe(0);
+    expect(harn.getWs().handleUpgrade.mock.calls.length).toBe(0);
+  });
+
+  it("external server mode triggered by http - should do nothing on ws", () => {
+    const httpServer = emitter({});
+    const harn = harness({ server: httpServer });
+    harn.server.start();
+
+    harn.getWs().mockClear();
+
+    httpServer.emit("listening");
+
+    expect(harn.getWs().close.mock.calls.length).toBe(0);
+    expect(harn.getWs().handleUpgrade.mock.calls.length).toBe(0);
+  });
 
   // Outbound callbacks - N/A
 
-  // Inbound callbacks (events, state, ws, callbacks) - N/A
+  // Inbound callbacks (events, state, ws, callbacks)
+
+  describe("external server mode - the polling interval callback, if server still listening", () => {
+    it("it should emit nothing", async () => {
+      const httpServer = emitter({});
+      const harn = harness({ server: httpServer });
+      harn.server.start();
+      httpServer.listening = true;
+      httpServer.emit("listening");
+
+      await asyncUtil.nextTick(); // Move past queued events
+
+      const listener = harn.createServerListener();
+
+      jest.advanceTimersByTime(serverConfig.httpPollingMs);
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+    });
+
+    it("it should not change the state", async () => {
+      const httpServer = emitter({});
+      const harn = harness({ server: httpServer });
+      harn.server.start();
+      httpServer.listening = true;
+      httpServer.emit("listening");
+
+      await asyncUtil.nextTick(); // Move past queued events
+
+      const newState = harn.getServerState();
+
+      jest.advanceTimersByTime(serverConfig.httpPollingMs);
+
+      expect(harn.server).toHaveState(newState);
+    });
+
+    it("it should do nothing on ws", async () => {
+      const httpServer = emitter({});
+      const harn = harness({ server: httpServer });
+      harn.server.start();
+      httpServer.listening = true;
+      httpServer.emit("listening");
+
+      await asyncUtil.nextTick(); // Move past queued events
+
+      const wsServer = harn.getWs();
+      wsServer.mockClear();
+
+      jest.advanceTimersByTime(serverConfig.httpPollingMs);
+
+      expect(wsServer.close.mock.calls.length).toBe(0);
+      expect(wsServer.handleUpgrade.mock.calls.length).toBe(0);
+    });
+  });
+
+  describe("external server mode - the polling interval callback, if server no longer listening", () => {
+    it("it should emit stopping and then stopped", async () => {
+      const httpServer = emitter({});
+      const harn = harness({ server: httpServer });
+      harn.server.start();
+      httpServer.listening = true;
+      httpServer.emit("listening");
+
+      await asyncUtil.nextTick(); // Move past queued events
+
+      const wsServer = harn.getWs();
+      wsServer.mockClear();
+
+      const listener = harn.createServerListener();
+
+      httpServer.listening = false;
+
+      jest.advanceTimersByTime(serverConfig.httpPollingMs);
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(1);
+      expect(listener.stopping.mock.calls[0].length).toBe(1);
+      expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stopping.mock.calls[0][0].message).toBe(
+        "FAILURE: The external http server stopped listening."
+      );
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      listener.mockClear();
+
+      wsServer.close.mock.calls[0][0](); // Fire ws close callback
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(1);
+      expect(listener.stop.mock.calls[0].length).toBe(1);
+      expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stop.mock.calls[0][0].message).toBe(
+        "FAILURE: The external http server stopped listening."
+      );
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+    });
+
+    it("it should update the state appropriately", async () => {
+      const httpServer = emitter({});
+      const harn = harness({ server: httpServer });
+      harn.server.start();
+      httpServer.listening = true;
+      httpServer.emit("listening");
+
+      const wsServer = harn.getWs();
+      wsServer.mockClear();
+
+      const newState = harn.getServerState();
+      newState._wsServer = null;
+      newState._state = "stopping";
+      newState._httpHandlers = null;
+      newState._httpPollingInterval = false;
+
+      httpServer.listening = false;
+      jest.advanceTimersByTime(serverConfig.httpPollingMs);
+
+      expect(harn.server).toHaveState(newState);
+
+      wsServer.close.mock.calls[0][0](); // Fire ws close callback
+
+      newState._state = "stopped";
+      expect(harn.server).toHaveState(newState);
+    });
+
+    it("it should call ws.close", async () => {
+      const httpServer = emitter({});
+      const harn = harness({ server: httpServer });
+      harn.server.start();
+      httpServer.listening = true;
+      httpServer.emit("listening");
+
+      await asyncUtil.nextTick(); // Move past queued events
+
+      const wsServer = harn.getWs();
+      wsServer.mockClear();
+
+      httpServer.listening = false;
+
+      jest.advanceTimersByTime(serverConfig.httpPollingMs);
+
+      expect(wsServer.close.mock.calls.length).toBe(1);
+      expect(wsServer.close.mock.calls[0].length).toBe(1);
+      expect(check.function(wsServer.close.mock.calls[0][0])).toBe(true);
+      expect(wsServer.handleUpgrade.mock.calls.length).toBe(0);
+    });
+  });
 });
 
-describe("The server._processWsServerClose() function", () => {
+describe("The server._processServerClose() function", () => {
   // Events
 
-  it("should emit client disconnects, stopping, and stopped", () => {
+  it("stand-alone server - should asynchronously emit client disconnects, stopping, and stopped", async () => {
     // Set up two connected clients
     // One with no heartbeat timeout and one with
     const harn = harness({ port: PORT });
     harn.server.start();
-    jest.advanceTimersByTime(EPSILON);
     harn.getWs().emit("listening");
+
+    await asyncUtil.nextTick(); // Move past queued events
+
     const mockWs1 = harn.createMockWs();
     let cid1;
     harn.server.once("connect", c => {
       cid1 = c;
     });
     harn.getWs().emit("connection", mockWs1);
+
+    await asyncUtil.nextTick(); // Move past queued events
+
     const mockWs2 = harn.createMockWs();
     let cid2;
     harn.server.once("connect", c => {
@@ -1815,60 +3009,188 @@ describe("The server._processWsServerClose() function", () => {
     });
     harn.getWs().emit("connection", mockWs2);
 
-    // Not checking emit order, but verified disconnect(s), stopping, stop
-    // Per requirements
+    await asyncUtil.nextTick(); // Move past queued events
+
+    const eventOrder = [];
+    ["stopping", "stop", "disconnect"].forEach(evt => {
+      harn.server.on(evt, () => {
+        eventOrder.push(evt);
+      });
+    });
 
     const listener = harn.createServerListener();
     harn.getWs().emit("close");
+
+    expect(listener.starting.mock.calls.length).toBe(0);
+    expect(listener.start.mock.calls.length).toBe(0);
+    expect(listener.stopping.mock.calls.length).toBe(0);
+    expect(listener.stop.mock.calls.length).toBe(0);
+    expect(listener.connect.mock.calls.length).toBe(0);
+    expect(listener.message.mock.calls.length).toBe(0);
+    expect(listener.disconnect.mock.calls.length).toBe(0);
+
+    await asyncUtil.nextTick();
+
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(0);
     expect(listener.stopping.mock.calls.length).toBe(1);
     expect(listener.stopping.mock.calls[0].length).toBe(1);
     expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
     expect(listener.stopping.mock.calls[0][0].message).toBe(
-      "FAILURE: The WebSocket server stopped unexpectedly."
+      "FAILURE: The server stopped unexpectedly."
     );
     expect(listener.stop.mock.calls.length).toBe(1);
     expect(listener.stop.mock.calls[0].length).toBe(1);
     expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
     expect(listener.stop.mock.calls[0][0].message).toBe(
-      "FAILURE: The WebSocket server stopped unexpectedly."
+      "FAILURE: The server stopped unexpectedly."
     );
     expect(listener.connect.mock.calls.length).toBe(0);
     expect(listener.message.mock.calls.length).toBe(0);
     expect(listener.disconnect.mock.calls.length).toBe(2);
     expect(listener.disconnect.mock.calls[0].length).toBe(2);
+    expect(listener.disconnect.mock.calls[1].length).toBe(2);
     expect(
-      _.indexOf([cid1, cid2], listener.disconnect.mock.calls[0][0])
-    ).toBeGreaterThanOrEqual(0);
+      (cid1 === listener.disconnect.mock.calls[0][0] &&
+        cid2 === listener.disconnect.mock.calls[1][0]) ||
+        (cid1 === listener.disconnect.mock.calls[1][0] &&
+          cid2 === listener.disconnect.mock.calls[0][0])
+    ).toBe(true);
     expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
     expect(listener.disconnect.mock.calls[0][1].message).toBe(
       "STOPPING: The server is stopping."
     );
-    expect(listener.disconnect.mock.calls[1].length).toBe(2);
-    expect(
-      _.indexOf([cid1, cid2], listener.disconnect.mock.calls[1][0])
-    ).toBeGreaterThanOrEqual(0);
     expect(listener.disconnect.mock.calls[1][1]).toBeInstanceOf(Error);
     expect(listener.disconnect.mock.calls[1][1].message).toBe(
       "STOPPING: The server is stopping."
     );
+    expect(eventOrder).toEqual([
+      "disconnect",
+      "disconnect",
+      "stopping",
+      "stop"
+    ]);
+  });
+
+  it("external http server - should asynchronously emit client disconnects, stopping, and stopped", async () => {
+    // Set up two connected clients
+    // One with no heartbeat timeout and one with
+    const httpServer = emitter({ listening: true });
+    const harn = harness({ server: httpServer });
+    harn.server.start();
+    harn.getWs().emit("listening");
+
+    await asyncUtil.nextTick(); // Move past queued events
+
+    const mockWs1 = harn.createMockWs();
+    let cid1;
+    harn.server.once("connect", c => {
+      cid1 = c;
+    });
+    harn.getWs().emit("connection", mockWs1);
+
+    await asyncUtil.nextTick(); // Move past queued events
+
+    const mockWs2 = harn.createMockWs();
+    let cid2;
+    harn.server.once("connect", c => {
+      cid2 = c;
+    });
+    harn.getWs().emit("connection", mockWs2);
+
+    await asyncUtil.nextTick(); // Move past queued events
+
+    const eventOrder = [];
+    ["stopping", "stop", "disconnect"].forEach(evt => {
+      harn.server.on(evt, () => {
+        eventOrder.push(evt);
+      });
+    });
+
+    const wsServer = harn.getWs();
+
+    const listener = harn.createServerListener();
+    httpServer.emit("close");
+
+    expect(listener.starting.mock.calls.length).toBe(0);
+    expect(listener.start.mock.calls.length).toBe(0);
+    expect(listener.stopping.mock.calls.length).toBe(0);
+    expect(listener.stop.mock.calls.length).toBe(0);
+    expect(listener.connect.mock.calls.length).toBe(0);
+    expect(listener.message.mock.calls.length).toBe(0);
+    expect(listener.disconnect.mock.calls.length).toBe(0);
+
+    await asyncUtil.nextTick();
+
+    expect(listener.starting.mock.calls.length).toBe(0);
+    expect(listener.start.mock.calls.length).toBe(0);
+    expect(listener.stopping.mock.calls.length).toBe(1);
+    expect(listener.stopping.mock.calls[0].length).toBe(1);
+    expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
+    expect(listener.stopping.mock.calls[0][0].message).toBe(
+      "FAILURE: The server stopped unexpectedly."
+    );
+    expect(listener.stop.mock.calls.length).toBe(0);
+    expect(listener.connect.mock.calls.length).toBe(0);
+    expect(listener.message.mock.calls.length).toBe(0);
+    expect(listener.disconnect.mock.calls.length).toBe(2);
+    expect(listener.disconnect.mock.calls[0].length).toBe(2);
+    expect(listener.disconnect.mock.calls[1].length).toBe(2);
+    expect(
+      (cid1 === listener.disconnect.mock.calls[0][0] &&
+        cid2 === listener.disconnect.mock.calls[1][0]) ||
+        (cid1 === listener.disconnect.mock.calls[1][0] &&
+          cid2 === listener.disconnect.mock.calls[0][0])
+    ).toBe(true);
+    expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
+    expect(listener.disconnect.mock.calls[0][1].message).toBe(
+      "STOPPING: The server is stopping."
+    );
+    expect(listener.disconnect.mock.calls[1][1]).toBeInstanceOf(Error);
+    expect(listener.disconnect.mock.calls[1][1].message).toBe(
+      "STOPPING: The server is stopping."
+    );
+    expect(eventOrder).toEqual(["disconnect", "disconnect", "stopping"]);
+
+    listener.mockClear();
+    wsServer.close.mock.calls[0][0](); // Fire ws close callback
+
+    expect(listener.starting.mock.calls.length).toBe(0);
+    expect(listener.start.mock.calls.length).toBe(0);
+    expect(listener.stopping.mock.calls.length).toBe(0);
+    expect(listener.stop.mock.calls.length).toBe(0);
+    expect(listener.connect.mock.calls.length).toBe(0);
+    expect(listener.message.mock.calls.length).toBe(0);
+    expect(listener.disconnect.mock.calls.length).toBe(0);
+
+    await asyncUtil.nextTick();
+
+    expect(listener.starting.mock.calls.length).toBe(0);
+    expect(listener.start.mock.calls.length).toBe(0);
+    expect(listener.stopping.mock.calls.length).toBe(0);
+    expect(listener.stop.mock.calls[0].length).toBe(1);
+    expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
+    expect(listener.stop.mock.calls[0][0].message).toBe(
+      "FAILURE: The server stopped unexpectedly."
+    );
+    expect(listener.connect.mock.calls.length).toBe(0);
+    expect(listener.message.mock.calls.length).toBe(0);
+    expect(listener.disconnect.mock.calls.length).toBe(0);
   });
 
   // State
 
-  it("should update the state appropriately - standalone server", () => {
+  it("stand-alone server - should update the state appropriately", () => {
     // Set up two connected clients
     // One with no heartbeat timeout and one with
     const harn = harness({ port: PORT });
     harn.server.start();
-    jest.advanceTimersByTime(EPSILON);
     harn.getWs().emit("listening");
     const mockWs1 = harn.createMockWs();
     harn.getWs().emit("connection", mockWs1);
     const mockWs2 = harn.createMockWs();
     harn.getWs().emit("connection", mockWs2);
-    jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
+    jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
     const newState = harn.getServerState();
     newState._wsServer = null;
@@ -1880,67 +3202,660 @@ describe("The server._processWsServerClose() function", () => {
     expect(harn.server).toHaveState(newState);
   });
 
-  it("should update the state appropriately - external server", () => {
-    const harn = harness({ server: emitter({ listening: true }) });
+  it("external server - should update the state appropriately", () => {
+    const httpServer = emitter({ listening: true });
+    const harn = harness({ server: httpServer });
     harn.server.start();
     harn.getWs().emit("listening");
 
+    const wsServer = harn.getWs();
+
     const newState = harn.getServerState();
     newState._wsServer = null;
+    newState._state = "stopping"; // Ws server still closing
+    newState._httpHandlers = null;
+    newState._httpPollingInterval = false;
+    httpServer.emit("close");
+    expect(harn.server).toHaveState(newState);
+
+    wsServer.close.mock.calls[0][0](); // Run ws.close() callback
+
     newState._state = "stopped";
-    newState._httpCloseHandler = null;
-    harn.getWs().emit("close");
     expect(harn.server).toHaveState(newState);
   });
 
   // Function calls
 
-  it("should call clearInterval and clearTimeout for heartbeats", () => {
+  it("should call clearInterval and clearTimeout for heartbeats and http polling interval", () => {
     // Set up two connected clients
     // One with no heartbeat timeout and one with
     const harn = harness({ port: PORT });
     harn.server.start();
-    jest.advanceTimersByTime(EPSILON);
     harn.getWs().emit("listening");
     const mockWs1 = harn.createMockWs();
     harn.getWs().emit("connection", mockWs1);
-    jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
+    jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
     const mockWs2 = harn.createMockWs();
     harn.getWs().emit("connection", mockWs2);
 
     clearInterval.mockClear();
     clearTimeout.mockClear();
     harn.getWs().emit("close");
-    expect(clearInterval.mock.calls.length).toBe(2);
-    expect(clearInterval.mock.calls[0].length).toBe(1);
-    expect(check.integer(clearInterval.mock.calls[0][0])).toBe(true);
-    expect(clearInterval.mock.calls[1].length).toBe(1);
-    expect(check.integer(clearInterval.mock.calls[1][0])).toBe(true);
+    expect(clearInterval.mock.calls.length).toBe(3);
     expect(clearTimeout.mock.calls.length).toBe(1);
-    expect(clearTimeout.mock.calls[0].length).toBe(1);
-    expect(check.integer(clearTimeout.mock.calls[0][0])).toBe(true);
   });
 
-  // Calls on ws - N/A
+  // Calls on ws
+
+  it("stand-alone server - should call nothing on ws", () => {
+    const harn = harness({ port: PORT });
+    harn.server.start();
+    harn.getWs().emit("listening");
+
+    const wsServer = harn.getWs();
+    wsServer.mockClear();
+
+    harn.getWs().emit("close");
+
+    expect(wsServer.close.mock.calls.length).toBe(0);
+    expect(wsServer.handleUpgrade.mock.calls.length).toBe(0);
+  });
+
+  it("external server - should call ws.close", () => {
+    const httpServer = emitter({ listening: true });
+    const harn = harness({ server: httpServer });
+    harn.server.start();
+
+    const wsServer = harn.getWs();
+    wsServer.mockClear();
+
+    httpServer.emit("close");
+
+    expect(wsServer.close.mock.calls.length).toBe(1);
+    expect(wsServer.close.mock.calls[0].length).toBe(1);
+    expect(check.function(wsServer.close.mock.calls[0][0])).toBe(true);
+    expect(wsServer.handleUpgrade.mock.calls.length).toBe(0);
+  });
 
   // Outbound callbacks - N/A
 
   // Inbound callbacks (events, state, ws, callbacks) - N/A
 });
 
+describe("The server._processServerError() function", () => {
+  describe("If the transport was starting", () => {
+    // Events
+
+    it("stand-alone server - should asynchronously emit stopping and stop", async () => {
+      const err = new Error("SOME_ERROR");
+      // Start a transport server and have ws emit error
+      const harn = harness({ port: PORT });
+      harn.server.start();
+
+      await asyncUtil.nextTick(); // Move past starting event
+
+      const listener = harn.createServerListener();
+
+      harn.getWs().emit("error", err);
+
+      // Emit nothing synchronously
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      const eventOrder = [];
+      ["stopping", "stop"].forEach(evt => {
+        eventOrder.push(evt);
+      });
+
+      await asyncUtil.nextTick();
+
+      // Emit stopping and stop asynchronously
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(1);
+      expect(listener.stopping.mock.calls[0].length).toBe(1);
+      expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stopping.mock.calls[0][0].message).toBe(
+        "FAILURE: Failed to listen for connections."
+      );
+      expect(listener.stopping.mock.calls[0][0].wsError).toBe(err);
+      expect(listener.stop.mock.calls.length).toBe(1);
+      expect(listener.stop.mock.calls[0].length).toBe(1);
+      expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stop.mock.calls[0][0].message).toBe(
+        "FAILURE: Failed to listen for connections."
+      );
+      expect(listener.stop.mock.calls[0][0].wsError).toBe(err);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+      expect(eventOrder).toEqual(["stopping", "stop"]);
+    });
+
+    it("external server - should asynchronously emit stopping and stop", async () => {
+      const err = new Error("SOME_ERROR");
+      const httpServer = emitter({ listening: false });
+      const harn = harness({ server: httpServer });
+      harn.server.start();
+
+      await asyncUtil.nextTick(); // Move past starting event
+
+      const wsServer = harn.getWs();
+
+      const listener = harn.createServerListener();
+
+      httpServer.emit("error", err);
+
+      // Emit nothing synchronously
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      // Emit stopping and stop asynchronously
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(1);
+      expect(listener.stopping.mock.calls[0].length).toBe(1);
+      expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stopping.mock.calls[0][0].message).toBe(
+        "FAILURE: Failed to listen for connections."
+      );
+      expect(listener.stopping.mock.calls[0][0].wsError).toBe(err);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      listener.mockClear();
+
+      wsServer.close.mock.calls[0][0](); // Fire ws close callback
+
+      // Emit nothing synchronously
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      // Emit stopping and stop asynchronously
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(1);
+      expect(listener.stop.mock.calls[0].length).toBe(1);
+      expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stop.mock.calls[0][0].message).toBe(
+        "FAILURE: Failed to listen for connections."
+      );
+      expect(listener.stop.mock.calls[0][0].wsError).toBe(err);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+    });
+    // State
+
+    it("stand-alone server - should update the state appropriately", async () => {
+      const harn = harness({ port: PORT });
+      harn.server.start();
+
+      const newState = harn.getServerState();
+      newState._wsServer = null;
+      newState._state = "stopped";
+
+      harn.getWs().emit("error", new Error("SOME_ERROR"));
+
+      expect(harn.server).toHaveState(newState);
+    });
+
+    it("external server - should update the state appropriately", async () => {
+      const httpServer = emitter({ listening: false });
+      const harn = harness({ server: httpServer });
+      harn.server.start();
+
+      const wsServer = harn.getWs();
+
+      const newState = harn.getServerState();
+      newState._wsServer = null;
+      newState._state = "stopping";
+      newState._httpHandlers = null;
+
+      httpServer.emit("error", new Error("SOME_ERROR"));
+
+      expect(harn.server).toHaveState(newState);
+
+      wsServer.close.mock.calls[0][0](); // Run ws.close() callback
+
+      newState._state = "stopped";
+
+      expect(harn.server).toHaveState(newState);
+    });
+
+    // Function calls - N/A
+
+    // Calls on ws
+
+    it("stand-alone server - should do nothing on ws", async () => {
+      // Start a transport server and have ws emit error
+      const harn = harness({ port: PORT });
+      harn.server.start();
+
+      const prevWs = harn.getWs();
+      prevWs.mockClear();
+
+      harn.getWs().emit("error", new Error("SOME_ERROR"));
+
+      expect(prevWs.close.mock.calls.length).toBe(0);
+      expect(prevWs.handleUpgrade.mock.calls.length).toBe(0);
+    });
+
+    it("external server - should call ws.close()", async () => {
+      const httpServer = emitter({ listening: false });
+      const harn = harness({ server: httpServer });
+      harn.server.start();
+
+      const prevWs = harn.getWs();
+      prevWs.mockClear();
+
+      httpServer.emit("error", new Error("SOME_ERROR"));
+
+      expect(prevWs.close.mock.calls.length).toBe(1);
+      expect(prevWs.close.mock.calls[0].length).toBe(1);
+      expect(check.function(prevWs.close.mock.calls[0][0])).toBe(true);
+      expect(prevWs.handleUpgrade.mock.calls.length).toBe(0);
+    });
+
+    // Outbound callbacks - N/A
+
+    // Inbound callbacks (events, state, ws, callbacks) - N/A
+  });
+
+  describe("If the transport was started - error comes after close event", () => {
+    // Events
+
+    it("stand-alone server - should emit nothing", async () => {
+      const harn = harness({ port: PORT });
+      harn.server.start();
+      harn.getWs().emit("listening");
+
+      const wsServer = harn.getWs();
+      harn.getWs().emit("close");
+
+      await asyncUtil.nextTick(); // Move past queued events
+
+      const listener = harn.createServerListener();
+
+      wsServer.emit("error", new Error("SOME_ERROR"));
+
+      // Emit nothing synchronously
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      // Emit nothing asynchronously
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+    });
+
+    it("external server - should emit nothing", async () => {
+      const httpServer = emitter({ listening: true });
+      const harn = harness({ server: httpServer });
+      harn.server.start();
+
+      httpServer.emit("close");
+
+      await asyncUtil.nextTick(); // Move past queued events
+
+      const listener = harn.createServerListener();
+
+      httpServer.emit("error", new Error("SOME_ERROR"));
+
+      // Emit nothing synchronously
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      // Emit nothing asynchronously
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+    });
+
+    // State
+
+    it("stand-alone server - should not change the state", async () => {
+      const harn = harness({ port: PORT });
+      harn.server.start();
+      harn.getWs().emit("listening");
+
+      const wsServer = harn.getWs();
+      harn.getWs().emit("close");
+
+      const newState = harn.getServerState();
+
+      wsServer.emit("error", new Error("SOME_ERROR"));
+
+      expect(harn.server).toHaveState(newState);
+    });
+
+    it("external server - should not change the state", async () => {
+      const httpServer = emitter({ listening: true });
+      const harn = harness({ server: httpServer });
+      harn.server.start();
+
+      httpServer.emit("close");
+
+      const newState = harn.getServerState();
+
+      httpServer.emit("error", new Error("SOME_ERROR"));
+
+      expect(harn.server).toHaveState(newState);
+    });
+
+    // Function calls - N/A
+
+    // Calls on ws
+
+    it("stand-alone server - should do nothing on ws", async () => {
+      // Start a transport server and laterhave ws emit error
+      const harn = harness({ port: PORT });
+      harn.server.start();
+      harn.getWs().emit("listening");
+
+      const prevWs = harn.getWs();
+
+      harn.getWs().emit("close");
+
+      prevWs.mockClear();
+
+      prevWs.emit("error", new Error("SOME_ERROR"));
+
+      expect(prevWs.close.mock.calls.length).toBe(0);
+      expect(prevWs.handleUpgrade.mock.calls.length).toBe(0);
+    });
+
+    it("external server - should do nothing on ws", async () => {
+      const httpServer = emitter({ listening: true });
+      const harn = harness({ server: httpServer });
+      harn.server.start();
+
+      const prevWs = harn.getWs();
+
+      httpServer.emit("close");
+
+      prevWs.mockClear();
+
+      httpServer.emit("error", new Error("SOME_ERROR"));
+
+      expect(prevWs.close.mock.calls.length).toBe(0);
+      expect(prevWs.handleUpgrade.mock.calls.length).toBe(0);
+    });
+
+    // Outbound callbacks - N/A
+
+    // Inbound callbacks (events, state, ws, callbacks) - N/A
+  });
+
+  describe("If the transport was started - error comes before close event", () => {
+    // Events
+
+    it("stand-alone server - should asynchronously emit stopping and then stopped", async () => {
+      const harn = harness({ port: PORT });
+      harn.server.start();
+      harn.getWs().emit("listening");
+
+      const wsServer = harn.getWs();
+
+      await asyncUtil.nextTick(); // Move past queued events
+
+      const listener = harn.createServerListener();
+
+      const eventOrder = [];
+      ["stopping", "stop"].forEach(evt => {
+        harn.server.on(evt, () => {
+          eventOrder.push(evt);
+        });
+      });
+
+      wsServer.emit("error", new Error("SOME_ERROR"));
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(1);
+      expect(listener.stopping.mock.calls[0].length).toBe(1);
+      expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stopping.mock.calls[0][0].message).toBe(
+        "FAILURE: Failed to listen for connections."
+      );
+      expect(listener.stop.mock.calls.length).toBe(1);
+      expect(listener.stop.mock.calls[0].length).toBe(1);
+      expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stop.mock.calls[0][0].message).toBe(
+        "FAILURE: Failed to listen for connections."
+      );
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+      expect(eventOrder).toEqual(["stopping", "stop"]);
+    });
+
+    it("external server - should asynchronously emit stopping and then stopped", async () => {
+      const httpServer = emitter({ listening: true });
+      const harn = harness({ server: httpServer });
+      harn.server.start();
+
+      await asyncUtil.nextTick(); // Move past queued events
+
+      const wsServer = harn.getWs();
+
+      const listener = harn.createServerListener();
+
+      httpServer.emit("error", new Error("SOME_ERROR"));
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(1);
+      expect(listener.stopping.mock.calls[0].length).toBe(1);
+      expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stopping.mock.calls[0][0].message).toBe(
+        "FAILURE: Failed to listen for connections."
+      );
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      listener.mockClear();
+
+      wsServer.close.mock.calls[0][0](); // Call ws close callback
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(1);
+      expect(listener.stop.mock.calls[0].length).toBe(1);
+      expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
+      expect(listener.stop.mock.calls[0][0].message).toBe(
+        "FAILURE: Failed to listen for connections."
+      );
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+    });
+
+    // State
+
+    it("stand-alone server - should update the state appropriately", async () => {
+      const harn = harness({ port: PORT });
+      harn.server.start();
+      harn.getWs().emit("listening");
+
+      const wsServer = harn.getWs();
+
+      const newState = harn.getServerState();
+      newState._wsServer = null;
+      newState._state = "stopped";
+
+      wsServer.emit("error", new Error("SOME_ERROR"));
+
+      expect(harn.server).toHaveState(newState);
+    });
+
+    it("external server - should update the state appropriately", async () => {
+      const httpServer = emitter({ listening: true });
+      const harn = harness({ server: httpServer });
+      harn.server.start();
+
+      const wsServer = harn.getWs();
+
+      const newState = harn.getServerState();
+      newState._wsServer = null;
+      newState._state = "stopping";
+      newState._httpHandlers = null;
+      newState._httpPollingInterval = false;
+
+      httpServer.emit("error", new Error("SOME_ERROR"));
+
+      expect(harn.server).toHaveState(newState);
+
+      wsServer.close.mock.calls[0][0](); // Call ws.close() callback
+
+      newState._state = "stopped";
+      expect(harn.server).toHaveState(newState);
+    });
+
+    // Function calls - N/A
+
+    // Calls on ws
+
+    it("stand-alone server - should do nothing on ws", async () => {
+      // Start a transport server and laterhave ws emit error
+      const harn = harness({ port: PORT });
+      harn.server.start();
+      harn.getWs().emit("listening");
+
+      const prevWs = harn.getWs();
+      prevWs.mockClear();
+
+      harn.getWs().emit("error", new Error("SOME_ERROR"));
+
+      expect(prevWs.close.mock.calls.length).toBe(0);
+      expect(prevWs.handleUpgrade.mock.calls.length).toBe(0);
+    });
+
+    it("external server - should call ws.close()", async () => {
+      const httpServer = emitter({ listening: true });
+      const harn = harness({ server: httpServer });
+      harn.server.start();
+
+      const prevWs = harn.getWs();
+
+      prevWs.mockClear();
+
+      httpServer.emit("error", new Error("SOME_ERROR"));
+
+      expect(prevWs.close.mock.calls.length).toBe(1);
+      expect(prevWs.close.mock.calls[0].length).toBe(1);
+      expect(check.function(prevWs.close.mock.calls[0][0])).toBe(true);
+      expect(prevWs.handleUpgrade.mock.calls.length).toBe(0);
+    });
+
+    // Outbound callbacks - N/A
+
+    // Inbound callbacks (events, state, ws, callbacks) - N/A
+  });
+});
+
 describe("The server._processWsServerConnection() function", () => {
   describe("if heartbeat is enabled", () => {
     // Events
 
-    it("should emit connect", () => {
+    it("should emit connect next tick", async () => {
       const harn = harness({ port: PORT });
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
+
+      await asyncUtil.nextTick(); // Move past queued events
 
       const listener = harn.createServerListener();
       const mockWs = harn.createMockWs();
       harn.getWs().emit("connection", mockWs);
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
       expect(listener.stopping.mock.calls.length).toBe(0);
@@ -1954,10 +3869,9 @@ describe("The server._processWsServerConnection() function", () => {
 
     // State
 
-    it("should update state appropriately", () => {
+    it("should update state appropriately", async () => {
       const harn = harness({ port: PORT });
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
 
       // Outside code does not have access to the ws client
@@ -1969,6 +3883,9 @@ describe("The server._processWsServerConnection() function", () => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
+
+      await asyncUtil.nextTick();
+
       newState._wsClients[cid] = harn.server._wsClients[cid]; // Basically checking cid
       newState._heartbeatIntervals[cid] = 123;
       expect(harn.server).toHaveState(newState);
@@ -1983,16 +3900,20 @@ describe("The server._processWsServerConnection() function", () => {
     // Inbound callbacks (events, state, ws, callbacks)
 
     describe("when the heartbeat interval fires", () => {
-      it("should emit nothing", () => {
+      it("should emit nothing next tick", async () => {
         const harn = harness({ port: PORT });
         harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
         harn.getWs().emit("listening");
         const mockWs = harn.createMockWs();
         harn.getWs().emit("connection", mockWs);
 
+        await asyncUtil.nextTick(); // Move past queued events
+
         const listener = harn.createServerListener();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
+        jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
+
+        await asyncUtil.nextTick();
+
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
         expect(listener.stopping.mock.calls.length).toBe(0);
@@ -2002,10 +3923,9 @@ describe("The server._processWsServerConnection() function", () => {
         expect(listener.disconnect.mock.calls.length).toBe(0);
       });
 
-      it("should update state appropriately", () => {
+      it("should update state appropriately", async () => {
         const harn = harness({ port: PORT });
         harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
         harn.getWs().emit("listening");
         const mockWs = harn.createMockWs();
         let cid;
@@ -2014,8 +3934,10 @@ describe("The server._processWsServerConnection() function", () => {
         });
         harn.getWs().emit("connection", mockWs);
 
+        await asyncUtil.nextTick(); // Move past queued events
+
         const newState = harn.getServerState();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
+        jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
         newState._heartbeatTimeouts[cid] = 123;
         expect(harn.server).toHaveState(newState);
       });
@@ -2023,13 +3945,12 @@ describe("The server._processWsServerConnection() function", () => {
       it("should call wsClient.ping()", () => {
         const harn = harness({ port: PORT });
         harn.server.start();
-        jest.advanceTimersByTime(EPSILON);
         harn.getWs().emit("listening");
         const mockWs = harn.createMockWs();
         harn.getWs().emit("connection", mockWs);
 
         mockWs.mockClear();
-        jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
+        jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
         expect(mockWs.ping.mock.calls.length).toBe(1);
         expect(mockWs.ping.mock.calls[0].length).toBe(1);
         expect(mockWs.ping.mock.calls[0][0]).toBeInstanceOf(Function);
@@ -2042,14 +3963,13 @@ describe("The server._processWsServerConnection() function", () => {
         it("should call ws.terminate(cid)", () => {
           const harn = harness({ port: PORT });
           harn.server.start();
-          jest.advanceTimersByTime(EPSILON);
           harn.getWs().emit("listening");
           const mockWs = harn.createMockWs();
           harn.getWs().emit("connection", mockWs);
-          jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+          jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
           mockWs.mockClear();
-          jest.advanceTimersByTime(config.defaults.heartbeatTimeoutMs);
+          jest.advanceTimersByTime(serverConfig.defaults.heartbeatTimeoutMs);
           expect(mockWs.ping.mock.calls.length).toBe(0);
           expect(mockWs.send.mock.calls.length).toBe(0);
           expect(mockWs.close.mock.calls.length).toBe(0);
@@ -2063,12 +3983,11 @@ describe("The server._processWsServerConnection() function", () => {
           it("should emit nothing", () => {
             const harn = harness({ port: PORT });
             harn.server.start();
-            jest.advanceTimersByTime(EPSILON);
             harn.getWs().emit("listening");
             const mockWs = harn.createMockWs();
             harn.getWs().emit("connection", mockWs);
 
-            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+            jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
             const pingCb = mockWs.ping.mock.calls[0][0];
             const listener = harn.createServerListener();
@@ -2085,12 +4004,11 @@ describe("The server._processWsServerConnection() function", () => {
           it("should not change the state", () => {
             const harn = harness({ port: PORT });
             harn.server.start();
-            jest.advanceTimersByTime(EPSILON);
             harn.getWs().emit("listening");
             const mockWs = harn.createMockWs();
             harn.getWs().emit("connection", mockWs);
 
-            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+            jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
             const pingCb = mockWs.ping.mock.calls[0][0];
             const newState = harn.getServerState();
@@ -2101,12 +4019,11 @@ describe("The server._processWsServerConnection() function", () => {
           it("should do nothing on ws", () => {
             const harn = harness({ port: PORT });
             harn.server.start();
-            jest.advanceTimersByTime(EPSILON);
             harn.getWs().emit("listening");
             const mockWs = harn.createMockWs();
             harn.getWs().emit("connection", mockWs);
 
-            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+            jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
             const pingCb = mockWs.ping.mock.calls[0][0];
             mockWs.mockClear();
@@ -2119,10 +4036,9 @@ describe("The server._processWsServerConnection() function", () => {
         });
 
         describe("if there was an error writing the ping frame and the client is still there", () => {
-          it("should emit disconnect", () => {
+          it("should emit disconnect next tick", async () => {
             const harn = harness({ port: PORT });
             harn.server.start();
-            jest.advanceTimersByTime(EPSILON);
             harn.getWs().emit("listening");
             let clientId;
             harn.server.once("connect", cid => {
@@ -2131,12 +4047,25 @@ describe("The server._processWsServerConnection() function", () => {
             const mockWs = harn.createMockWs();
             harn.getWs().emit("connection", mockWs);
 
-            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+            await asyncUtil.nextTick(); // Move past queued events
+
+            jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
             const pingCb = mockWs.ping.mock.calls[0][0];
             const listener = harn.createServerListener();
             const err = new Error("SOME_ERROR");
             pingCb(err);
+
+            expect(listener.starting.mock.calls.length).toBe(0);
+            expect(listener.start.mock.calls.length).toBe(0);
+            expect(listener.stopping.mock.calls.length).toBe(0);
+            expect(listener.stop.mock.calls.length).toBe(0);
+            expect(listener.connect.mock.calls.length).toBe(0);
+            expect(listener.message.mock.calls.length).toBe(0);
+            expect(listener.disconnect.mock.calls.length).toBe(0);
+
+            await asyncUtil.nextTick();
+
             expect(listener.starting.mock.calls.length).toBe(0);
             expect(listener.start.mock.calls.length).toBe(0);
             expect(listener.stopping.mock.calls.length).toBe(0);
@@ -2153,10 +4082,9 @@ describe("The server._processWsServerConnection() function", () => {
             expect(listener.disconnect.mock.calls[0][1].wsError).toBe(err);
           });
 
-          it("should update the state appropriately", () => {
+          it("should update the state appropriately", async () => {
             const harn = harness({ port: PORT });
             harn.server.start();
-            jest.advanceTimersByTime(EPSILON);
             harn.getWs().emit("listening");
             let clientId;
             harn.server.once("connect", cid => {
@@ -2165,7 +4093,9 @@ describe("The server._processWsServerConnection() function", () => {
             const mockWs = harn.createMockWs();
             harn.getWs().emit("connection", mockWs);
 
-            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+            await asyncUtil.nextTick(); // Move past queued events
+
+            jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
             const pingCb = mockWs.ping.mock.calls[0][0];
             const newState = harn.getServerState();
@@ -2179,12 +4109,11 @@ describe("The server._processWsServerConnection() function", () => {
           it("should call ws.terminate()", () => {
             const harn = harness({ port: PORT });
             harn.server.start();
-            jest.advanceTimersByTime(EPSILON);
             harn.getWs().emit("listening");
             const mockWs = harn.createMockWs();
             harn.getWs().emit("connection", mockWs);
 
-            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+            jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
             const pingCb = mockWs.ping.mock.calls[0][0];
             mockWs.mockClear();
@@ -2201,12 +4130,11 @@ describe("The server._processWsServerConnection() function", () => {
           it("should emit disconnect", () => {
             const harn = harness({ port: PORT });
             harn.server.start();
-            jest.advanceTimersByTime(EPSILON);
             harn.getWs().emit("listening");
             const mockWs = harn.createMockWs();
             harn.getWs().emit("connection", mockWs);
 
-            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+            jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
             mockWs.readyState = mockWs.CLOSING;
             mockWs.emit("close");
@@ -2227,12 +4155,11 @@ describe("The server._processWsServerConnection() function", () => {
           it("should not change the state", () => {
             const harn = harness({ port: PORT });
             harn.server.start();
-            jest.advanceTimersByTime(EPSILON);
             harn.getWs().emit("listening");
             const mockWs = harn.createMockWs();
             harn.getWs().emit("connection", mockWs);
 
-            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+            jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
             mockWs.readyState = mockWs.CLOSING;
             mockWs.emit("close");
@@ -2246,12 +4173,11 @@ describe("The server._processWsServerConnection() function", () => {
           it("should do nothing on ws", () => {
             const harn = harness({ port: PORT });
             harn.server.start();
-            jest.advanceTimersByTime(EPSILON);
             harn.getWs().emit("listening");
             const mockWs = harn.createMockWs();
             harn.getWs().emit("connection", mockWs);
 
-            jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs);
+            jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
             mockWs.readyState = mockWs.CLOSING;
             mockWs.emit("close");
@@ -2272,15 +4198,27 @@ describe("The server._processWsServerConnection() function", () => {
   describe("if heartbeat is disabled", () => {
     // Events
 
-    it("should emit connect", () => {
+    it("should emit connect next tick", async () => {
       const harn = harness({ port: PORT, heartbeatIntervalMs: 0 });
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
+
+      await asyncUtil.nextTick(); // Move past queued events
 
       const listener = harn.createServerListener();
       const mockWs = harn.createMockWs();
       harn.getWs().emit("connection", mockWs);
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
       expect(listener.stopping.mock.calls.length).toBe(0);
@@ -2294,13 +4232,12 @@ describe("The server._processWsServerConnection() function", () => {
 
     // State
 
-    it("should update state appropriately", () => {
+    it("should update state appropriately", async () => {
       const harn = harness({ port: PORT, heartbeatIntervalMs: 0 });
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
 
-      // Outside code does not have access to the ws client
+      // Outside code does not have access to the ws client object
 
       const newState = harn.getServerState();
       const mockWs = harn.createMockWs();
@@ -2309,6 +4246,9 @@ describe("The server._processWsServerConnection() function", () => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
+
+      await asyncUtil.nextTick(); // Move past queued events
+
       newState._wsClients[cid] = harn.server._wsClients[cid]; // Basically checking cid
       expect(harn.server).toHaveState(newState);
     });
@@ -2327,12 +4267,9 @@ describe("The server._processWsClientMessage() function", () => {
   describe("if the message was a string", () => {
     // Events
 
-    it("should emit message", () => {
+    it("should emit message next tick", async () => {
       const harn = harness({ port: PORT });
-      harn.server.disconnect = jest.fn();
-
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
@@ -2341,8 +4278,21 @@ describe("The server._processWsClientMessage() function", () => {
       });
       harn.getWs().emit("connection", mockWs);
 
+      await asyncUtil.nextTick(); // Move past queued events
+
       const listener = harn.createServerListener();
       mockWs.emit("message", "some_msg");
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
       expect(listener.stopping.mock.calls.length).toBe(0);
@@ -2359,10 +4309,7 @@ describe("The server._processWsClientMessage() function", () => {
 
     it("should not change the state", () => {
       const harn = harness({ port: PORT });
-      harn.server.disconnect = jest.fn();
-
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       harn.getWs().emit("connection", mockWs);
@@ -2372,21 +4319,7 @@ describe("The server._processWsClientMessage() function", () => {
       expect(harn.server).toHaveState(newState);
     });
 
-    // Function calls
-
-    it("should not call transport.disconnect(...)", () => {
-      const harn = harness({ port: PORT });
-      harn.server.disconnect = jest.fn();
-
-      harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
-      harn.getWs().emit("listening");
-      const mockWs = harn.createMockWs();
-      harn.getWs().emit("connection", mockWs);
-
-      mockWs.emit("message", "some_msg");
-      expect(harn.server.disconnect.mock.calls.length).toBe(0);
-    });
+    // Function calls - N/A
 
     // Calls on ws - N/A
 
@@ -2398,52 +4331,9 @@ describe("The server._processWsClientMessage() function", () => {
   describe("if the message was not a string", () => {
     // Events
 
-    it("should emit nothing", () => {
+    it("should emit disconnect next tick", async () => {
       const harn = harness({ port: PORT });
-      harn.server.disconnect = jest.fn();
-
       harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
-      harn.getWs().emit("listening");
-      const mockWs = harn.createMockWs();
-      harn.getWs().emit("connection", mockWs);
-
-      const listener = harn.createServerListener();
-      mockWs.emit("message", 123);
-      expect(listener.starting.mock.calls.length).toBe(0);
-      expect(listener.start.mock.calls.length).toBe(0);
-      expect(listener.stopping.mock.calls.length).toBe(0);
-      expect(listener.stop.mock.calls.length).toBe(0);
-      expect(listener.connect.mock.calls.length).toBe(0);
-      expect(listener.message.mock.calls.length).toBe(0);
-      expect(listener.disconnect.mock.calls.length).toBe(0);
-    });
-
-    // State
-
-    it("should not change the state", () => {
-      const harn = harness({ port: PORT });
-      harn.server.disconnect = jest.fn();
-
-      harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
-      harn.getWs().emit("listening");
-      const mockWs = harn.createMockWs();
-      harn.getWs().emit("connection", mockWs);
-
-      const newState = harn.getServerState();
-      mockWs.emit("message", 123);
-      expect(harn.server).toHaveState(newState);
-    });
-
-    // Function calls
-
-    it("should call transport.disconnect(...)", () => {
-      const harn = harness({ port: PORT });
-      harn.server.disconnect = jest.fn();
-
-      harn.server.start();
-      jest.advanceTimersByTime(EPSILON);
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
@@ -2452,15 +4342,54 @@ describe("The server._processWsClientMessage() function", () => {
       });
       harn.getWs().emit("connection", mockWs);
 
+      await asyncUtil.nextTick(); // Move past queued events
+
+      const listener = harn.createServerListener();
       mockWs.emit("message", 123);
-      expect(harn.server.disconnect.mock.calls.length).toBe(1);
-      expect(harn.server.disconnect.mock.calls[0].length).toBe(2);
-      expect(harn.server.disconnect.mock.calls[0][0]).toBe(cid);
-      expect(harn.server.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
-      expect(harn.server.disconnect.mock.calls[0][1].message).toBe(
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      expect(listener.starting.mock.calls.length).toBe(0);
+      expect(listener.start.mock.calls.length).toBe(0);
+      expect(listener.stopping.mock.calls.length).toBe(0);
+      expect(listener.stop.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(1);
+      expect(listener.disconnect.mock.calls[0].length).toBe(2);
+      expect(listener.disconnect.mock.calls[0][0]).toBe(cid);
+      expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
+      expect(listener.disconnect.mock.calls[0][1].message).toBe(
         "FAILURE: Received non-string message on WebSocket connection."
       );
     });
+
+    // State
+
+    it("should update the state appropriately", () => {
+      const harn = harness({ port: PORT });
+      harn.server.start();
+      harn.getWs().emit("listening");
+      const mockWs = harn.createMockWs();
+      harn.getWs().emit("connection", mockWs);
+
+      const newState = harn.getServerState();
+      newState._wsClients = {};
+      newState._heartbeatIntervals = {};
+      newState._heartbeatTimeouts = {};
+      mockWs.emit("message", 123);
+      expect(harn.server).toHaveState(newState);
+    });
+
+    // Function calls - N/A
 
     // Calls on ws - N/A
 
@@ -2473,17 +4402,21 @@ describe("The server._processWsClientMessage() function", () => {
 describe("The server._processWsClientPong() function", () => {
   // Events
 
-  it("should emit nothing", () => {
+  it("should emit nothing next tick", async () => {
     const harn = harness({ port: PORT });
     harn.server.start();
-    jest.advanceTimersByTime(EPSILON);
     harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
     harn.getWs().emit("connection", mockWs);
-    jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
+    jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
+
+    await asyncUtil.nextTick(); // Move past queued events
 
     const listener = harn.createServerListener();
     mockWs.emit("pong");
+
+    await asyncUtil.nextTick();
+
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(0);
     expect(listener.stopping.mock.calls.length).toBe(0);
@@ -2495,10 +4428,9 @@ describe("The server._processWsClientPong() function", () => {
 
   // State
 
-  it("should update the state appropriately", () => {
+  it("should update the state appropriately", async () => {
     const harn = harness({ port: PORT });
     harn.server.start();
-    jest.advanceTimersByTime(EPSILON);
     harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
     let cid;
@@ -2506,7 +4438,10 @@ describe("The server._processWsClientPong() function", () => {
       cid = c;
     });
     harn.getWs().emit("connection", mockWs);
-    jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
+
+    await asyncUtil.nextTick(); // Move past queued events
+
+    jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
     const newState = harn.getServerState();
     mockWs.emit("pong");
@@ -2519,11 +4454,10 @@ describe("The server._processWsClientPong() function", () => {
   it("should call clearTimeout()", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
-    jest.advanceTimersByTime(EPSILON);
     harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
     harn.getWs().emit("connection", mockWs);
-    jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
+    jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
     clearTimeout.mockClear();
     mockWs.emit("pong");
@@ -2537,11 +4471,10 @@ describe("The server._processWsClientPong() function", () => {
   it("should do nothing on ws", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
-    jest.advanceTimersByTime(EPSILON);
     harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
     harn.getWs().emit("connection", mockWs);
-    jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
+    jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
     harn.getWs().mockClear();
     mockWs.emit("pong");
@@ -2557,10 +4490,9 @@ describe("The server._processWsClientPong() function", () => {
 describe("The server._processWsClientClose() function", () => {
   // Events
 
-  it("should emit disconnect", () => {
+  it("should emit disconnect next tick", async () => {
     const harn = harness({ port: PORT });
     harn.server.start();
-    jest.advanceTimersByTime(EPSILON);
     harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
     let cid;
@@ -2569,10 +4501,21 @@ describe("The server._processWsClientClose() function", () => {
     });
     harn.getWs().emit("connection", mockWs);
 
-    const listener = harn.createServerListener();
+    await asyncUtil.nextTick(); // Move past queued events
 
+    const listener = harn.createServerListener();
     mockWs.readyState = mockWs.CLOSING;
     mockWs.emit("close");
+
+    expect(listener.starting.mock.calls.length).toBe(0);
+    expect(listener.start.mock.calls.length).toBe(0);
+    expect(listener.stopping.mock.calls.length).toBe(0);
+    expect(listener.stop.mock.calls.length).toBe(0);
+    expect(listener.connect.mock.calls.length).toBe(0);
+    expect(listener.message.mock.calls.length).toBe(0);
+    expect(listener.disconnect.mock.calls.length).toBe(0);
+
+    await asyncUtil.nextTick();
 
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(0);
@@ -2591,10 +4534,9 @@ describe("The server._processWsClientClose() function", () => {
 
   // State
 
-  it("should update the state appropriately", () => {
+  it("should update the state appropriately", async () => {
     const harn = harness({ port: PORT });
     harn.server.start();
-    jest.advanceTimersByTime(EPSILON);
     harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
     let cid;
@@ -2602,7 +4544,10 @@ describe("The server._processWsClientClose() function", () => {
       cid = c;
     });
     harn.getWs().emit("connection", mockWs);
-    jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
+
+    await asyncUtil.nextTick(); // Move past queued events
+
+    jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
     const newState = harn.getServerState();
 
@@ -2617,14 +4562,13 @@ describe("The server._processWsClientClose() function", () => {
 
   // Function calls
 
-  it("should call clearInterval and clearTimeout if heartbeat outstanding", () => {
+  it("should call clearInterval and clearTimeout", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
-    jest.advanceTimersByTime(EPSILON);
     harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
     harn.getWs().emit("connection", mockWs);
-    jest.advanceTimersByTime(config.defaults.heartbeatIntervalMs + EPSILON);
+    jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
     clearInterval.mockClear();
     clearTimeout.mockClear();
@@ -2640,32 +4584,11 @@ describe("The server._processWsClientClose() function", () => {
     expect(check.integer(clearTimeout.mock.calls[0][0])).toBe(true);
   });
 
-  it("should call clearInterval only if no heartbeat outstanding", () => {
-    const harn = harness({ port: PORT });
-    harn.server.start();
-    jest.advanceTimersByTime(EPSILON);
-    harn.getWs().emit("listening");
-    const mockWs = harn.createMockWs();
-    harn.getWs().emit("connection", mockWs);
-
-    clearInterval.mockClear();
-    clearTimeout.mockClear();
-
-    mockWs.readyState = mockWs.CLOSING;
-    mockWs.emit("close");
-
-    expect(clearInterval.mock.calls.length).toBe(1);
-    expect(clearInterval.mock.calls[0].length).toBe(1);
-    expect(check.integer(clearInterval.mock.calls[0][0])).toBe(true);
-    expect(clearTimeout.mock.calls.length).toBe(0);
-  });
-
   // Calls on ws
 
   it("should do nothing on ws", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
-    jest.advanceTimersByTime(EPSILON);
     harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
     harn.getWs().emit("connection", mockWs);
@@ -2684,16 +4607,22 @@ describe("The server._processWsClientClose() function", () => {
   // Inbound callbacks (events, state, ws, callbacks) - N/A
 });
 
+describe("The server._processWsClientError() function", () => {
+  // Trivial
+});
+
 // State-getting functionality
 
 describe("The server.state() function", () => {
   // Events
 
-  it("should emit nothing", () => {
+  it("should emit nothing next tick", async () => {
     const harn = harness({ port: PORT });
-
     const listener = harn.createServerListener();
     harn.server.state();
+
+    await asyncUtil.nextTick();
+
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(0);
     expect(listener.stopping.mock.calls.length).toBe(0);
@@ -2720,7 +4649,6 @@ describe("The server.state() function", () => {
   it("should do nothing on ws", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
-    jest.advanceTimersByTime(EPSILON);
     harn.getWs().emit("listening");
 
     harn.getWs().mockClear();
@@ -2741,4 +4669,66 @@ describe("The server.state() function", () => {
   });
 });
 
-// Internal functions - tested as part of outward-facing functions (just one)
+// Stateless functionality
+
+describe("The server._handleProtocols() function", () => {
+  // Events - N/A
+
+  // State - N/A
+
+  // Function calls - N/A
+
+  // Calls on ws - N/A
+
+  // Outbound callbacks - N/A
+
+  // Inbound callbacks (events, state, ws, callbacks) - N/A
+
+  // Return value
+
+  it("should return correctly if feedme is present - only", () => {
+    const harn = harness({ port: PORT });
+    expect(harn.server._processHandleProtocols(["feedme"])).toBe("feedme");
+  });
+
+  it("should return correctly if feedme is present - first", () => {
+    const harn = harness({ port: PORT });
+    expect(harn.server._processHandleProtocols(["feedme", "something"])).toBe(
+      "feedme"
+    );
+  });
+
+  it("should return correctly if feedme is present - last", () => {
+    const harn = harness({ port: PORT });
+    expect(harn.server._processHandleProtocols(["something", "feedme"])).toBe(
+      "feedme"
+    );
+  });
+
+  it("should return correctly if feedme is present - mid", () => {
+    const harn = harness({ port: PORT });
+    expect(
+      harn.server._processHandleProtocols([
+        "something",
+        "feedme",
+        "somethingelse"
+      ])
+    ).toBe("feedme");
+  });
+
+  it("should return correctly if feedme is present - preserve alternative case", () => {
+    const harn = harness({ port: PORT });
+    expect(harn.server._processHandleProtocols(["FeEdMe"])).toBe("FeEdMe");
+  });
+
+  it("should return correctly if feedme is missing", () => {
+    const harn = harness({ port: PORT });
+    expect(
+      harn.server._processHandleProtocols(["something", "somethingelse"])
+    ).toBe(false);
+  });
+
+  // Ws always passes at least one protocol element
+});
+
+// Internal functions - tested as part of outward-facing API

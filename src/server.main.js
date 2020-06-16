@@ -5,7 +5,8 @@ import check from "check-types";
 import _ from "lodash";
 import http from "http";
 import stream from "stream";
-import config from "./server.config";
+import serverConfig from "./server.config";
+import config from "./config";
 
 const dbg = debug("feedme-transport-ws:server");
 
@@ -13,33 +14,23 @@ const dbg = debug("feedme-transport-ws:server");
  * Server transport object.
  *
  * The ws module does not provide a way to reuse a server object once closed,
- * so a new one is initialized for each start/stop cycle. The WebSocket.server
+ * so a new one is initialized for each start/stop cycle. The WebSocket.Server
  * constructor is injected to facilitate testing.
  *
- * There are some complexities involved in getting the transport to play nicely
- * with the various ws server modes (stand-alone server, existing HTTP server,
- * and noServer).
+ * Server modes:
  *
- * With an existing http server...
+ *  - When ws is running in stand-alone mode, listen for listening/close/error
+ * events on ws.
  *
- * 1. If the http server is already started when passed to ws, then ws will
- * not emit a listening event. In this case, the transport start event is
- * emitted synchronously from the transport.start() method.
+ * - When ws is running in external http server mode, listen for
+ * listening/close/error events on the external http server, as ws does not emit
+ * them reliably. Also poll the http server to determine whether it is still
+ * listening, as calls to httpServer.close() do not force connections closed
+ * and an http server close event is not emitted until all WebSocket clients
+ * depart.
  *
- * 2. If the http server is closed by the application, then ws does not emit
- * a close event. So the transport server listens directly for close events
- * on the http server.
+ * - When ws is running in noServer mode, there is no server status to monitor.
  *
- * With no-server mode...
- *
- * 1. There is no server to be start, so emit start synchronously when there
- * is a call to transport.start().
- *
- * 2. You can still call wsServer.close(cb) and receive a callback, so there
- * are no changes to transport.stop().
- *
- * 2. WebSocket upgrades need to be piped in by the application, so a
- * transport.handleUpgrade() function is exposed.
  * @typedef {Object} Server
  * @extends emitter
  */
@@ -48,16 +39,16 @@ const proto = {};
 emitter(proto);
 
 /**
- * Server factory function.
- * @param {Function} wsConstructor WebSocket.server constuctor
- * @param {Object} options Options for WebSocket.server plus transport heartbeat config
+ * Transport server factory function.
+ * @param {Function} wsConstructor WebSocket.Server constuctor
+ * @param {Object} options Options for WebSocket.Server plus transport heartbeat config
  * @throws {Error} "INVALID_ARGUMENT: ..."
  * @returns {Server}
  */
 export default function serverFactory(wsConstructor, options) {
   dbg("Initializing Server object");
 
-  // Validate wssConstructor
+  // Validate wsConstructor
   if (!check.function(wsConstructor)) {
     throw new Error("INVALID_ARGUMENT: Invalid wsConstructor argument.");
   }
@@ -67,63 +58,78 @@ export default function serverFactory(wsConstructor, options) {
     throw new Error("INVALID_ARGUMENT: Invalid options argument.");
   }
 
-  // Validate core ws options - leave the rest to ws
+  // Clone the app-supplied options object to avoid modifying it if using the
+  // default heartbeat configuration
+  const tOptions = _.clone(options);
+
+  // Validate core ws options - leave the rest to ws on initialization
   if (
-    "port" in options &&
-    (!check.integer(options.port) || options.port < 0 || options.port > 65535)
+    "port" in tOptions &&
+    (!check.integer(tOptions.port) ||
+      tOptions.port < 0 ||
+      tOptions.port > 65535)
   ) {
     throw new Error("INVALID_ARGUMENT: Invalid options.port argument.");
   }
-  if ("server" in options && !check.object(options.server)) {
+  if ("server" in tOptions && !check.object(tOptions.server)) {
     throw new Error("INVALID_ARGUMENT: Invalid options.server argument.");
   }
-  if ("noServer" in options && !check.boolean(options.noServer)) {
+  if ("noServer" in tOptions && !check.boolean(tOptions.noServer)) {
     throw new Error("INVALID_ARGUMENT: Invalid options.noServer argument.");
   }
   if (
-    !("port" in options) &&
-    !("server" in options) &&
-    !("noServer" in options)
+    !("port" in tOptions) &&
+    !("server" in tOptions) &&
+    !("noServer" in tOptions)
   ) {
     throw new Error(
       "INVALID_ARGUMENT: Must specify a valid port, server, or noServer option."
     );
   }
 
-  // Validate options.heartbeatIntervalMs (if specified) and overlay default
-  if ("heartbeatIntervalMs" in options) {
+  // Ensure that the application does not specify options.handleProtocols,
+  // which is used internally by the transport to validate client subprotocols
+  if ("handleProtocols" in tOptions) {
+    throw new Error(
+      "INVALID_ARGUMENT: Must not specify options.handleProtocols."
+    );
+  }
+
+  // Validate tOptions.heartbeatIntervalMs (if specified) and overlay default
+  if ("heartbeatIntervalMs" in tOptions) {
     if (
-      !check.integer(options.heartbeatIntervalMs) ||
-      options.heartbeatIntervalMs < 0
+      !check.integer(tOptions.heartbeatIntervalMs) ||
+      tOptions.heartbeatIntervalMs < 0
     ) {
       throw new Error(
         "INVALID_ARGUMENT: Invalid options.heartbeatIntervalMs argument."
       );
     }
   } else {
-    options.heartbeatIntervalMs = config.defaults.heartbeatIntervalMs; // eslint-disable-line no-param-reassign
+    tOptions.heartbeatIntervalMs = serverConfig.defaults.heartbeatIntervalMs;
   }
 
-  // Validate options.heartbeatTimeoutMs (if specified) and overlay default
-  if ("heartbeatTimeoutMs" in options) {
+  // Validate tOptions.heartbeatTimeoutMs (if specified) and overlay default
+  if ("heartbeatTimeoutMs" in tOptions) {
     if (
-      !check.integer(options.heartbeatTimeoutMs) ||
-      options.heartbeatTimeoutMs <= 0 ||
-      options.heartbeatTimeoutMs >= options.heartbeatIntervalMs
+      !check.integer(tOptions.heartbeatTimeoutMs) ||
+      tOptions.heartbeatTimeoutMs <= 0 ||
+      tOptions.heartbeatTimeoutMs >= tOptions.heartbeatIntervalMs
     ) {
       throw new Error(
         "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument."
       );
     }
   } else {
-    options.heartbeatTimeoutMs = config.defaults.heartbeatTimeoutMs; // eslint-disable-line no-param-reassign
+    tOptions.heartbeatTimeoutMs = serverConfig.defaults.heartbeatTimeoutMs;
   }
 
   // Success
+
   const server = Object.create(proto);
 
   /**
-   * WebSocket.server constructor function. Injected to facilitate unit tests.
+   * WebSocket.Server constructor function. Injected to facilitate unit tests.
    * @memberof Server
    * @instance
    * @private
@@ -180,7 +186,9 @@ export default function serverFactory(wsConstructor, options) {
   /**
    * Heartbeat timeouts for clients.
    *
-   * this._heartbeatTimeouts[clientId] = timeout id or missing if not awaiting pong or heartbeats disabled
+   * this._heartbeatTimeouts[clientId] = timeout id or missing
+   *
+   * Missing if not awaiting pong or heartbeats are disabled.
    *
    * @memberof Server
    * @instance
@@ -190,23 +198,46 @@ export default function serverFactory(wsConstructor, options) {
   server._heartbeatTimeouts = {};
 
   /**
-   * Options for WebSocket.server().
+   * Application-specified options.
    * @memberof Server
    * @instance
    * @private
    * @type {Object}
    */
-  server._options = options;
+  server._options = tOptions;
 
   /**
-   * The close event handler attached to the external HTTP server, if ws is
-   * operating in that mode. Null otherwise.
+   * The listening/close/error event handlers attached to the external http
+   * server, if operating in that mode. Retained so that external listeners can
+   * be removed when the transport server stops.
+   *
+   * If present: { listening: fn, close: fn, error: fn }
+   *
+   * Null if not operating in external server mode or transport not
+   * starting/started.
    * @memberof Server
    * @instance
    * @private
-   * @type {?Function}
+   * @type {?Object}
    */
-  server._httpCloseHandler = null;
+  server._httpHandlers = null;
+
+  /**
+   * Interval that polls the external http server to verify that it is still
+   * listening. Null if not running in external server mode or transport not
+   * started.
+   *
+   * You cannot rely only on the http server close event to monitor whether the
+   * external server is listening. A call to httpServer.close() does not kill
+   * outstanding connections (including WebSocket connections, which can persist
+   * indefinetely) and the http close event is only emitted after all clients
+   * have disconnected.
+   * @memberof Server
+   * @instance
+   * @private
+   * @type {?number}
+   */
+  server._httpPollingInterval = null;
 
   return server;
 }
@@ -292,63 +323,70 @@ proto.start = function start() {
 
   // Update state and emit
   this._state = "starting";
-  this.emit("starting");
+  this._emitAsync("starting");
 
-  // Create the ws server
+  // Assemble ws options
+  const wsOptions = _.clone(this._options);
+  delete wsOptions.heartbeatIntervalMs;
+  delete wsOptions.heartbeatTimeoutMs;
+  wsOptions.handleProtocols = this._processHandleProtocols.bind(this);
+
+  // Try to initialize the ws server
   try {
-    // Passes the two extraneous heartbeat options, which are ignored by ws
-    this._wsServer = new this._wsConstructor(this._options);
+    this._wsServer = new this._wsConstructor(wsOptions);
   } catch (e) {
-    // Emit stopping, emit stop
+    // Emit stopping and stop
+    // State immediately becomes stopped because a call to transport.start() is valid
+    this._state = "stopped";
     const err = new Error("FAILURE: Could not initialize WebSocket server.");
     err.wsError = e;
-    this._state = "stopping";
-    this.emit("stopping", err);
-    this._state = "stopped";
-    this.emit("stop", err);
+    this._emitAsync("stopping", err);
+    this._emitAsync("stop", err);
     return; // Stop
   }
 
-  // Listen for ws events
-  this._wsServer.on("listening", this._processWsServerListening.bind(this));
-  this._wsServer.on("close", this._processWsServerClose.bind(this));
+  // Listen for server status events
+  // Ws does not reliably emit these events when in external server mode, so:
+  // - If running in stand-alone mode, listen for ws listening/close/error
+  // - If running in external server mode, listen for external http listening/close/error
+  // - If running in noServer mode, then there are no server status events to monitor
+  if (this._options.port) {
+    dbg("Listening for ws listening, close, and error events");
+    ["listening", "close", "error"].forEach(evt => {
+      const listener = this[`_processServer${_.startCase(evt)}`].bind(this);
+      this._wsServer.on(evt, listener);
+    });
+  } else if (this._options.server) {
+    dbg("Listening for external http listening, close, and error events");
+    this._httpHandlers = {};
+    ["listening", "close", "error"].forEach(evt => {
+      const listener = this[`_processServer${_.startCase(evt)}`].bind(this);
+      this._httpHandlers[evt] = listener;
+      this._options.server.on(evt, listener);
+    });
+
+    // Ws server will emit error if the external http server does
+    // Listen for it to prevent unhandled errors
+    this._wsServer.on("error", () => {});
+  }
+
+  // Listen for ws client connection events
   this._wsServer.on("connection", this._processWsServerConnection.bind(this));
 
-  // If using ws in with an external http server and the server is already
-  // listening, then ws will not emit a listening event. In that case, do it
-  // here. But you can sometimes observe server.listening === true before the listening
-  // event has fired, so in the listening handler check that you haven't already
-  // emitted here.
-  // You also emit start synchronously in noServer mode.
+  // The server should immediately become started if:
+  // - Running in external server mode and the server is already listening
+  // - Running in noServer mode, as there is no knowledge of the outside server
   if (
     (this._options.server && this._options.server.listening) ||
     this._options.noServer
   ) {
-    dbg(
-      "External http server is already started or in noServer mode - emitting start now"
-    );
-    this._state = "started";
-    this.emit("start");
-  }
-
-  // If using ws with an external http server then attach a close listener to
-  // the server, as ws will not emit a close event when the server closes and
-  // you need to stop the transport. Keep a reference to the handler so that
-  // you can remove it (and not others) if the server closes.
-  if (this._options.server) {
-    dbg("Listening for external http server close event");
-    // To do - don't just refer to server close event (bad debugging, for example)
-    this._httpCloseHandler = this._processWsServerClose.bind(this);
-    this._options.server.on("close", this._httpCloseHandler);
+    dbg("External http server is already started or in noServer mode");
+    this._start();
   }
 };
 
 /**
  * Stops the server.
- *
- * Does not rely on the "stop" event fired by the ws module, because that event
- * does not know whether the stoppage was requested by a call to server.stop()
- * or from a ws problem.
  * @memberof Server
  * @instance
  * @throws {Error} "INVALID_STATE: ..."
@@ -364,58 +402,7 @@ proto.stop = function stop() {
 
   // Success
 
-  // Stop listening to all ws events
-  _.each(this._wsClients, ws => {
-    ws.removeAllListeners();
-  });
-  this._wsServer.removeAllListeners();
-
-  // Remove the http close handler if using an external server
-  if (this._options.server) {
-    this._options.server.removeListener("close", this._httpCloseHandler);
-    this._httpCloseHandler = null;
-  }
-
-  // Stop all heartbeat intervals and timers
-  _.each(this._heartbeatIntervals, intervalId => {
-    clearInterval(intervalId);
-  });
-  _.each(this._heartbeatTimeouts, timeoutId => {
-    clearTimeout(timeoutId);
-  });
-
-  // Save some references and update state
-  const wsServer = this._wsServer;
-  const clients = this._wsClients;
-  this._wsServer = null;
-  this._state = "stopping";
-  this._wsClients = {};
-  this._heartbeatIntervals = {};
-  this._heartbeatTimeouts = {};
-
-  // Emit a disconnect event for each previously-connected client
-  _.each(clients, (ws, cid) => {
-    this.emit(
-      "disconnect",
-      cid,
-      new Error("STOPPING: The server is stopping.")
-    );
-  });
-
-  // Emit stopping
-  this.emit("stopping");
-
-  // Stop the ws server
-  // A callback is received from ws even if the transport was established
-  // on an external http server, which is left running
-  // Also succeeds and calls back in noServer mode
-  wsServer.close(() => {
-    dbg("Observed ws close callback");
-
-    // Emit stopped
-    this._state = "stopped";
-    this.emit("stop");
-  });
+  this._stop();
 };
 
 /**
@@ -448,14 +435,13 @@ proto.send = function send(cid, msg) {
 
   // Try to send the message
   this._wsClients[cid].send(msg, err => {
-    // The message has been written or has failed to write
     if (err) {
-      dbg("Error writing message");
+      dbg("Error writing message to WebSocket");
       const transportErr = new Error("FAILURE: WebSocket transmission failed.");
       transportErr.wsError = err;
-      this._connectionFailure(cid, transportErr);
+      this._disconnect(cid, transportErr);
     } else {
-      dbg("Message written successfully");
+      dbg("Message successfully written to WebSocket");
     }
   });
 };
@@ -497,35 +483,12 @@ proto.disconnect = function disconnect(...args) {
 
   // Success
 
-  // Stop listening to client ws events
-  this._wsClients[cid].removeAllListeners();
-
-  // Clear heartbeat interval/timeout
-  clearInterval(this._heartbeatIntervals[cid]);
-  if (this._heartbeatTimeouts[cid]) {
-    clearTimeout(this._heartbeatTimeouts[cid]);
-  }
-
-  // Update transport state
-  const wsClient = this._wsClients[cid];
-  delete this._wsClients[cid];
-  delete this._heartbeatIntervals[cid];
-  delete this._heartbeatTimeouts[cid];
-
-  // Disconnect the client (normal status)
-  wsClient.close(1000, "Connection closed by the server.");
-
-  // Emit disconnect (with err if present)
-  if (err) {
-    this.emit("disconnect", cid, err);
-  } else {
-    this.emit("disconnect", cid);
-  }
+  this._disconnect(cid, err);
 };
 
 /**
- * Allows the application to pipe in upgrade requests when operating in
- * noServer mode.
+ * Used by the application to pipe in WebSocket upgrade requests when operating
+ * in noServer mode.
  * @memberof Server
  * @instance
  * @param {http.IncomingMessage} request
@@ -566,86 +529,52 @@ proto.handleUpgrade = function handleUpgrade(request, socket, head) {
 };
 
 /**
- * Processes a ws server "listening" event.
+ * Processes a ws or external http server listening event.
  * @memberof Server
  * @instance
  * @private
  * @returns {void}
  */
-proto._processWsServerListening = function _processWsServerListening() {
-  dbg("Observed ws listening event");
-
-  // Only emit if you haven't already on server.start() - see notes there
-
-  if (this._state !== "started") {
-    this._state = "started";
-    this.emit("start");
-  }
+proto._processServerListening = function _processServerListening() {
+  dbg("Observed ws or external http listening event");
+  this._start();
 };
 
 /**
- * Processes a ws server "close" event.
+ * Processes a ws or external http server close event.
  *
- * The server.stop() method removes all ws event listeners, so this function
- * is called only when the server stops unexpectedly.
- *
- * The server state may have been "starting" or "started" but both cases are
- * handled the same way.
+ * The server.stop() method removes all ws and external http server event
+ * listeners before actually stopping the server, so this method is called
+ * only when the server stops unexpectedly.
  * @memberof Server
  * @instance
  * @private
  * @returns {void}
  */
-proto._processWsServerClose = function _processWsServerClose() {
-  dbg("Observed ws close event");
+proto._processServerClose = function _processServerClose() {
+  dbg("Observed ws or external http close event");
+  this._stop(new Error("FAILURE: The server stopped unexpectedly."));
+};
 
-  // Stop listening to all ws events
-  _.each(this._wsClients, ws => {
-    ws.removeAllListeners();
-  });
-  this._wsServer.removeAllListeners();
+/**
+ * Processes a ws or external http server error event.
+ *
+ * Http and ws servers emit only "error" and not "close" if they fail to begin
+ * listening, so need to monitor this event as well. And to avoid uncaught
+ * exceptions.
+ * @memberof Client
+ * @instance
+ * @private
+ * @param {Error} err
+ * @returns {void}
+ */
+proto._processServerError = function _processServerError(err) {
+  dbg("Observed ws or external http server error event");
+  dbg(err);
 
-  // Remove the http close handler if using an external server
-  if (this._options.server) {
-    this._options.server.removeListener("close", this._httpCloseHandler);
-    this._httpCloseHandler = null;
-  }
-
-  // Stop all heartbeat intervals and timers
-  _.each(this._heartbeatIntervals, intervalId => {
-    clearInterval(intervalId);
-  });
-  _.each(this._heartbeatTimeouts, timeoutId => {
-    clearTimeout(timeoutId);
-  });
-
-  // Update transport state
-  const clients = this._wsClients;
-  this._wsServer = null;
-  this._state = "stopping";
-  this._wsClients = {};
-  this._heartbeatIntervals = {};
-  this._heartbeatTimeouts = {};
-
-  // Emit client disconnect events
-  _.each(clients, (ws, cid) => {
-    this.emit(
-      "disconnect",
-      cid,
-      new Error("STOPPING: The server is stopping.")
-    );
-  });
-
-  // Emit stopping and stop
-  this.emit(
-    "stopping",
-    new Error("FAILURE: The WebSocket server stopped unexpectedly.")
-  );
-  this._state = "stopped";
-  this.emit(
-    "stop",
-    new Error("FAILURE: The WebSocket server stopped unexpectedly.")
-  );
+  const emitErr = new Error("FAILURE: Failed to listen for connections.");
+  emitErr.wsError = err;
+  this._stop(emitErr);
 };
 
 /**
@@ -659,7 +588,7 @@ proto._processWsServerClose = function _processWsServerClose() {
 proto._processWsServerConnection = function _processWsServerConnection(ws) {
   dbg("Observed ws connection event");
 
-  // Assign an id and store the ws client
+  // Assign an id and store a reference to the ws client
   const cid = uuid();
   this._wsClients[cid] = ws;
 
@@ -669,10 +598,10 @@ proto._processWsServerConnection = function _processWsServerConnection(ws) {
       dbg("Starting heartbeat timeout");
 
       // Start the heartbeat timeout
-      // Timeout is cleared on pong receipt and on client disconnect
+      // Cleared on pong receipt, client disconnect, and server stoppage
       this._heartbeatTimeouts[cid] = setTimeout(() => {
         dbg("Heartbeat timed out");
-        this._connectionFailure(
+        this._disconnect(
           cid,
           new Error("FAILURE: The WebSocket heartbeat failed.")
         );
@@ -680,14 +609,13 @@ proto._processWsServerConnection = function _processWsServerConnection(ws) {
 
       // Ping the client - ws automatically responds with pong
       this._wsClients[cid].ping(err => {
-        // The ping frame has been written or has failed to write - pong not yet received
         if (err) {
           dbg("Error writing ping frame");
           const transportErr = new Error(
             "FAILURE: The WebSocket heartbeat failed."
           );
           transportErr.wsError = err;
-          this._connectionFailure(cid, transportErr);
+          this._disconnect(cid, transportErr);
         } else {
           dbg("Ping frame written successfully");
         }
@@ -696,16 +624,20 @@ proto._processWsServerConnection = function _processWsServerConnection(ws) {
   }
 
   // Listen for ws client events
-  ws.on("message", this._processWsClientMessage.bind(this, cid));
-  ws.on("pong", this._processWsClientPong.bind(this, cid));
-  ws.on("close", this._processWsClientClose.bind(this, cid));
+  ["message", "pong", "close", "error"].forEach(evt => {
+    const listener = this[`_processWsClient${_.startCase(evt)}`].bind(
+      this,
+      cid
+    );
+    ws.on(evt, listener);
+  });
 
   // Emit transport connect
-  this.emit("connect", cid);
+  this._emitAsync("connect", cid);
 };
 
 /**
- * Processes a ws client "message" event.
+ * Processes a ws client message event.
  * @memberof Server
  * @instance
  * @private
@@ -726,11 +658,11 @@ proto._processWsClientMessage = function _processWsClientMessage(cid, msg) {
     return; // Stop
   }
 
-  this.emit("message", cid, msg);
+  this._emitAsync("message", cid, msg);
 };
 
 /**
- * Processes a ws client "pong" event.
+ * Processes a ws client pong event.
  * @memberof Server
  * @instance
  * @private
@@ -746,18 +678,16 @@ proto._processWsClientPong = function _processWsClientPong(cid) {
 };
 
 /**
- * Processes a ws client "close" event.
+ * Processes a ws client close event.
  *
- * The client "close" event is fired by ws...
+ * The client close event is fired...
  *
  * - On server stoppage after the server-level close event
  * - On server call to ws.close() or ws.terminate()
  * - On client call to ws.close() or ws.terminate()
  *
- * The server.disconnect() and server._connectionFailure() methods remove client
- * ws event listeners and the server.stop() method removes all ws event
- * listeners, so this function is called only when a single client disconnects
- * unexpectedly but normally.
+ * The _disconnect() and _stop() methods remove ws client event listeners, so
+ * this function is called only when a client disconnects unexpectedly.
  * @memberof Server
  * @instance
  * @private
@@ -776,20 +706,13 @@ proto._processWsClientClose = function _processWsClientClose(
   const err = new Error("FAILURE: The WebSocket closed.");
   err.wsCode = code;
   err.wsReason = reason;
-  this._connectionFailure(cid, err);
+  this._disconnect(cid, err);
 };
 
-// Internal Functions
-
 /**
- * Handles an unexpected connection failure:
- *
- *  - Ws client close event
- *  - Heartbeat timeout
- *  - Ws calls back error to ws.ping()
- *  - Ws calls back error to ws.send()
- *
- * Resets the state, emits, and terminates the ws connection as appropriate.
+ * Processes a ws client error event.
+ * The ws module also fires a close event when an error occurs. This method
+ * is required to prevent unhandled errors and for debugging.
  * @memberof Client
  * @instance
  * @private
@@ -797,13 +720,234 @@ proto._processWsClientClose = function _processWsClientClose(
  * @param {Error} err
  * @returns {void}
  */
-proto._connectionFailure = function _connectionFailure(cid, err) {
-  dbg("Connection failed");
+proto._processWsClientError = function _processWsClientError(cid, err) {
+  dbg("Observed ws client error event");
+  dbg(err);
+};
 
-  // Exit if the connection failure has already been handled, since it's not
-  // clear whether ws.ping() and ws.send() fire a close event before calling back error
-  if (!this._wsClients[cid]) {
-    dbg("Client has already disconnected");
+/**
+ * Called by ws when a client WebSocket connection request specifies one or
+ * more subprotocols. Not strictly an event handler - a bound reference to this
+ * function is passed to ws on initialization.
+ *
+ * When there is a new connection...
+ *
+ * - If there is a "feedme" protocol present then the connection is accepted and
+ * the feedme protocol is selected.
+ *
+ * - If there is no "feedme" protocol present then the connection is terminated.
+ *
+ * The WebSocket standard calls for subprotocols to be considered on a
+ * case-sensitive basis. The comparison here is intentionally case-insensitive,
+ * but the original casing is preserved in the response to the client.
+ *
+ * If a client initiates a WebSocket connection without specifying any
+ * subprotocols then ws automatically accepts the connection without calling
+ * this function, which is fine.
+ * @memberof Client
+ * @instance
+ * @private
+ * @param {Array} protocols Always contains at least one protocol element
+ * @returns {string|boolean}
+ */
+proto._processHandleProtocols = function _processHandleProtocols(protocols) {
+  dbg(`Ws handleProtocols request: ${protocols.join(",")}`);
+  for (let i = 0; i < protocols.length; i += 1) {
+    if (protocols[i].toLowerCase() === config.wsSubprotocol.toLowerCase()) {
+      return protocols[i]; // Accepts the connection and selects subprotocol
+    }
+  }
+  return false; // Terminates the connection
+};
+
+// Internal Functions
+
+/**
+ * Executes a server start.
+ *
+ * Invoked on:
+ *
+ * - Call to tranport.start() with listening external http server or noServer mode
+ * - Ws or http server listening event
+ *
+ * @memberof Server
+ * @instance
+ * @private
+ * @returns {void}
+ */
+proto._start = function _start() {
+  dbg("Starting the server");
+
+  // Make sure the transport is starting
+  // In external server mode, the start() function sometimes observes
+  // server.listening === true before the listening event has fired,
+  // which causes the transport to immediately become started
+  if (this._state !== "starting") {
+    dbg("Server is not starting - exiting");
+    return; // Stop
+  }
+
+  // If in external server mode, monitor whether the server is still listening
+  // Calls to httpServer.close() only trigger a http close event once all
+  // WebSocket connections have disconnected, it does not force them closed
+  if (this._options.server) {
+    this._httpPollingInterval = setInterval(() => {
+      dbg("Checking external http server listening status");
+      if (this._options.server.listening) {
+        dbg("External http server is still listening");
+      } else {
+        dbg("External http server is no longer listening");
+        this._stop(
+          new Error("FAILURE: The external http server stopped listening.")
+        );
+      }
+    }, serverConfig.httpPollingMs);
+  }
+
+  // Update state and emit
+  this._state = "started";
+  this._emitAsync("start");
+};
+
+/**
+ * Executes a server stoppage.
+ *
+ * Invoked on:
+ *
+ * - Call to transport.stop()
+ * - Ws or external http server close event
+ * - Ws or external http server error event
+ *
+ * @memberof Server
+ * @instance
+ * @private
+ * @param {?Error} err
+ * @returns {void}
+ */
+proto._stop = function _stop(err) {
+  dbg("Stopping the server");
+
+  // Do nothing if the transport is already stopping/stopped
+  // Ws and external http servers emit both a close and an error event if
+  // something goes wrong while already listening.
+  if (this._state !== "starting" && this._state !== "started") {
+    dbg("Server is not starting or started - exiting");
+    return; // Stop
+  }
+
+  // Stop external http server status polling (if applicable)
+  clearInterval(this._httpPollingInterval);
+  this._httpPollingInterval = null;
+
+  // Stop listening to all ws events (if applicable)
+  _.each(this._wsClients, ws => {
+    ws.removeAllListeners();
+  });
+  this._wsServer.removeAllListeners();
+
+  // Stop listening to all external http server events (if applicable)
+  if (this._httpHandlers) {
+    ["listening", "close", "error"].forEach(evt => {
+      this._options.server.removeListener(evt, this._httpHandlers[evt]);
+    });
+  }
+  this._httpHandlers = null;
+
+  // Stop any heartbeat intervals and timers
+  _.each(this._heartbeatIntervals, intervalId => {
+    clearInterval(intervalId);
+  });
+  _.each(this._heartbeatTimeouts, timeoutId => {
+    clearTimeout(timeoutId);
+  });
+  this._heartbeatIntervals = {};
+  this._heartbeatTimeouts = {};
+
+  // Update transport state
+  const wsServer = this._wsServer;
+  const wsClients = this._wsClients;
+  this._wsServer = null;
+  this._wsClients = {};
+  this._state = "stopping";
+
+  // Close or terminate any outstanding WebSocket connections
+  // In external http server mode a call to httpServer.close() does not force
+  // WebSocket connections closed
+  _.each(wsClients, ws => {
+    if (err) {
+      dbg("Terminating client connection");
+      ws.terminate();
+    } else {
+      dbg("Closing client connection");
+      ws.close(1000, "");
+    }
+  });
+
+  // Emit any client disconnect events
+  const disconnectErr = new Error("STOPPING: The server is stopping.");
+  _.each(wsClients, (ws, cid) => {
+    this._emitAsync("disconnect", cid, disconnectErr);
+  });
+
+  // Emit stopping
+  if (err) {
+    this._emitAsync("stopping", err);
+  } else {
+    this._emitAsync("stopping");
+  }
+
+  // Close the ws server if it's not already closed
+  // Unfortunately the ws server has no readyState indicator
+  // The ws server won't be closed on call to transport.stop() or if there is
+  // a call to httpServer.close() in external server mode (listening polling fails)
+  if (!err || this._options.server) {
+    dbg("Closing ws server");
+    wsServer.close(() => {
+      // A callback is received from ws in all server modes
+      dbg("Observed ws close callback");
+      this._state = "stopped";
+      if (err) {
+        this._emitAsync("stop", err);
+      } else {
+        this._emitAsync("stop");
+      }
+    });
+  } else {
+    dbg("No need to close ws server, setting stopped");
+    this._state = "stopped"; // Call to transport.start() is valid
+    if (err) {
+      this._emitAsync("stop", err);
+    } else {
+      this._emitAsync("stop");
+    }
+  }
+};
+
+/**
+ * Executes a client disconnect.
+ *
+ * Invoked on:
+ *
+ *  - Call to transport.disconnect()
+ *  - Ws client close event
+ *  - Heartbeat timeout
+ *  - Ws calls back error to ws.ping()
+ *  - Ws calls back error to ws.send()
+ *
+ * @memberof Client
+ * @instance
+ * @private
+ * @param {string} cid
+ * @param {?Error} err
+ * @returns {void}
+ */
+proto._disconnect = function _disconnect(cid, err) {
+  dbg("Disconnecting a client");
+
+  // Exit if the client has already been disconnected
+  // Not clear whether ws.ping() and ws.send() fire close before calling back error
+  if (!(cid in this._wsClients)) {
+    dbg("Client already disconnected");
     return; // Stop
   }
   dbg("Client is still present");
@@ -811,28 +955,56 @@ proto._connectionFailure = function _connectionFailure(cid, err) {
   // Stop listening for ws client events
   this._wsClients[cid].removeAllListeners();
 
-  // Clear heartbeat (if any)
-  if (this._heartbeatIntervals[cid]) {
-    clearInterval(this._heartbeatIntervals[cid]);
-  }
-  if (this._heartbeatTimeouts[cid]) {
-    clearTimeout(this._heartbeatTimeouts[cid]);
-  }
-
-  // Terminate the ws connection if still open - won't be if due to close event
-  // Fires ws close, but listeners removed
-  if (this._wsClients[cid].readyState === this._wsClients[cid].OPEN) {
-    dbg("Terminating client connection");
-    this._wsClients[cid].terminate();
-  } else {
-    dbg("Client connection already closing");
-  }
-
-  // Update the state
-  delete this._wsClients[cid];
+  // Clear any heartbeat interval/timeout
+  clearInterval(this._heartbeatIntervals[cid]);
+  clearTimeout(this._heartbeatTimeouts[cid]);
   delete this._heartbeatIntervals[cid];
   delete this._heartbeatTimeouts[cid];
 
+  // Update the state
+  const wsClient = this._wsClients[cid];
+  delete this._wsClients[cid];
+
+  // Close or terminate the ws connection if still open
+  if (wsClient.readyState === wsClient.OPEN) {
+    if (err) {
+      dbg("Terminating client connection");
+      wsClient.terminate();
+    } else {
+      dbg("Closing client connection");
+      wsClient.close(1000, "");
+    }
+  } else {
+    dbg("Client connection already closing or closed");
+  }
+
   // Emit disconnect
-  this.emit("disconnect", cid, err);
+  if (err) {
+    this._emitAsync("disconnect", cid, err);
+  } else {
+    this._emitAsync("disconnect", cid);
+  }
+};
+
+/**
+ * Emits an event asynchronously during the next run around the event loop.
+ *
+ * The library only cares that events triggered by the library-facing API
+ * (i.e. methods) are emitted asynchronously. But it is not clear whether ws
+ * may in some cases call back or emit synchronously, so in order to ensure
+ * a correct sequence of transport events, all are emitted asynchronously via
+ * the nextTick queue.
+ * @memberof Client
+ * @instance
+ * @private
+ * @param {*} ...args
+ * @returns {void}
+ */
+proto._emitAsync = function _emitAsync(...args) {
+  dbg(`Scheduling asynchronous emission: ${args[0]}`);
+
+  process.nextTick(() => {
+    dbg(`Asynchronous emission: ${args[0]}`);
+    this.emit(...args);
+  });
 };

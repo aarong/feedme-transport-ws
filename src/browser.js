@@ -7,11 +7,10 @@ import client from "./browser.main";
  * Create a browser client with native WebSocket injected (dependency injection
  * to facilitate unit testing).
  * @param {string} address
- * @param {?string|Array} protocols
  * @throws {Error} "NO_WEBSOCKET: ..."
  * @returns {Client}
  */
-export default function feedmeTransportWsClient(address, protocols) {
+export default function feedmeTransportWsClient(address) {
   // Get the native WebSocket implementation
   let ws;
   if (typeof WebSocket !== "undefined") {
@@ -34,5 +33,5 @@ export default function feedmeTransportWsClient(address, protocols) {
   }
 
   // Create and return the client
-  return client(ws, address, protocols || "");
+  return client(ws, address || "");
 }

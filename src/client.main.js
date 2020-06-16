@@ -1,7 +1,8 @@
 import emitter from "component-emitter";
 import check from "check-types";
 import debug from "debug";
-import config from "./client.config";
+import clientConfig from "./client.config";
+import config from "./config";
 
 const dbg = debug("feedme-transport-ws:client");
 
@@ -20,13 +21,14 @@ emitter(proto);
  * WebSocket client objects cannot reconnect once disconnected, so a new
  * one is created for each connection attempt.
  *
+ * The WebSocket constructor is injected to facilitate testing.
+ *
  * WebSocket clients have a closing state and Feedme transports do not, so
  * the former is subsumed into the transport connecting state if there is a
  * quick sequence of calls to transport.disconnect() and transport.connect().
  * @param {Function} wsConstructor WebSocket client constructor
  * @param {string} address Endpoint address for ws
- * @param {?string|Array} protocols Protocols for ws
- * @param {?Object} options Additional options for ws
+ * @param {?Object} options Heartbeat settings and additional options for ws
  * @throws {Error} "INVALID_ARGUMENT: ..."
  * @returns {Client}
  */
@@ -52,31 +54,13 @@ export default function clientFactory(...args) {
     throw new Error("INVALID_ARGUMENT: Invalid address argument.");
   }
 
-  // Check protocols (if specified)
-  let protocols;
-  if (args.length > 2) {
-    if (!check.string(args[2]) && !check.array(args[2])) {
-      throw new Error("INVALID_ARGUMENT: Invalid protocols argument.");
-    }
-    if (check.array(args[2])) {
-      args[2].forEach(protocol => {
-        if (!check.string(protocol)) {
-          throw new Error("INVALID_ARGUMENT: Invalid protocols argument.");
-        }
-      });
-    }
-    protocols = args[2]; // eslint-disable-line prefer-destructuring
-  } else {
-    protocols = "";
-  }
-
   // Check options (if specified)
   let options;
-  if (args.length > 3) {
-    if (!check.object(args[3])) {
+  if (args.length > 2) {
+    if (!check.object(args[2])) {
       throw new Error("INVALID_ARGUMENT: Invalid options argument.");
     }
-    options = args[3]; // eslint-disable-line prefer-destructuring
+    options = args[2]; // eslint-disable-line prefer-destructuring
   } else {
     options = {};
   }
@@ -92,7 +76,7 @@ export default function clientFactory(...args) {
       );
     }
   } else {
-    options.heartbeatIntervalMs = config.defaults.heartbeatIntervalMs; // eslint-disable-line no-param-reassign
+    options.heartbeatIntervalMs = clientConfig.defaults.heartbeatIntervalMs; // eslint-disable-line no-param-reassign
   }
 
   // Validate options.heartbeatTimeoutMs (if specified) and overlay default
@@ -110,7 +94,7 @@ export default function clientFactory(...args) {
     // If heartbeatIntervalMs === 0 (disabled) and heartbeatTimeoutMs is not specified,
     // then heartbeatTimeoutMs will be the default and thus greater than heartbeatIntervalMs,
     // but the option is not relevant
-    options.heartbeatTimeoutMs = config.defaults.heartbeatTimeoutMs; // eslint-disable-line no-param-reassign
+    options.heartbeatTimeoutMs = clientConfig.defaults.heartbeatTimeoutMs; // eslint-disable-line no-param-reassign
   }
 
   // Success
@@ -176,15 +160,6 @@ export default function clientFactory(...args) {
   client._address = address;
 
   /**
-   * Protocols passed to ws.
-   * @memberof Client
-   * @instance
-   * @private
-   * @type {string|Array}
-   */
-  client._protocols = protocols;
-
-  /**
    * Additional options passed to ws, plus heartbeat configuration.
    * @memberof Client
    * @instance
@@ -239,7 +214,7 @@ export default function clientFactory(...args) {
  * @event disconnect
  * @memberof Client
  * @instance
- * @param {?Error} err "DISCONNECTED: ..." if not due to call to client.disconnect()
+ * @param {?Error} err "FAILURE: ..." if not due to call to client.disconnect()
  */
 
 // Public API
@@ -284,13 +259,13 @@ proto.connect = function connect() {
     try {
       this._wsClient = new this._wsConstructor(
         this._address,
-        this._protocols,
+        config.wsSubprotocol,
         this._options
       );
     } catch (e) {
       dbg("Failed to initialize ws client");
       const err = new Error(
-        "DISCONNECTED: Could not initialize the WebSocket client."
+        "FAILURE: Could not initialize the WebSocket client."
       );
       err.wsError = e;
       this._state = "disconnected";
@@ -477,9 +452,7 @@ proto._processWsMessage = function _processWsMessage(data) {
     dbg("Unexpected WebSocket message type");
     dbg(data);
     this.disconnect(
-      new Error(
-        "DISCONNECTED: Received invalid message type on WebSocket connection."
-      )
+      new Error("FAILURE: Received non-string message on WebSocket connection.")
     );
     return; // Stop
   }
@@ -552,7 +525,7 @@ proto._processWsClose = function _processWsClose(code, reason) {
     try {
       this._wsClient = new this._wsConstructor(
         this._address,
-        this._protocols,
+        config.wsSubprotocol,
         this._options
       );
     } catch (e) {
@@ -561,7 +534,7 @@ proto._processWsClose = function _processWsClose(code, reason) {
       this._wsPreviousState = null;
       this._state = "disconnected";
       const err = new Error(
-        "DISCONNECTED: Could not initialize the WebSocket client."
+        "FAILURE: Could not initialize the WebSocket client."
       );
       err.wsError = e;
       this._emitAsync("disconnect", err);
@@ -583,8 +556,8 @@ proto._processWsClose = function _processWsClose(code, reason) {
     dbg("Transport connection failed unexpectedly");
     const errMsg =
       this._state === "connecting"
-        ? "DISCONNECTED: The WebSocket could not be opened."
-        : "DISCONNECTED: The WebSocket closed unexpectedly.";
+        ? "FAILURE: The WebSocket could not be opened."
+        : "FAILURE: The WebSocket closed unexpectedly.";
     this._wsClient = null;
     this._wsPreviousState = null;
     this._state = "disconnected";
@@ -598,7 +571,7 @@ proto._processWsClose = function _processWsClose(code, reason) {
 /**
  * Processes a ws error event.
  * The WebSocket client also fires a close event when an error occurs, so
- * this is for debugging purposes only.
+ * this is to prevent unhandled error events and for debugging.
  * @memberof Client
  * @instance
  * @private
