@@ -335,6 +335,9 @@ proto.start = function start() {
   try {
     this._wsServer = new this._wsConstructor(wsOptions);
   } catch (e) {
+    dbg("Ws server constructor threw an error");
+    dbg(e);
+
     // Emit stopping and stop
     // State immediately becomes stopped because a call to transport.start() is valid
     this._state = "stopped";

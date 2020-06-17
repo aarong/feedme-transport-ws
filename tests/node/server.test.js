@@ -1122,6 +1122,10 @@ describe("The transport.start() function", () => {
       it.only("should set the state to starting and then stopped", async () => {
         const port = getNextPortNumber();
 
+        // Occupy the port
+        const httpServer = http.createServer(() => {});
+        httpServer.listen(port);
+
         console.log(1);
 
         // Create a transport server
@@ -1147,7 +1151,8 @@ describe("The transport.start() function", () => {
         //   test.listen("junk", () => {});
         // }
 
-        transportServer._options.port = "junk";
+        // transportServer._options.port = "junk";
+
         transportServer.start();
         expect(transportServer.state()).toBe("starting");
 
@@ -1158,11 +1163,14 @@ describe("The transport.start() function", () => {
         console.log(3);
 
         expect(transportServer.state()).toBe("stopped");
+
+        httpServer.close();
+        await asyncUtil.once(httpServer, "close");
       });
 
       // Transport server events
 
-      it.only("should asynchronously emit starting, stopping, stopped", async () => {
+      it("should asynchronously emit starting, stopping, stopped", async () => {
         const port = getNextPortNumber();
 
         // Create a transport server
