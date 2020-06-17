@@ -1141,11 +1141,11 @@ describe("The transport.start() function", () => {
           console.log("STOP");
         });
 
-        if (process.env.CI) {
-          console.log("starting http server.");
-          const test = http.createServer(() => {});
-          test.listen("junk", () => {});
-        }
+        // if (process.env.CI) {
+        //   console.log("starting http server.");
+        //   const test = http.createServer(() => {});
+        //   test.listen("junk", () => {});
+        // }
 
         transportServer._options.port = "junk";
         transportServer.start();
