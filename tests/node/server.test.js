@@ -4852,9 +4852,12 @@ describe("The transport._processServerError() function", () => {
     it("should set the state to stopping and then stopped", async () => {
       const port = getNextPortNumber();
 
+      // Occupy the port
+      const httpServer = http.createServer(() => {});
+      httpServer.listen(port);
+
       // Start a transport server
       const transportServer = transportWsServer({ port });
-      transportServer._options.port = "junk";
 
       expect(transportServer.state()).toBe("stopped");
 
@@ -4871,6 +4874,10 @@ describe("The transport._processServerError() function", () => {
       });
 
       await asyncUtil.once(transportServer, "stop");
+
+      // Clean up
+      httpServer.close();
+      await asyncUtil.once(httpServer, "close");
     });
 
     // Transport server events
@@ -4878,9 +4885,12 @@ describe("The transport._processServerError() function", () => {
     it("should asynchronously emit stopping and then stopped", async () => {
       const port = getNextPortNumber();
 
+      // Occupy the port
+      const httpServer = http.createServer(() => {});
+      httpServer.listen(port);
+
       // Start a transport server
       const transportServer = transportWsServer({ port });
-      transportServer._options.port = "junk";
 
       transportServer.start();
 
@@ -4916,6 +4926,10 @@ describe("The transport._processServerError() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
       expect(eventOrder).toEqual(["starting", "stopping", "stop"]);
+
+      // Clean up
+      httpServer.close();
+      await asyncUtil.once(httpServer, "close");
     });
 
     // WS client events - N/A
@@ -4927,6 +4941,12 @@ describe("The transport._processServerError() function", () => {
     // State functions
 
     it("should set the state to stopping and then stopped", async () => {
+      const port = getNextPortNumber();
+
+      // Occupy the port
+      const httpServer1 = http.createServer(() => {});
+      httpServer1.listen(port);
+
       // Create an http server
       const httpServer = http.createServer((req, res) => {
         res.writeHead(200);
@@ -4944,7 +4964,7 @@ describe("The transport._processServerError() function", () => {
 
       expect(transportServer.state()).toBe("starting");
 
-      httpServer.listen("junk");
+      httpServer.listen(port);
 
       expect(transportServer.state()).toBe("starting");
 
@@ -4957,11 +4977,21 @@ describe("The transport._processServerError() function", () => {
       });
 
       await asyncUtil.once(transportServer, "stop");
+
+      // Clean up
+      httpServer1.close();
+      await asyncUtil.once(httpServer1, "close");
     });
 
     // Transport server events
 
     it("should asynchronously emit stopping and then stopped", async () => {
+      const port = getNextPortNumber();
+
+      // Occupy the port
+      const httpServer1 = http.createServer(() => {});
+      httpServer1.listen(port);
+
       // Create an http server
       const httpServer = http.createServer((req, res) => {
         res.writeHead(200);
@@ -4979,7 +5009,7 @@ describe("The transport._processServerError() function", () => {
 
       const listener = createServerListener(transportServer);
 
-      httpServer.listen("junk");
+      httpServer.listen(port);
 
       const eventOrder = [];
       ["stopping", "stop"].forEach(evt => {
@@ -5008,6 +5038,10 @@ describe("The transport._processServerError() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
       expect(eventOrder).toEqual(["stopping", "stop"]);
+
+      // Clean up
+      httpServer1.close();
+      await asyncUtil.once(httpServer1, "close");
     });
 
     // WS client events - N/A
@@ -5015,6 +5049,12 @@ describe("The transport._processServerError() function", () => {
     // HTTP event listeners
 
     it("should remove external http listeners", async () => {
+      const port = getNextPortNumber();
+
+      // Occupy the port
+      const httpServer1 = http.createServer(() => {});
+      httpServer1.listen(port);
+
       // Create an http server
       const httpServer = http.createServer((req, res) => {
         res.writeHead(200);
@@ -5034,13 +5074,17 @@ describe("The transport._processServerError() function", () => {
       expect(httpServer.listenerCount("close")).toBe(1);
       expect(httpServer.listenerCount("error")).toBe(2);
 
-      httpServer.listen("junk");
+      httpServer.listen(port);
 
       await asyncUtil.once(transportServer, "stop");
 
       expect(httpServer.listenerCount("listening")).toBe(0);
       expect(httpServer.listenerCount("close")).toBe(0);
       expect(httpServer.listenerCount("error")).toBe(0);
+
+      // Clean up
+      httpServer1.close();
+      await asyncUtil.once(httpServer1, "close");
     });
   });
 });
