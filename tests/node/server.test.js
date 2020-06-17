@@ -1119,7 +1119,7 @@ describe("The transport.start() function", () => {
 
       // State functions
 
-      it("should set the state to starting and then stopped", async () => {
+      it.only("should set the state to starting and then stopped", async () => {
         const port = getNextPortNumber();
 
         console.log(1);
@@ -1143,7 +1143,7 @@ describe("The transport.start() function", () => {
 
       // Transport server events
 
-      it("should asynchronously emit starting, stopping, stopped", async () => {
+      it.only("should asynchronously emit starting, stopping, stopped", async () => {
         const port = getNextPortNumber();
 
         // Create a transport server
