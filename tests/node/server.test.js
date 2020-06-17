@@ -979,9 +979,7 @@ describe("The transport.start() function", () => {
 
         // Create a transport server and have the ws constructor throw
         const transportServer = transportWsServer({ port });
-        transportServer._wsConstructor = () => {
-          throw new Error("SOME_ERROR");
-        };
+        transportServer._options.port = false; // Bad port causes constructor failure
         transportServer.start();
         expect(transportServer.state()).toBe("stopped");
       });
@@ -990,13 +988,10 @@ describe("The transport.start() function", () => {
 
       it("should asynchronously emit starting, stopping, stopped", async () => {
         const port = getNextPortNumber();
-        const err = new Error("SOME_ERROR");
 
         // Create a transport server and have the ws constructor throw
         const transportServer = transportWsServer({ port });
-        transportServer._wsConstructor = () => {
-          throw err;
-        };
+        transportServer._options.port = false; // Bad port causes constructor failure
 
         const listener = createServerListener(transportServer);
 
@@ -1028,14 +1023,14 @@ describe("The transport.start() function", () => {
         expect(listener.stopping.mock.calls[0][0].message).toBe(
           "FAILURE: Could not initialize WebSocket server."
         );
-        expect(listener.stopping.mock.calls[0][0].wsError).toBe(err);
+        expect(listener.stopping.mock.calls[0][0].wsError).toBeDefined();
         expect(listener.stop.mock.calls.length).toBe(1);
         expect(listener.stop.mock.calls[0].length).toBe(1);
         expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
         expect(listener.stop.mock.calls[0][0].message).toBe(
           "FAILURE: Could not initialize WebSocket server."
         );
-        expect(listener.stop.mock.calls[0][0].wsError).toBe(err);
+        expect(listener.stop.mock.calls[0][0].wsError).toBeDefined();
         expect(listener.connect.mock.calls.length).toBe(0);
         expect(listener.message.mock.calls.length).toBe(0);
         expect(listener.disconnect.mock.calls.length).toBe(0);
@@ -1119,51 +1114,22 @@ describe("The transport.start() function", () => {
 
       // State functions
 
-      it.only("should set the state to starting and then stopped", async () => {
+      it("should set the state to starting and then stopped", async () => {
         const port = getNextPortNumber();
 
         // Occupy the port
         const httpServer = http.createServer(() => {});
         httpServer.listen(port);
 
-        console.log(1);
-
-        // Create a transport server
-        const transportServer = transportWsServer({
-          port
-        });
-
-        transportServer.on("starting", () => {
-          console.log("STARTING");
-        });
-
-        transportServer.on("stopping", () => {
-          console.log("STOPPING");
-        });
-
-        transportServer.on("stop", () => {
-          console.log("STOP");
-        });
-
-        // if (process.env.CI) {
-        //   console.log("starting http server.");
-        //   const test = http.createServer(() => {});
-        //   test.listen("junk", () => {});
-        // }
-
-        // transportServer._options.port = "junk";
-
+        const transportServer = transportWsServer({ port });
         transportServer.start();
         expect(transportServer.state()).toBe("starting");
 
-        console.log(2);
-
         await asyncUtil.once(transportServer, "stop");
-
-        console.log(3);
 
         expect(transportServer.state()).toBe("stopped");
 
+        // Clean up
         httpServer.close();
         await asyncUtil.once(httpServer, "close");
       });
@@ -1173,9 +1139,11 @@ describe("The transport.start() function", () => {
       it("should asynchronously emit starting, stopping, stopped", async () => {
         const port = getNextPortNumber();
 
-        // Create a transport server
+        // Occupy the port
+        const httpServer = http.createServer(() => {});
+        httpServer.listen(port);
+
         const transportServer = transportWsServer({ port });
-        transportServer._options.port = "junk";
 
         const listener = createServerListener(transportServer);
 
@@ -1221,6 +1189,10 @@ describe("The transport.start() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         expect(listener.disconnect.mock.calls.length).toBe(0);
         expect(eventOrder).toEqual(["starting", "stopping", "stopped"]);
+
+        // Clean up
+        httpServer.close();
+        await asyncUtil.once(httpServer, "close");
       });
 
       // WS client events - N/A
