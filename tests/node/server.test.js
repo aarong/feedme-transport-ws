@@ -1141,6 +1141,11 @@ describe("The transport.start() function", () => {
           console.log("STOP");
         });
 
+        if (process.env.CI) {
+          const test = http.createServer(() => {});
+          test.listen("junk", () => {});
+        }
+
         transportServer._options.port = "junk";
         transportServer.start();
         expect(transportServer.state()).toBe("starting");
