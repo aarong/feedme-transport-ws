@@ -22,6 +22,7 @@ jobs:
       language: node_js
       node_js: "8"
       script: # npm run build # test-src, build, test-build-node
+        - npx gulp build
         - set debug=feedme-*
         - npx jest tests/node/server.test.js 
     - stage: Test
