@@ -975,11 +975,7 @@ describe("The transport.start() function", () => {
       // State functions
 
       it("should set the state to stopped", () => {
-        const port = getNextPortNumber();
-
-        // Create a transport server and have the ws constructor throw
-        const transportServer = transportWsServer({ port });
-        transportServer._options.port = false; // Bad port causes constructor failure
+        const transportServer = transportWsServer({ server: {} }); // Causes constructor error
         transportServer.start();
         expect(transportServer.state()).toBe("stopped");
       });
@@ -987,11 +983,7 @@ describe("The transport.start() function", () => {
       // Transport server events
 
       it("should asynchronously emit starting, stopping, stopped", async () => {
-        const port = getNextPortNumber();
-
-        // Create a transport server and have the ws constructor throw
-        const transportServer = transportWsServer({ port });
-        transportServer._options.port = false; // Bad port causes constructor failure
+        const transportServer = transportWsServer({ server: {} }); // Causes constructor error
 
         const listener = createServerListener(transportServer);
 
