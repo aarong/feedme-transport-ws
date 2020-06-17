@@ -1128,6 +1128,19 @@ describe("The transport.start() function", () => {
         const transportServer = transportWsServer({
           port
         });
+
+        transportServer.on("starting", () => {
+          console.log("STARTING");
+        });
+
+        transportServer.on("stopping", () => {
+          console.log("STOPPING");
+        });
+
+        transportServer.on("stop", () => {
+          console.log("STOP");
+        });
+
         transportServer._options.port = "junk";
         transportServer.start();
         expect(transportServer.state()).toBe("starting");
