@@ -21,7 +21,9 @@ jobs:
     - stage: Test
       language: node_js
       node_js: "8"
-      script: set debug=feedme-* && npx jest tests/node/server.test.js # npm run build # test-src, build, test-build-node
+      script: # npm run build # test-src, build, test-build-node
+        - set debug=feedme-*
+        - npx jest tests/node/server.test.js 
     - stage: Test
       language: node_js
       node_js: "10"
