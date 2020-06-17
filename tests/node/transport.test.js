@@ -6,6 +6,9 @@ import transportWsClient from "../../build/client";
 
 Test the transport client and transport server against each another.
 
+Test only that the library-facing side of the client (server) API generates the
+correct events and state on the  server (client).
+
 */
 
 // const EPSILON = 100;

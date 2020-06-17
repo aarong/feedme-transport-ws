@@ -1122,6 +1122,8 @@ describe("The transport.start() function", () => {
       it("should set the state to starting and then stopped", async () => {
         const port = getNextPortNumber();
 
+        console.log(1);
+
         // Create a transport server
         const transportServer = transportWsServer({
           port
@@ -1130,7 +1132,11 @@ describe("The transport.start() function", () => {
         transportServer.start();
         expect(transportServer.state()).toBe("starting");
 
+        console.log(2);
+
         await asyncUtil.once(transportServer, "stop");
+
+        console.log(3);
 
         expect(transportServer.state()).toBe("stopped");
       });
