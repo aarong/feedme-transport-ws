@@ -59,7 +59,7 @@ const createClientListener = transportClient => {
 
 // Client library-facing API
 
-describe("the client.connect() function", () => {
+describe("The client.connect() function", () => {
   describe("against a server in stand-alone mode", () => {
     // Server state
 
@@ -275,7 +275,7 @@ describe("the client.connect() function", () => {
   });
 });
 
-describe("the client.disconnect() function", () => {
+describe("The client.disconnect() function", () => {
   describe("against a server in stand-alone mode", () => {
     // Server state
 
@@ -527,7 +527,7 @@ describe("the client.disconnect() function", () => {
   });
 });
 
-describe("the client.send() function", () => {
+describe("The client.send() function", () => {
   describe("against a server in stand-alone mode", () => {
     // Server state
 
@@ -772,11 +772,11 @@ describe("the client.send() function", () => {
 
 // Server library-facing API
 
-describe("the server.start() function", () => {
+describe("The server.start() function", () => {
   // N/A - No client impact
 });
 
-describe("the server.stop() function", () => {
+describe("The server.stop() function", () => {
   describe("on a server in stand-alone mode", () => {
     // Client state
 
@@ -992,7 +992,7 @@ describe("the server.stop() function", () => {
   });
 });
 
-describe("the httpServer.close() function", () => {
+describe("The httpServer.close() function", () => {
   describe("on a server in external server mode", () => {
     // Client state
 
@@ -1150,7 +1150,7 @@ describe("the httpServer.close() function", () => {
   });
 });
 
-describe("the server.send() function", () => {
+describe("The server.send() function", () => {
   describe("on a server in stand-alone mode", () => {
     // Client state
 
@@ -1393,7 +1393,7 @@ describe("the server.send() function", () => {
   });
 });
 
-describe("the server.disconnect() function", () => {
+describe("The server.disconnect() function", () => {
   describe("on a server in stand-alone mode", () => {
     // Client state
 
@@ -1641,6 +1641,43 @@ describe("the server.disconnect() function", () => {
   });
 });
 
-describe("the server.handleUpgrade() function (noServer only)", () => {
+describe("The server.handleUpgrade() function (noServer only)", () => {
   // Tested above in noServer cases
+});
+
+// Misc
+
+it("The transport should be able to exchange long messages", async () => {
+  const port = getNextPortNumber();
+  const msg = "z".repeat(1e8); // 100mb
+
+  // Start a server
+  const server = transportWsServer({ port });
+  let cid;
+  server.on("connect", c => {
+    cid = c;
+  });
+  server.start();
+  await asyncUtil.once(server, "start");
+
+  // Connnect a client
+  const client = transportWsClient(`ws://localhost:${port}`);
+  client.connect();
+  await asyncUtil.once(client, "connect");
+
+  // Client-to-server message
+  const sListner = createServerListener(server);
+  client.send(msg);
+  await asyncUtil.once(server, "message");
+  expect(sListner.message.mock.calls[0][1]).toBe(msg);
+
+  // Server-to-client message
+  const cListener = createClientListener(client);
+  server.send(cid, msg);
+  await asyncUtil.once(client, "message");
+  expect(cListener.message.mock.calls[0][0]).toBe(msg);
+
+  // Clean up
+  server.stop();
+  await asyncUtil.once(server, "stop");
 });

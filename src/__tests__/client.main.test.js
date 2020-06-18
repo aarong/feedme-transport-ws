@@ -935,11 +935,8 @@ describe("The client.disconnect() function", () => {
       expect(harn.getWs().ping.mock.calls.length).toBe(0);
       expect(harn.getWs().send.mock.calls.length).toBe(0);
       expect(harn.getWs().close.mock.calls.length).toBe(1);
-      expect(harn.getWs().close.mock.calls[0].length).toBe(2);
+      expect(harn.getWs().close.mock.calls[0].length).toBe(1);
       expect(harn.getWs().close.mock.calls[0][0]).toBe(1000);
-      expect(harn.getWs().close.mock.calls[0][1]).toBe(
-        "Connection closed by the client."
-      );
       expect(harn.getWs().terminate.mock.calls.length).toBe(0);
     });
 
@@ -1882,13 +1879,9 @@ describe("The client._processWsMessage() function", () => {
     harn.getWs().emit("message", 123);
     expect(harn.getWs().ping.mock.calls.length).toBe(0);
     expect(harn.getWs().send.mock.calls.length).toBe(0);
-    expect(harn.getWs().close.mock.calls.length).toBe(1);
-    expect(harn.getWs().close.mock.calls[0].length).toBe(2);
-    expect(harn.getWs().close.mock.calls[0][0]).toBe(1000);
-    expect(harn.getWs().close.mock.calls[0][1]).toBe(
-      "Connection closed by the client."
-    );
-    expect(harn.getWs().terminate.mock.calls.length).toBe(0);
+    expect(harn.getWs().close.mock.calls.length).toBe(0);
+    expect(harn.getWs().terminate.mock.calls.length).toBe(1);
+    expect(harn.getWs().terminate.mock.calls[0].length).toBe(0);
   });
 
   // Outbound callbacks - N/A

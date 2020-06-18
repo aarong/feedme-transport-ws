@@ -253,35 +253,7 @@ proto.connect = function connect() {
 
   // If the ws client is disconnected then start connecting, otherwise wait for ws event
   if (!this._wsClient) {
-    dbg("Initializing ws client");
-
-    // Try to create the WebSocket client and emit disconnect asynchronously if constructor throws
-    try {
-      this._wsClient = new this._wsConstructor(
-        this._address,
-        config.wsSubprotocol,
-        this._options
-      );
-    } catch (e) {
-      dbg("Failed to initialize ws client");
-      const err = new Error(
-        "FAILURE: Could not initialize the WebSocket client."
-      );
-      err.wsError = e;
-      this._state = "disconnected";
-      this._emitAsync("disconnect", err);
-      return; // Stop
-    }
-
-    // Update state
-    this._wsPreviousState = "connecting";
-
-    // Listen for events
-    this._wsClient.on("open", this._processWsOpen.bind(this));
-    this._wsClient.on("message", this._processWsMessage.bind(this));
-    this._wsClient.on("pong", this._processWsPong.bind(this));
-    this._wsClient.on("close", this._processWsClose.bind(this));
-    this._wsClient.on("error", this._processWsError.bind(this));
+    this._connect();
   }
 };
 
@@ -312,29 +284,9 @@ proto.disconnect = function disconnect(...args) {
     throw new Error("INVALID_STATE: Already disconnected.");
   }
 
-  // Clear heartbeat (if any)
-  if (this._heartbeatInterval) {
-    clearInterval(this._heartbeatInterval);
-    this._heartbeatInterval = null;
-  }
-  if (this._heartbeatTimeout) {
-    clearTimeout(this._heartbeatTimeout);
-    this._heartbeatTimeout = null;
-  }
+  // Success
 
-  // Close the ws connection if it's open, otherwise wait for ws event
-  if (this._wsClient.readyState === this._wsClient.OPEN) {
-    this._wsClient.close(1000, "Connection closed by the client.");
-    this._wsPreviousState = "disconnecting";
-  }
-
-  // Update state and emit disconnect asynchronously
-  this._state = "disconnected";
-  if (err) {
-    this._emitAsync("disconnect", err);
-  } else {
-    this._emitAsync("disconnect");
-  }
+  this._disconnect(err);
 };
 
 /**
@@ -366,7 +318,7 @@ proto.send = function send(msg) {
       dbg("Error writing message");
       const transportErr = new Error("FAILURE: WebSocket transmission failed.");
       transportErr.wsError = err;
-      this._connectionFailure(transportErr);
+      this._disconnect(transportErr);
     } else {
       dbg("Message written successfully");
     }
@@ -407,7 +359,7 @@ proto._processWsOpen = function _processWsOpen() {
         // Cleared on pong receipt and on disconnect, so if fired you know you need to terminate
         this._heartbeatTimeout = setTimeout(() => {
           dbg("Heartbeat timed out");
-          this._connectionFailure(
+          this._disconnect(
             new Error("FAILURE: The WebSocket heartbeat failed.")
           );
         }, this._options.heartbeatTimeoutMs);
@@ -421,7 +373,7 @@ proto._processWsOpen = function _processWsOpen() {
               "FAILURE: The WebSocket heartbeat failed."
             );
             transportErr.wsError = err;
-            this._connectionFailure(transportErr);
+            this._disconnect(transportErr);
           } else {
             dbg("Ping frame written successfully");
           }
@@ -520,51 +472,26 @@ proto._processWsClose = function _processWsClose(code, reason) {
     // There was a call to transport.connect() when ws was disconnecting due to
     // a call to transport.disconnect(). The connecting event has already been
     // fired, so just try to establish a new ws connection
-
-    // Try to create the WebSocket client and emit disconnect if constructor throws
-    try {
-      this._wsClient = new this._wsConstructor(
-        this._address,
-        config.wsSubprotocol,
-        this._options
-      );
-    } catch (e) {
-      dbg("Ws initialization failed");
-      this._wsClient = null; // Otherwise it will be the previous client
-      this._wsPreviousState = null;
-      this._state = "disconnected";
-      const err = new Error(
-        "FAILURE: Could not initialize the WebSocket client."
-      );
-      err.wsError = e;
-      this._emitAsync("disconnect", err);
-      return; // Stop
-    }
-
-    // Update state
-    this._wsPreviousState = "connecting";
-
-    // Listen for events
-    this._wsClient.on("open", this._processWsOpen.bind(this));
-    this._wsClient.on("message", this._processWsMessage.bind(this));
-    this._wsClient.on("pong", this._processWsPong.bind(this));
-    this._wsClient.on("close", this._processWsClose.bind(this));
-    this._wsClient.on("error", this._processWsError.bind(this));
+    this._connect();
   } else {
     // The transport connection failed unexpectedly. The transport state could
     // be connecting or connected, but either way you emit disconnect
     dbg("Transport connection failed unexpectedly");
+
+    // Emit disconnect asynchronously
     const errMsg =
       this._state === "connecting"
         ? "FAILURE: The WebSocket could not be opened."
         : "FAILURE: The WebSocket closed unexpectedly.";
-    this._wsClient = null;
-    this._wsPreviousState = null;
-    this._state = "disconnected";
     const err = new Error(errMsg);
     err.wsCode = code;
     err.wsReason = reason;
     this._emitAsync("disconnect", err);
+
+    // Update state
+    this._wsClient = null;
+    this._wsPreviousState = null;
+    this._state = "disconnected";
   }
 };
 
@@ -587,13 +514,65 @@ proto._processWsError = function _processWsError(err) {
 // Internal Functions
 
 /**
- * Handles an abnormal connection failure:
+ * Connect the WebSocket.
  *
+ * Called from
+ *
+ *  - Library call to transport.connect()
+ *  - WebSocket close event handler (if library has requested reconnect)
+ * @memberof Client
+ * @instance
+ * @private
+ * @param {Error} err
+ * @returns {void}
+ */
+proto._connect = function _connect() {
+  dbg("Connecting the client");
+
+  // Try to create the WebSocket client and emit disconnect asynchronously if constructor throws
+  try {
+    this._wsClient = new this._wsConstructor(
+      this._address,
+      config.wsSubprotocol,
+      this._options
+    );
+  } catch (e) {
+    dbg("Failed to initialize ws client");
+
+    // Update state
+    this._state = "disconnected";
+    this._wsClient = null; // May exist if due to close event
+    this._wsPreviousState = null;
+
+    // Emit disconnect
+    const err = new Error(
+      "FAILURE: Could not initialize the WebSocket client."
+    );
+    err.wsError = e;
+    this._emitAsync("disconnect", err);
+    return; // Stop
+  }
+
+  // Update state
+  this._wsPreviousState = "connecting";
+
+  // Listen for events
+  this._wsClient.on("open", this._processWsOpen.bind(this));
+  this._wsClient.on("message", this._processWsMessage.bind(this));
+  this._wsClient.on("pong", this._processWsPong.bind(this));
+  this._wsClient.on("close", this._processWsClose.bind(this));
+  this._wsClient.on("error", this._processWsError.bind(this));
+};
+
+/**
+ * Disconnect the transport client.
+ *
+ *  - Call to transport.disconnect()
  *  - Heartbeat timeout
  *  - Ws calls back error to ws.ping()
  *  - Ws calls back error to ws.send()
  *
- * Resets the state, emits, and terminates the ws connection as appropriate.
+ * Resets the state, emits, and closes the ws connection as appropriate.
  *
  * Unsure whether ws.ping() and ws.send() trigger close events when calling back
  * error, but it doesn't matter.
@@ -603,8 +582,8 @@ proto._processWsError = function _processWsError(err) {
  * @param {Error} err
  * @returns {void}
  */
-proto._connectionFailure = function _connectionFailure(err) {
-  dbg("Connection failed");
+proto._disconnect = function _disconnect(err) {
+  dbg("Disconnecting the client");
 
   // Clear heartbeat (if any)
   if (this._heartbeatInterval) {
@@ -619,14 +598,24 @@ proto._connectionFailure = function _connectionFailure(err) {
   // Terminate the ws connection if it's still open
   // Triggers a ws close event asynchronously, which resets _wsClient and _wsPreviousState
   if (this._wsClient && this._wsClient.readyState === this._wsClient.OPEN) {
-    this._wsClient.terminate();
+    if (err) {
+      dbg("Terminating client connection");
+      this._wsClient.terminate();
+    } else {
+      dbg("Closing client connection");
+      this._wsClient.close(1000);
+    }
     this._wsPreviousState = "disconnecting";
   }
 
-  // Update state and emit
+  // Update state and emit asynchronously
   if (this._state !== "disconnected") {
     this._state = "disconnected";
-    this._emitAsync("disconnect", err);
+    if (err) {
+      this._emitAsync("disconnect", err);
+    } else {
+      this._emitAsync("disconnect");
+    }
   }
 };
 
