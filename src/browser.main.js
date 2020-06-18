@@ -468,15 +468,11 @@ proto._disconnect = function _disconnect(err) {
   }
 
   // Terminate the ws connection if it's still open
+  // You cannot use .terminate() in the browser
   // Triggers a ws close event asynchronously, which resets _wsClient and _wsPreviousState
   if (this._wsClient && this._wsClient.readyState === this._wsClient.OPEN) {
-    if (err) {
-      dbg("Terminating client connection");
-      this._wsClient.terminate();
-    } else {
-      dbg("Closing client connection");
-      this._wsClient.close(1000);
-    }
+    dbg("Closing client connection");
+    this._wsClient.close(1000);
     this._wsPreviousState = "disconnecting";
   }
 

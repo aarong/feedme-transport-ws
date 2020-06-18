@@ -430,9 +430,11 @@ proto._processWsPong = function _processWsPong() {
 /**
  * Processes a ws close event.
  *
- * The ws client will emit a close event if the initial connection could not
- * be established, if an open connection is closed normally, and if an open
- * connection fails due to an error.
+ * The ws client will emit a close event if
+ *
+ *  - The initial connection could not be established
+ *  - An open connection is closed normally
+ *  - An open connection fails due to an error.
  * @memberof Client
  * @instance
  * @private
@@ -576,6 +578,9 @@ proto._connect = function _connect() {
  *
  * Unsure whether ws.ping() and ws.send() trigger close events when calling back
  * error, but it doesn't matter.
+ *
+ * Cannot remove ws listeners. Need to listen for the close event to know when
+ * you could try to attempt a new connection.
  * @memberof Client
  * @instance
  * @private
