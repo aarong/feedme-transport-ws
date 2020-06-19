@@ -3,7 +3,6 @@ import check from "check-types";
 import emitter from "component-emitter";
 import client from "../client.main";
 import clientConfig from "../client.config";
-import config from "../config";
 import asyncUtil from "./asyncutil";
 
 /*
@@ -39,7 +38,6 @@ so advance manually using use "await asyncUtil.nextTick()".
 State: Object members
   ._wsConstructor
   ._wsClient
-  ._wsPreviousState
   ._state
   ._address
   ._options
@@ -170,7 +168,6 @@ harnessProto.getClientState = function getClientState() {
   const state = {};
   state._wsConstructor = this.client._wsConstructor; // Object reference
   state._wsClient = this.client._wsClient; // Object reference
-  state._wsPreviousState = this.client._wsPreviousState; // String or null
   state._state = this.client._state; // String
   state._address = this.client._address; // String
   state._options = _.clone(this.client._options); // Object copy
@@ -203,16 +200,6 @@ const toHaveState = function toHaveState(receivedClient, expectedState) {
       pass: false,
       message() {
         return "expected ._wsClient to match, but they didn't";
-      }
-    };
-  }
-
-  // Check ._wsPreviousState
-  if (receivedClient._wsPreviousState !== expectedState._wsPreviousState) {
-    return {
-      pass: false,
-      message() {
-        return "expected ._wsPreviousState to match, but they didn't";
       }
     };
   }
@@ -314,17 +301,6 @@ describe("The toHaveState() function", () => {
       );
     });
 
-    it("should fail if _wsPreviousState values don't match", () => {
-      const result = toHaveState(
-        { _wsPreviousState: "123" },
-        { _wsPreviousState: null }
-      );
-      expect(result.pass).toBe(false);
-      expect(result.message()).toBe(
-        "expected ._wsPreviousState to match, but they didn't"
-      );
-    });
-
     it("should fail if _state values don't match", () => {
       const result = toHaveState({ _state: "123" }, { _state: "456" });
       expect(result.pass).toBe(false);
@@ -389,14 +365,6 @@ describe("The toHaveState() function", () => {
 
     it("should pass if _wsClient matches - case 2", () => {
       const result = toHaveState({ _wsClient: null }, { _wsClient: null });
-      expect(result.pass).toBe(true);
-    });
-
-    it("should pass if _wsPreviousState matches", () => {
-      const result = toHaveState(
-        { _wsPreviousState: "disconnected" },
-        { _wsPreviousState: "disconnected" }
-      );
       expect(result.pass).toBe(true);
     });
 
@@ -557,7 +525,6 @@ describe("The client() factory function", () => {
       expect(c).toHaveState({
         _wsConstructor: f,
         _wsClient: null,
-        _wsPreviousState: null,
         _state: "disconnected",
         _address: "ws://localhost",
         _options: {
@@ -577,7 +544,6 @@ describe("The client() factory function", () => {
       expect(c).toHaveState({
         _wsConstructor: f,
         _wsClient: null,
-        _wsPreviousState: null,
         _state: "disconnected",
         _address: "ws://localhost",
         _options: {
@@ -600,7 +566,6 @@ describe("The client() factory function", () => {
       expect(c).toHaveState({
         _wsConstructor: f,
         _wsClient: null,
-        _wsPreviousState: null,
         _state: "disconnected",
         _address: "ws://localhost",
         _options: {
@@ -643,167 +608,87 @@ describe("The client.connect() function", () => {
   });
 
   describe("can succeed", () => {
-    describe("when there is an existing ws client instance", () => {
-      // Events
+    // Events
 
-      it("should emit connecting next tick", async () => {
-        const harn = harness("ws://localhost");
-        await harn.makeWsConnecting();
-        harn.client.disconnect();
+    it("should emit connecting next tick", async () => {
+      const harn = harness("ws://localhost");
+      const listener = harn.createClientListener();
 
-        await asyncUtil.nextTick(); // Move past queued events
+      harn.client.connect();
 
-        const listener = harn.createClientListener();
-        harn.client.connect();
+      expect(listener.connecting.mock.calls.length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
 
-        expect(listener.connecting.mock.calls.length).toBe(0);
-        expect(listener.connect.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(0);
-        expect(listener.message.mock.calls.length).toBe(0);
+      await asyncUtil.nextTick();
 
-        await asyncUtil.nextTick();
-
-        expect(listener.connecting.mock.calls.length).toBe(1);
-        expect(listener.connecting.mock.calls[0].length).toBe(0);
-        expect(listener.connect.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(0);
-        expect(listener.message.mock.calls.length).toBe(0);
-      });
-
-      // State
-
-      it("should update the state appropriately", () => {
-        const harn = harness("ws://localhost");
-        harn.makeWsConnecting();
-        harn.client.disconnect();
-        const newState = harn.getClientState();
-        newState._state = "connecting";
-        harn.client.connect();
-        expect(harn.client).toHaveState(newState);
-      });
-
-      // Function calls - N/A
-
-      // Calls on ws
-
-      it("should do nothing on previous ws and new ws", () => {
-        const harn = harness("ws://localhost");
-        harn.makeWsConnecting();
-        const prevWs = harn.getWs();
-        harn.client.disconnect();
-        harn.getWs().mockClear();
-        harn.client.connect();
-
-        expect(prevWs.ping.mock.calls.length).toBe(0);
-        expect(prevWs.send.mock.calls.length).toBe(0);
-        expect(prevWs.close.mock.calls.length).toBe(0);
-        expect(prevWs.terminate.mock.calls.length).toBe(0);
-
-        expect(harn.getWs().ping.mock.calls.length).toBe(0);
-        expect(harn.getWs().send.mock.calls.length).toBe(0);
-        expect(harn.getWs().close.mock.calls.length).toBe(0);
-        expect(harn.getWs().terminate.mock.calls.length).toBe(0);
-      });
-
-      // Outbound callbacks - N/A
-
-      // Inbound callbacks - N/A
-
-      // Return value
-
-      it("should return nothing", () => {
-        const harn = harness("ws://localhost");
-        harn.makeWsConnecting();
-        harn.getWs().emit("open");
-        harn.client.disconnect();
-        expect(harn.client.connect()).toBe(undefined);
-      });
+      expect(listener.connecting.mock.calls.length).toBe(1);
+      expect(listener.connecting.mock.calls[0].length).toBe(0);
+      expect(listener.connect.mock.calls.length).toBe(0);
+      expect(listener.disconnect.mock.calls.length).toBe(0);
+      expect(listener.message.mock.calls.length).toBe(0);
     });
 
-    describe("when there is no existing ws client instance", () => {
-      // Events
+    // State
 
-      it("should emit connecting next tick", async () => {
-        const harn = harness("ws://localhost");
-        const listener = harn.createClientListener();
+    it("should update the state appropriately", () => {
+      const harn = harness("ws://localhost");
+      const newState = harn.getClientState();
+      newState._wsClient = {};
+      newState._state = "connecting";
+      harn.client.connect();
+      expect(harn.client).toHaveState(newState);
+    });
 
-        harn.client.connect();
+    // Function calls
 
-        expect(listener.connecting.mock.calls.length).toBe(0);
-        expect(listener.connect.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(0);
-        expect(listener.message.mock.calls.length).toBe(0);
-
-        await asyncUtil.nextTick();
-
-        expect(listener.connecting.mock.calls.length).toBe(1);
-        expect(listener.connecting.mock.calls[0].length).toBe(0);
-        expect(listener.connect.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(0);
-        expect(listener.message.mock.calls.length).toBe(0);
-      });
-
-      // State
-
-      it("should update the state appropriately", () => {
-        const harn = harness("ws://localhost");
-        const newState = harn.getClientState();
-        newState._wsClient = {};
-        newState._wsPreviousState = "connecting";
-        newState._state = "connecting";
-        harn.client.connect();
-        expect(harn.client).toHaveState(newState);
-      });
-
-      // Function calls
-
-      it("should call the ws constructor", () => {
-        let constructorArgs;
-        const constructor = function constructor(...args) {
-          constructorArgs = args;
-          emitter(this);
-        };
-        const harn = harness(
-          "ws://localhost",
-          {
-            heartbeatIntervalMs: 123,
-            heartbeatTimeoutMs: 12,
-            otherOption: "value"
-          },
-          constructor
-        );
-        harn.client.connect();
-        expect(check.array(constructorArgs)).toBe(true);
-        expect(constructorArgs.length).toBe(3);
-        expect(constructorArgs[0]).toBe("ws://localhost");
-        expect(constructorArgs[2]).toEqual({
+    it("should call the ws constructor", () => {
+      let constructorArgs;
+      const constructor = function constructor(...args) {
+        constructorArgs = args;
+        emitter(this);
+      };
+      const harn = harness(
+        "ws://localhost",
+        {
           heartbeatIntervalMs: 123,
           heartbeatTimeoutMs: 12,
           otherOption: "value"
-        });
+        },
+        constructor
+      );
+      harn.client.connect();
+      expect(check.array(constructorArgs)).toBe(true);
+      expect(constructorArgs.length).toBe(3);
+      expect(constructorArgs[0]).toBe("ws://localhost");
+      expect(constructorArgs[2]).toEqual({
+        heartbeatIntervalMs: 123,
+        heartbeatTimeoutMs: 12,
+        otherOption: "value"
       });
+    });
 
-      // Calls on ws
+    // Calls on ws
 
-      it("should do nothing on new ws (was no previous)", () => {
-        const harn = harness("ws://localhost");
-        harn.client.connect();
-        expect(harn.getWs().ping.mock.calls.length).toBe(0);
-        expect(harn.getWs().send.mock.calls.length).toBe(0);
-        expect(harn.getWs().close.mock.calls.length).toBe(0);
-        expect(harn.getWs().terminate.mock.calls.length).toBe(0);
-      });
+    it("should do nothing on new ws", () => {
+      const harn = harness("ws://localhost");
+      harn.client.connect();
+      expect(harn.getWs().ping.mock.calls.length).toBe(0);
+      expect(harn.getWs().send.mock.calls.length).toBe(0);
+      expect(harn.getWs().close.mock.calls.length).toBe(0);
+      expect(harn.getWs().terminate.mock.calls.length).toBe(0);
+    });
 
-      // Outbound callbacks - N/A
+    // Outbound callbacks - N/A
 
-      // Inbound callbacks - N/A
+    // Inbound callbacks - N/A
 
-      // Return value
+    // Return value
 
-      it("should return nothing", () => {
-        const harn = harness("ws://localhost");
-        expect(harn.client.connect()).toBe(undefined);
-      });
+    it("should return nothing", () => {
+      const harn = harness("ws://localhost");
+      expect(harn.client.connect()).toBe(undefined);
     });
   });
 });
@@ -874,23 +759,11 @@ describe("The client.disconnect() function", () => {
 
     // State
 
-    it("if closing a ws client, should update the state appropriately", () => {
+    it("should update the state appropriately", () => {
       const harn = harness("ws://localhost");
       harn.makeWsConnected();
-      harn.getWs().readyState = harn.getWs().OPEN;
       const newState = harn.getClientState();
-      newState._wsPreviousState = "disconnecting";
-      newState._state = "disconnected";
-      newState._heartbeatInterval = null;
-      newState._heartbeatTimer = null;
-      harn.client.disconnect();
-      expect(harn.client).toHaveState(newState);
-    });
-
-    it("if not closing a ws client, should update the state appropriately", () => {
-      const harn = harness("ws://localhost");
-      harn.makeWsConnecting();
-      const newState = harn.getClientState();
+      newState._wsClient = null;
       newState._state = "disconnected";
       newState._heartbeatInterval = null;
       newState._heartbeatTimer = null;
@@ -900,7 +773,7 @@ describe("The client.disconnect() function", () => {
 
     // Function calls
 
-    it("should clear the heartbeatInterval and heartbeatTimeout, if present", () => {
+    it("should clear the heartbeatInterval and heartbeatTimeout", () => {
       const harn = harness("ws://localhost");
       harn.makeWsConnected();
       jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs); // Send a ping - creates timer
@@ -915,42 +788,68 @@ describe("The client.disconnect() function", () => {
       expect(check.number(clearTimeout.mock.calls[0][0])).toBe(true);
     });
 
-    it("should not clear the heartbeatInterval and heartbeatTimeout, if not present", () => {
-      const harn = harness("ws://localhost", { heartbeatIntervalMs: 0 });
-      harn.makeWsConnected();
-      clearInterval.mockClear();
-      clearTimeout.mockClear();
-      harn.client.disconnect();
-      expect(clearInterval.mock.calls.length).toBe(0);
-      expect(clearTimeout.mock.calls.length).toBe(0);
-    });
-
     // Calls on ws
 
-    it("if the ws client is connected, should call ws.close()", () => {
+    it("if the ws client is connected and no error, should call ws.close()", () => {
       const harn = harness("ws://localhost");
       harn.makeWsConnected();
-      harn.getWs().mockClear();
+      const wsClient = harn.getWs();
       harn.client.disconnect();
-      expect(harn.getWs().ping.mock.calls.length).toBe(0);
-      expect(harn.getWs().send.mock.calls.length).toBe(0);
-      expect(harn.getWs().close.mock.calls.length).toBe(1);
-      expect(harn.getWs().close.mock.calls[0].length).toBe(1);
-      expect(harn.getWs().close.mock.calls[0][0]).toBe(1000);
-      expect(harn.getWs().terminate.mock.calls.length).toBe(0);
+      expect(wsClient.ping.mock.calls.length).toBe(0);
+      expect(wsClient.send.mock.calls.length).toBe(0);
+      expect(wsClient.close.mock.calls.length).toBe(1);
+      expect(wsClient.close.mock.calls[0].length).toBe(1);
+      expect(wsClient.close.mock.calls[0][0]).toBe(1000);
+      expect(wsClient.terminate.mock.calls.length).toBe(0);
     });
 
-    it("if the ws client is not connected, should do nothing on ws", () => {
+    it("if the ws client is connected and error, should call ws.terminate()", () => {
       const harn = harness("ws://localhost");
-      harn.makeWsDisconnecting();
+      harn.makeWsConnected();
+      const wsClient = harn.getWs();
+      harn.client.disconnect(new Error("SOME_ERROR"));
+      expect(wsClient.ping.mock.calls.length).toBe(0);
+      expect(wsClient.send.mock.calls.length).toBe(0);
+      expect(wsClient.close.mock.calls.length).toBe(0);
+      expect(wsClient.terminate.mock.calls.length).toBe(1);
+      expect(wsClient.terminate.mock.calls[0].length).toBe(0);
+    });
+
+    it("if the ws client is connecting and no error, should call ws.close() after open", () => {
+      const harn = harness("ws://localhost");
       harn.client.connect();
-      // Now transport state is connecting and ws is disconnecting
-      harn.getWs().mockClear();
+      const wsClient = harn.getWs();
+      wsClient.readyState = wsClient.CONNECTING;
       harn.client.disconnect();
-      expect(harn.getWs().ping.mock.calls.length).toBe(0);
-      expect(harn.getWs().send.mock.calls.length).toBe(0);
-      expect(harn.getWs().close.mock.calls.length).toBe(0);
-      expect(harn.getWs().terminate.mock.calls.length).toBe(0);
+      expect(wsClient.ping.mock.calls.length).toBe(0);
+      expect(wsClient.send.mock.calls.length).toBe(0);
+      expect(wsClient.close.mock.calls.length).toBe(0);
+      expect(wsClient.terminate.mock.calls.length).toBe(0);
+      wsClient.emit("open");
+      expect(wsClient.ping.mock.calls.length).toBe(0);
+      expect(wsClient.send.mock.calls.length).toBe(0);
+      expect(wsClient.close.mock.calls.length).toBe(1);
+      expect(wsClient.close.mock.calls[0].length).toBe(1);
+      expect(wsClient.close.mock.calls[0][0]).toBe(1000);
+      expect(wsClient.terminate.mock.calls.length).toBe(0);
+    });
+
+    it("if the ws client is connecting and error, should call ws.terminate() after open", () => {
+      const harn = harness("ws://localhost");
+      harn.client.connect();
+      const wsClient = harn.getWs();
+      wsClient.readyState = wsClient.CONNECTING;
+      harn.client.disconnect(new Error("SOME_ERROR"));
+      expect(wsClient.ping.mock.calls.length).toBe(0);
+      expect(wsClient.send.mock.calls.length).toBe(0);
+      expect(wsClient.close.mock.calls.length).toBe(0);
+      expect(wsClient.terminate.mock.calls.length).toBe(0);
+      wsClient.emit("open");
+      expect(wsClient.ping.mock.calls.length).toBe(0);
+      expect(wsClient.send.mock.calls.length).toBe(0);
+      expect(wsClient.close.mock.calls.length).toBe(0);
+      expect(wsClient.terminate.mock.calls.length).toBe(1);
+      expect(wsClient.terminate.mock.calls[0].length).toBe(0);
     });
 
     // Outbound callbacks - N/A
@@ -1034,7 +933,7 @@ describe("The client.send() function", () => {
 
     // Inbound callbacks
 
-    describe("When the send callback fires with error", () => {
+    describe("When the send callback fires with error - still connected", () => {
       // Events
 
       it("should emit disconnect next tick", async () => {
@@ -1072,13 +971,12 @@ describe("The client.send() function", () => {
       it("should update the state appropriately", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
-        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs); // Create heartbeat timeout
         harn.client.send("msg");
         const cb = harn.getWs().send.mock.calls[0][1];
         const err = new Error("SOME_ERROR");
 
         const newState = harn.getClientState();
-        newState._wsPreviousState = "disconnecting";
+        newState._wsClient = null;
         newState._state = "disconnected";
         newState._heartbeatInterval = null;
         newState._heartbeatTimeout = null;
@@ -1091,7 +989,6 @@ describe("The client.send() function", () => {
       it("should call clearInterval and clearTimeout", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
-        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs); // Create heartbeat timeout
         harn.client.send("msg");
         const cb = harn.getWs().send.mock.calls[0][1];
         const err = new Error("SOME_ERROR");
@@ -1101,10 +998,8 @@ describe("The client.send() function", () => {
         cb(err);
         expect(clearInterval.mock.calls.length).toBe(1);
         expect(clearInterval.mock.calls[0].length).toBe(1);
-        expect(check.number(clearInterval.mock.calls[0][0])).toBe(true);
         expect(clearTimeout.mock.calls.length).toBe(1);
         expect(clearTimeout.mock.calls[0].length).toBe(1);
-        expect(check.number(clearTimeout.mock.calls[0][0])).toBe(true);
       });
 
       // Calls on ws
@@ -1112,18 +1007,115 @@ describe("The client.send() function", () => {
       it("should call ws.terminate()", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
-        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs); // Create heartbeat timeout
+        const wsClient = harn.getWs();
+        harn.client.send("msg");
+        const cb = wsClient.send.mock.calls[0][1];
+        const err = new Error("SOME_ERROR");
+
+        wsClient.mockClear();
+        cb(err);
+        expect(wsClient.ping.mock.calls.length).toBe(0);
+        expect(wsClient.send.mock.calls.length).toBe(0);
+        expect(wsClient.close.mock.calls.length).toBe(0);
+        expect(wsClient.terminate.mock.calls.length).toBe(1);
+        expect(wsClient.terminate.mock.calls[0].length).toBe(0);
+      });
+
+      // Outbound callbacks - N/A
+
+      // Inbound callbacks - N/A
+    });
+
+    describe("When the send callback fires with error - no longer connected", () => {
+      // Events
+
+      it("should emit nothing next tick", async () => {
+        const harn = harness("ws://localhost");
+        await harn.makeWsConnected();
+
         harn.client.send("msg");
         const cb = harn.getWs().send.mock.calls[0][1];
         const err = new Error("SOME_ERROR");
 
-        harn.getWs().mockClear();
+        harn.client.disconnect();
+
+        await asyncUtil.nextTick(); // Move past queued events
+
+        const listener = harn.createClientListener();
+
         cb(err);
-        expect(harn.getWs().ping.mock.calls.length).toBe(0);
-        expect(harn.getWs().send.mock.calls.length).toBe(0);
-        expect(harn.getWs().close.mock.calls.length).toBe(0);
-        expect(harn.getWs().terminate.mock.calls.length).toBe(1);
-        expect(harn.getWs().terminate.mock.calls[0].length).toBe(0);
+
+        expect(listener.connecting.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+
+        await asyncUtil.nextTick();
+
+        expect(listener.connecting.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+      });
+
+      // State
+
+      it("should not change the state", () => {
+        const harn = harness("ws://localhost");
+        harn.makeWsConnected();
+        harn.client.send("msg");
+        const cb = harn.getWs().send.mock.calls[0][1];
+        const err = new Error("SOME_ERROR");
+
+        harn.client.disconnect();
+
+        const newState = harn.getClientState();
+
+        cb(err);
+
+        expect(harn.client).toHaveState(newState);
+      });
+
+      // Function calls
+
+      it("should call clearInterval and clearTimeout", () => {
+        const harn = harness("ws://localhost");
+        harn.makeWsConnected();
+        harn.client.send("msg");
+        const cb = harn.getWs().send.mock.calls[0][1];
+        const err = new Error("SOME_ERROR");
+
+        harn.client.disconnect();
+
+        clearInterval.mockClear();
+        clearTimeout.mockClear();
+        cb(err);
+        expect(clearInterval.mock.calls.length).toBe(1);
+        expect(clearInterval.mock.calls[0].length).toBe(1);
+        expect(clearTimeout.mock.calls.length).toBe(1);
+        expect(clearTimeout.mock.calls[0].length).toBe(1);
+      });
+
+      // Calls on ws
+
+      it("should call nothing on ws", () => {
+        const harn = harness("ws://localhost");
+        harn.makeWsConnected();
+        const wsClient = harn.getWs();
+        harn.client.send("msg");
+        const cb = wsClient.send.mock.calls[0][1];
+        const err = new Error("SOME_ERROR");
+
+        harn.client.disconnect();
+
+        wsClient.mockClear();
+
+        cb(err);
+
+        expect(wsClient.ping.mock.calls.length).toBe(0);
+        expect(wsClient.send.mock.calls.length).toBe(0);
+        expect(wsClient.close.mock.calls.length).toBe(0);
+        expect(wsClient.terminate.mock.calls.length).toBe(0);
       });
 
       // Outbound callbacks - N/A
@@ -1157,7 +1149,6 @@ describe("The client.send() function", () => {
       it("should not change the state", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
-        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs); // Create heartbeat timeout
         harn.client.send("msg");
         const cb = harn.getWs().send.mock.calls[0][1];
 
@@ -1171,7 +1162,6 @@ describe("The client.send() function", () => {
       it("should not call clearInterval and clearTimeout", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
-        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs); // Create heartbeat timeout
         harn.client.send("msg");
         const cb = harn.getWs().send.mock.calls[0][1];
 
@@ -1187,7 +1177,6 @@ describe("The client.send() function", () => {
       it("should call nothing on ws", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
-        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs); // Create heartbeat timeout
         harn.client.send("msg");
         const cb = harn.getWs().send.mock.calls[0][1];
 
@@ -1219,7 +1208,7 @@ describe("The client.send() function", () => {
 describe("The client._processWsOpen() function", () => {
   // Events
 
-  it("should emit connect next tick if transport is connecting", async () => {
+  it("should emit connect next tick", async () => {
     const harn = harness("ws://localhost");
     await harn.makeWsConnecting();
 
@@ -1241,45 +1230,12 @@ describe("The client._processWsOpen() function", () => {
     expect(listener.message.mock.calls.length).toBe(0);
   });
 
-  it("should not emit connect next tick if transport is disconnected", async () => {
-    const harn = harness("ws://localhost");
-    await harn.makeWsConnecting();
-    harn.client.disconnect();
-
-    await asyncUtil.nextTick(); // Move past queued events
-
-    const listener = harn.createClientListener();
-    harn.getWs().readyState = harn.getWs().OPEN;
-    harn.getWs().emit("open");
-
-    await asyncUtil.nextTick();
-
-    expect(listener.connecting.mock.calls.length).toBe(0);
-    expect(listener.connect.mock.calls.length).toBe(0);
-    expect(listener.disconnect.mock.calls.length).toBe(0);
-    expect(listener.message.mock.calls.length).toBe(0);
-  });
-
   // State
 
-  it("if deciding to close the ws connection, should update state appropriately", () => {
-    const harn = harness("ws://localhost");
-    harn.makeWsConnecting();
-    harn.client.disconnect();
-
-    const newState = harn.getClientState();
-    newState._wsPreviousState = "disconnecting";
-
-    harn.getWs().readyState = harn.getWs().OPEN;
-    harn.getWs().emit("open");
-    expect(harn.client).toHaveState(newState);
-  });
-
-  it("if not closing the ws connection and heartbeat is enabled, should update state appropriately", () => {
+  it("if heartbeat is enabled, should update state appropriately", () => {
     const harn = harness("ws://localhost");
     harn.makeWsConnecting();
     const newState = harn.getClientState();
-    newState._wsPreviousState = "connected";
     newState._state = "connected";
     newState._heartbeatInterval = 123;
 
@@ -1288,11 +1244,10 @@ describe("The client._processWsOpen() function", () => {
     expect(harn.client).toHaveState(newState);
   });
 
-  it("if not closing the ws connection and heartbeat is not enabled, should update state appropriately", () => {
+  it("if heartbeat is not enabled, should update state appropriately", () => {
     const harn = harness("ws://localhost", { heartbeatIntervalMs: 0 });
     harn.makeWsConnecting();
     const newState = harn.getClientState();
-    newState._wsPreviousState = "connected";
     newState._state = "connected";
 
     harn.getWs().readyState = harn.getWs().OPEN;
@@ -1304,27 +1259,7 @@ describe("The client._processWsOpen() function", () => {
 
   // Calls on ws
 
-  it("if deciding to close the connection, should call ws.close()", () => {
-    const harn = harness("ws://localhost");
-    harn.makeWsConnecting();
-    harn.client.disconnect();
-    harn.getWs().mockClear();
-
-    harn.getWs().readyState = harn.getWs().OPEN;
-    harn.getWs().emit("open");
-
-    expect(harn.getWs().ping.mock.calls.length).toBe(0);
-    expect(harn.getWs().send.mock.calls.length).toBe(0);
-    expect(harn.getWs().close.mock.calls.length).toBe(1);
-    expect(harn.getWs().close.mock.calls[0].length).toBe(2);
-    expect(harn.getWs().close.mock.calls[0][0]).toBe(1000);
-    expect(harn.getWs().close.mock.calls[0][1]).toBe(
-      "Connection closed by the client."
-    );
-    expect(harn.getWs().terminate.mock.calls.length).toBe(0);
-  });
-
-  it("if not closing the ws connection, it should do nothing on ws", () => {
+  it("it should do nothing on ws", () => {
     const harn = harness("ws://localhost");
     harn.makeWsConnecting();
     harn.getWs().mockClear();
@@ -1458,7 +1393,7 @@ describe("The client._processWsOpen() function", () => {
       // Inbound callbacks - N/A
     });
 
-    describe("when the ping callback fires with error - ws client still open", () => {
+    describe("when the ping callback fires with error - still connected", () => {
       // Events
 
       it("should emit disconnect next tick", async () => {
@@ -1503,7 +1438,7 @@ describe("The client._processWsOpen() function", () => {
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         const newState = harn.getClientState();
-        newState._wsPreviousState = "disconnecting";
+        newState._wsClient = null;
         newState._state = "disconnected";
         newState._heartbeatInterval = null;
         newState._heartbeatTimeout = null;
@@ -1537,19 +1472,20 @@ describe("The client._processWsOpen() function", () => {
       it("should call ws.terminate()", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
+        const wsClient = harn.getWs();
 
-        harn.getWs().mockClear();
+        wsClient.mockClear();
         jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
-        const cb = harn.getWs().ping.mock.calls[0][0];
+        const cb = wsClient.ping.mock.calls[0][0];
 
-        harn.getWs().mockClear();
+        wsClient.mockClear();
         cb(new Error("SOME_ERROR"));
 
-        expect(harn.getWs().ping.mock.calls.length).toBe(0);
-        expect(harn.getWs().send.mock.calls.length).toBe(0);
-        expect(harn.getWs().close.mock.calls.length).toBe(0);
-        expect(harn.getWs().terminate.mock.calls.length).toBe(1);
-        expect(harn.getWs().terminate.mock.calls[0].length).toBe(0);
+        expect(wsClient.ping.mock.calls.length).toBe(0);
+        expect(wsClient.send.mock.calls.length).toBe(0);
+        expect(wsClient.close.mock.calls.length).toBe(0);
+        expect(wsClient.terminate.mock.calls.length).toBe(1);
+        expect(wsClient.terminate.mock.calls[0].length).toBe(0);
       });
 
       // Outbound callbacks- N/A
@@ -1557,7 +1493,7 @@ describe("The client._processWsOpen() function", () => {
       // Inbound callbacks - N/A
     });
 
-    describe("when the ping callback fires with error - ws client closing", () => {
+    describe("when the ping callback fires with error - disconnected", () => {
       // Events
 
       it("should emit nothing next tick", async () => {
@@ -1569,7 +1505,6 @@ describe("The client._processWsOpen() function", () => {
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         harn.client.disconnect();
-        harn.getWs().readyState = harn.getWs().readyState.CLOSING;
 
         await asyncUtil.nextTick(); // Move past queued events
 
@@ -1586,7 +1521,7 @@ describe("The client._processWsOpen() function", () => {
 
       // State
 
-      it("should update the state appropriately", () => {
+      it("should not change the state", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
 
@@ -1595,7 +1530,6 @@ describe("The client._processWsOpen() function", () => {
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         harn.client.disconnect();
-        harn.getWs().readyState = harn.getWs().readyState.CLOSING;
 
         const newState = harn.getClientState();
         cb(new Error("SOME_ERROR"));
@@ -1604,7 +1538,7 @@ describe("The client._processWsOpen() function", () => {
 
       // Function calls
 
-      it("should not call clearInterval and clearTimeout", () => {
+      it("should call clearInterval and clearTimeout", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
 
@@ -1613,13 +1547,14 @@ describe("The client._processWsOpen() function", () => {
         const cb = harn.getWs().ping.mock.calls[0][0];
 
         harn.client.disconnect();
-        harn.getWs().readyState = harn.getWs().readyState.CLOSING;
 
         clearInterval.mockClear();
         clearTimeout.mockClear();
         cb(new Error("SOME_ERROR"));
-        expect(clearInterval.mock.calls.length).toBe(0);
-        expect(clearTimeout.mock.calls.length).toBe(0);
+        expect(clearInterval.mock.calls.length).toBe(1);
+        expect(clearInterval.mock.calls[0].length).toBe(1);
+        expect(clearTimeout.mock.calls.length).toBe(1);
+        expect(clearTimeout.mock.calls[0].length).toBe(1);
       });
 
       // Calls on ws
@@ -1627,90 +1562,21 @@ describe("The client._processWsOpen() function", () => {
       it("should do nothing on ws", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
+        const wsClient = harn.getWs();
 
-        harn.getWs().mockClear();
+        wsClient.mockClear();
         jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
-        const cb = harn.getWs().ping.mock.calls[0][0];
+        const cb = wsClient.ping.mock.calls[0][0];
 
         harn.client.disconnect();
-        harn.getWs().readyState = harn.getWs().readyState.CLOSING;
 
-        harn.getWs().mockClear();
+        wsClient.mockClear();
         cb(new Error("SOME_ERROR"));
-        expect(harn.getWs().ping.mock.calls.length).toBe(0);
-        expect(harn.getWs().send.mock.calls.length).toBe(0);
-        expect(harn.getWs().close.mock.calls.length).toBe(0);
-        expect(harn.getWs().terminate.mock.calls.length).toBe(0);
+        expect(wsClient.ping.mock.calls.length).toBe(0);
+        expect(wsClient.send.mock.calls.length).toBe(0);
+        expect(wsClient.close.mock.calls.length).toBe(0);
+        expect(wsClient.terminate.mock.calls.length).toBe(0);
       });
-
-      // Outbound callbacks- N/A
-
-      // Inbound callbacks - N/A
-    });
-
-    describe("when the ping callback fires with error - ws client closed", () => {
-      // Events
-
-      it("should emit nothing next tick", async () => {
-        const harn = harness("ws://localhost");
-        await harn.makeWsConnected();
-
-        harn.getWs().mockClear();
-        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
-        const cb = harn.getWs().ping.mock.calls[0][0];
-
-        harn.getWs().emit("close", 1000, "Close reason.");
-
-        await asyncUtil.nextTick(); // Move past queued events
-
-        const listener = harn.createClientListener();
-        cb(new Error("SOME_ERROR"));
-
-        await asyncUtil.nextTick();
-
-        expect(listener.connecting.mock.calls.length).toBe(0);
-        expect(listener.connect.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(0);
-        expect(listener.message.mock.calls.length).toBe(0);
-      });
-
-      // State
-
-      it("should update the state appropriately", () => {
-        const harn = harness("ws://localhost");
-        harn.makeWsConnected();
-
-        harn.getWs().mockClear();
-        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
-        const cb = harn.getWs().ping.mock.calls[0][0];
-
-        harn.getWs().emit("close", 1000, "Close reason.");
-
-        const newState = harn.getClientState();
-        cb(new Error("SOME_ERROR"));
-        expect(harn.client).toHaveState(newState);
-      });
-
-      // Function calls
-
-      it("should not call clearInterval and clearTimeout", () => {
-        const harn = harness("ws://localhost");
-        harn.makeWsConnected();
-
-        harn.getWs().mockClear();
-        jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
-        const cb = harn.getWs().ping.mock.calls[0][0];
-
-        harn.getWs().emit("close", 1000, "Close reason.");
-
-        clearInterval.mockClear();
-        clearTimeout.mockClear();
-        cb(new Error("SOME_ERROR"));
-        expect(clearInterval.mock.calls.length).toBe(0);
-        expect(clearTimeout.mock.calls.length).toBe(0);
-      });
-
-      // Calls on ws - N/A (no ws to check)
 
       // Outbound callbacks- N/A
 
@@ -1750,7 +1616,7 @@ describe("The client._processWsOpen() function", () => {
         jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
 
         const newState = harn.getClientState();
-        newState._wsPreviousState = "disconnecting";
+        newState._wsClient = null;
         newState._state = "disconnected";
         newState._heartbeatInterval = null;
         newState._heartbeatTimeout = null;
@@ -1765,14 +1631,15 @@ describe("The client._processWsOpen() function", () => {
       it("should call ws.terminate()", () => {
         const harn = harness("ws://localhost");
         harn.makeWsConnected();
+        const wsClient = harn.getWs();
         jest.advanceTimersByTime(clientConfig.defaults.heartbeatIntervalMs);
-        harn.getWs().mockClear();
+        wsClient.mockClear();
         jest.advanceTimersByTime(clientConfig.defaults.heartbeatTimeoutMs);
-        expect(harn.getWs().ping.mock.calls.length).toBe(0);
-        expect(harn.getWs().send.mock.calls.length).toBe(0);
-        expect(harn.getWs().close.mock.calls.length).toBe(0);
-        expect(harn.getWs().terminate.mock.calls.length).toBe(1);
-        expect(harn.getWs().terminate.mock.calls[0].length).toBe(0);
+        expect(wsClient.ping.mock.calls.length).toBe(0);
+        expect(wsClient.send.mock.calls.length).toBe(0);
+        expect(wsClient.close.mock.calls.length).toBe(0);
+        expect(wsClient.terminate.mock.calls.length).toBe(1);
+        expect(wsClient.terminate.mock.calls[0].length).toBe(0);
       });
 
       // Outbound callbacks - N/A
@@ -1848,8 +1715,8 @@ describe("The client._processWsMessage() function", () => {
     harn.makeWsConnected();
 
     const newState = harn.getClientState();
+    newState._wsClient = null;
     newState._state = "disconnected";
-    newState._wsPreviousState = "disconnecting";
     newState._heartbeatInterval = null;
     harn.getWs().emit("message", 123);
     expect(harn.client).toHaveState(newState);
@@ -1874,14 +1741,15 @@ describe("The client._processWsMessage() function", () => {
   it("should call ws.close() if invalid data type", () => {
     const harn = harness("ws://localhost");
     harn.makeWsConnected();
+    const wsClient = harn.getWs();
 
-    harn.getWs().mockClear();
-    harn.getWs().emit("message", 123);
-    expect(harn.getWs().ping.mock.calls.length).toBe(0);
-    expect(harn.getWs().send.mock.calls.length).toBe(0);
-    expect(harn.getWs().close.mock.calls.length).toBe(0);
-    expect(harn.getWs().terminate.mock.calls.length).toBe(1);
-    expect(harn.getWs().terminate.mock.calls[0].length).toBe(0);
+    wsClient.mockClear();
+    wsClient.emit("message", 123);
+    expect(wsClient.ping.mock.calls.length).toBe(0);
+    expect(wsClient.send.mock.calls.length).toBe(0);
+    expect(wsClient.close.mock.calls.length).toBe(0);
+    expect(wsClient.terminate.mock.calls.length).toBe(1);
+    expect(wsClient.terminate.mock.calls[0].length).toBe(0);
   });
 
   // Outbound callbacks - N/A
@@ -1954,426 +1822,7 @@ describe("The client._processWsPong() function", () => {
 });
 
 describe("The client._processWsClose() function", () => {
-  describe("if outward-facing transport state is disconnected - call to disconnect()", () => {
-    // Events
-
-    it("should emit nothing next tick", async () => {
-      const harn = harness("ws://localhost");
-      await harn.makeWsConnected();
-      harn.client.disconnect();
-
-      await asyncUtil.nextTick(); // Move past queued events
-
-      const listener = harn.createClientListener();
-      harn.getWs().readyState = harn.getWs().OPENING;
-      harn.getWs().emit("close");
-
-      await asyncUtil.nextTick();
-
-      expect(listener.connecting.mock.calls.length).toBe(0);
-      expect(listener.connect.mock.calls.length).toBe(0);
-      expect(listener.disconnect.mock.calls.length).toBe(0);
-      expect(listener.message.mock.calls.length).toBe(0);
-    });
-
-    // State
-
-    it("should update state appropriately", () => {
-      const harn = harness("ws://localhost");
-      harn.makeWsConnected();
-      harn.client.disconnect();
-
-      const newState = harn.getClientState();
-      newState._wsClient = null;
-      newState._wsPreviousState = null;
-      harn.getWs().readyState = harn.getWs().OPENING;
-      harn.getWs().emit("close");
-      expect(harn.client).toHaveState(newState);
-    });
-
-    // Function calls - N/A
-
-    // Calls on ws
-
-    it("should do nothing on ws", () => {
-      const harn = harness("ws://localhost");
-      harn.makeWsConnected();
-      harn.client.disconnect();
-
-      const prevWs = harn.getWs();
-      prevWs.mockClear();
-      prevWs.readyState = prevWs.OPENING;
-      prevWs.emit("close");
-      expect(prevWs.ping.mock.calls.length).toBe(0);
-      expect(prevWs.send.mock.calls.length).toBe(0);
-      expect(prevWs.close.mock.calls.length).toBe(0);
-      expect(prevWs.terminate.mock.calls.length).toBe(0);
-    });
-
-    // Outbound callbacks - N/A
-
-    // Inbound callbacks - N/A
-  });
-
-  describe("if outward-facing transport state is disconnected - heartbeat failure", () => {
-    // Events
-
-    it("should emit nothing next tick", async () => {
-      const harn = harness("ws://localhost");
-      await harn.makeWsConnected();
-
-      jest.advanceTimersByTime(
-        clientConfig.defaults.heartbeatIntervalMs +
-          clientConfig.defaults.heartbeatTimeoutMs
-      );
-
-      await asyncUtil.nextTick(); // Move past queued events
-
-      const listener = harn.createClientListener();
-      harn.getWs().readyState = harn.getWs().OPENING;
-      harn.getWs().emit("close");
-
-      await asyncUtil.nextTick();
-
-      expect(listener.connecting.mock.calls.length).toBe(0);
-      expect(listener.connect.mock.calls.length).toBe(0);
-      expect(listener.disconnect.mock.calls.length).toBe(0);
-      expect(listener.message.mock.calls.length).toBe(0);
-    });
-
-    // State
-
-    it("should update state appropriately", () => {
-      const harn = harness("ws://localhost");
-      harn.makeWsConnected();
-      jest.advanceTimersByTime(
-        clientConfig.defaults.heartbeatIntervalMs +
-          clientConfig.defaults.heartbeatTimeoutMs
-      );
-
-      const newState = harn.getClientState();
-      newState._wsClient = null;
-      newState._wsPreviousState = null;
-      harn.getWs().readyState = harn.getWs().OPENING;
-      harn.getWs().emit("close");
-      expect(harn.client).toHaveState(newState);
-    });
-
-    // Function calls - N/A
-
-    // Calls on ws
-
-    it("should do nothing on ws", () => {
-      const harn = harness("ws://localhost");
-      harn.makeWsConnected();
-      jest.advanceTimersByTime(
-        clientConfig.defaults.heartbeatIntervalMs +
-          clientConfig.defaults.heartbeatTimeoutMs
-      );
-
-      const prevWs = harn.getWs();
-      prevWs.mockClear();
-      prevWs.readyState = prevWs.OPENING;
-      prevWs.emit("close");
-      expect(prevWs.ping.mock.calls.length).toBe(0);
-      expect(prevWs.send.mock.calls.length).toBe(0);
-      expect(prevWs.close.mock.calls.length).toBe(0);
-      expect(prevWs.terminate.mock.calls.length).toBe(0);
-    });
-
-    // Outbound callbacks - N/A
-
-    // Inbound callbacks - N/A
-  });
-
-  describe("if outward-facing transport state is connecting and ws had been disconnecting and ws constructor throws", () => {
-    // Events
-
-    it("should emit disconnect next tick", async () => {
-      // Constructor needs to succeed the first time and throw the second time
-      const err = new Error("SOME_ERROR");
-      let constructorArgs;
-      const constructor = function constructor(...args) {
-        if (constructorArgs) {
-          throw err;
-        } else {
-          constructorArgs = args;
-          emitter(this);
-          this.ping = jest.fn();
-          this.send = jest.fn();
-          this.close = jest.fn();
-          this.terminate = jest.fn();
-          this.mockClear = () => {
-            this.ping.mockClear();
-            this.send.mockClear();
-            this.close.mockClear();
-            this.terminate.mockClear();
-          };
-          this.CONNECTING = 0;
-          this.OPEN = 1;
-          this.CLOSING = 2;
-          this.CLOSED = 3;
-          this.readyState = this.CONNECTING;
-        }
-      };
-      const harn = harness(
-        "ws://localhost",
-        {
-          heartbeatIntervalMs: 123,
-          heartbeatTimeoutMs: 12,
-          otherOption: "value"
-        },
-        constructor
-      );
-      await harn.makeWsConnected();
-      harn.client.disconnect();
-      harn.client.connect();
-
-      await asyncUtil.nextTick(); // Move past queued events
-
-      const listener = harn.createClientListener();
-      harn.getWs().readyState = harn.getWs().CLOSING;
-      harn.getWs().emit("close");
-
-      expect(listener.connecting.mock.calls.length).toBe(0);
-      expect(listener.connect.mock.calls.length).toBe(0);
-      expect(listener.disconnect.mock.calls.length).toBe(0);
-      expect(listener.message.mock.calls.length).toBe(0);
-
-      await asyncUtil.nextTick();
-
-      expect(listener.connecting.mock.calls.length).toBe(0);
-      expect(listener.connect.mock.calls.length).toBe(0);
-      expect(listener.disconnect.mock.calls.length).toBe(1);
-      expect(listener.disconnect.mock.calls[0].length).toBe(1);
-      expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
-      expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: Could not initialize the WebSocket client."
-      );
-      expect(listener.disconnect.mock.calls[0][0].wsError).toBe(err);
-      expect(listener.message.mock.calls.length).toBe(0);
-    });
-
-    // State
-
-    it("should update the state appropriately", () => {
-      // Constructor needs to succeed the first time and throw the second time
-      let constructorArgs;
-      const constructor = function constructor(...args) {
-        if (constructorArgs) {
-          throw new Error("SOME_ERROR");
-        } else {
-          constructorArgs = args;
-          emitter(this);
-          this.ping = jest.fn();
-          this.send = jest.fn();
-          this.close = jest.fn();
-          this.terminate = jest.fn();
-          this.mockClear = () => {
-            this.ping.mockClear();
-            this.send.mockClear();
-            this.close.mockClear();
-            this.terminate.mockClear();
-          };
-          this.CONNECTING = 0;
-          this.OPEN = 1;
-          this.CLOSING = 2;
-          this.CLOSED = 3;
-          this.readyState = this.CONNECTING;
-        }
-      };
-      const harn = harness(
-        "ws://localhost",
-        {
-          heartbeatIntervalMs: 123,
-          heartbeatTimeoutMs: 12,
-          otherOption: "value"
-        },
-        constructor
-      );
-      harn.makeWsConnected();
-      harn.client.disconnect();
-      harn.client.connect();
-
-      const newState = harn.getClientState();
-      newState._state = "disconnected";
-      newState._wsClient = null;
-      newState._wsPreviousState = null;
-      harn.getWs().readyState = harn.getWs().CLOSING;
-      harn.getWs().emit("close");
-      expect(harn.client).toHaveState(newState);
-    });
-
-    // Function calls - N/A
-
-    // Calls on ws
-
-    it("should do nothing on the previous ws", () => {
-      // Constructor needs to succeed the first time and throw the second time
-      let constructorArgs;
-      const constructor = function constructor(...args) {
-        if (constructorArgs) {
-          throw new Error("SOME_ERROR");
-        } else {
-          constructorArgs = args;
-          emitter(this);
-          this.ping = jest.fn();
-          this.send = jest.fn();
-          this.close = jest.fn();
-          this.terminate = jest.fn();
-          this.mockClear = () => {
-            this.ping.mockClear();
-            this.send.mockClear();
-            this.close.mockClear();
-            this.terminate.mockClear();
-          };
-          this.CONNECTING = 0;
-          this.OPEN = 1;
-          this.CLOSING = 2;
-          this.CLOSED = 3;
-          this.readyState = this.CONNECTING;
-        }
-      };
-      const harn = harness(
-        "ws://localhost",
-        {
-          heartbeatIntervalMs: 123,
-          heartbeatTimeoutMs: 12,
-          otherOption: "value"
-        },
-        constructor
-      );
-      harn.makeWsConnected();
-      harn.client.disconnect();
-      harn.client.connect();
-
-      const prevWs = harn.getWs();
-      prevWs.mockClear();
-      harn.getWs().readyState = harn.getWs().CLOSING;
-      harn.getWs().emit("close");
-      expect(prevWs.ping.mock.calls.length).toBe(0);
-      expect(prevWs.send.mock.calls.length).toBe(0);
-      expect(prevWs.close.mock.calls.length).toBe(0);
-      expect(prevWs.terminate.mock.calls.length).toBe(0);
-    });
-
-    // Outbound callbacks - N/A
-
-    // Inbound callbacks - N/A
-  });
-
-  describe("if outward-facing transport state is connecting and ws had been disconnecting and ws constructor succeeds", () => {
-    // Events
-
-    it("should emit nothing next tick", async () => {
-      const harn = harness("ws://localhost");
-      await harn.makeWsConnected();
-      harn.client.disconnect();
-      harn.client.connect();
-
-      await asyncUtil.nextTick(); // Move past queued events
-
-      const listener = harn.createClientListener();
-      harn.getWs().readyState = harn.getWs().CLOSING;
-      harn.getWs().emit("close");
-
-      await asyncUtil.nextTick();
-
-      expect(listener.connecting.mock.calls.length).toBe(0);
-      expect(listener.connect.mock.calls.length).toBe(0);
-      expect(listener.disconnect.mock.calls.length).toBe(0);
-      expect(listener.message.mock.calls.length).toBe(0);
-    });
-
-    // State
-
-    it("should update the state appropriately", () => {
-      const harn = harness("ws://localhost");
-      harn.makeWsConnected();
-      harn.client.disconnect();
-      harn.client.connect();
-
-      const newState = harn.getClientState();
-      newState._wsPreviousState = "connecting";
-      harn.getWs().readyState = harn.getWs().CLOSING;
-      harn.getWs().emit("close");
-      expect(harn.client).toHaveState(newState);
-    });
-
-    // Function calls
-
-    it("should call the ws constructor", () => {
-      let constructorArgs;
-      const constructor = function constructor(...args) {
-        constructorArgs = args;
-        emitter(this);
-        this.ping = jest.fn();
-        this.send = jest.fn();
-        this.close = jest.fn();
-        this.terminate = jest.fn();
-        this.mockClear = () => {
-          this.ping.mockClear();
-          this.send.mockClear();
-          this.close.mockClear();
-          this.terminate.mockClear();
-        };
-        this.CONNECTING = 0;
-        this.OPEN = 1;
-        this.CLOSING = 2;
-        this.CLOSED = 3;
-        this.readyState = this.CONNECTING;
-      };
-      const harn = harness(
-        "ws://localhost",
-        {
-          heartbeatIntervalMs: 123,
-          heartbeatTimeoutMs: 12,
-          otherOption: "value"
-        },
-        constructor
-      );
-      harn.makeWsConnected();
-      harn.client.disconnect();
-      harn.client.connect();
-
-      harn.getWs().readyState = harn.getWs().CLOSING;
-      harn.getWs().emit("close");
-
-      expect(check.array(constructorArgs)).toBe(true);
-      expect(constructorArgs.length).toBe(3);
-      expect(constructorArgs[0]).toBe("ws://localhost");
-      expect(constructorArgs[1]).toBe(config.wsSubprotocol);
-      expect(constructorArgs[2]).toEqual({
-        heartbeatIntervalMs: 123,
-        heartbeatTimeoutMs: 12,
-        otherOption: "value"
-      });
-    });
-
-    // Calls on ws
-
-    it("should do nothing on the previous ws", () => {
-      const harn = harness("ws://localhost");
-      harn.makeWsConnected();
-      harn.client.disconnect();
-      harn.client.connect();
-
-      const prevWs = harn.getWs();
-      prevWs.mockClear();
-      prevWs.readyState = harn.getWs().CLOSING;
-      prevWs.emit("close");
-      expect(prevWs.ping.mock.calls.length).toBe(0);
-      expect(prevWs.send.mock.calls.length).toBe(0);
-      expect(prevWs.close.mock.calls.length).toBe(0);
-      expect(prevWs.terminate.mock.calls.length).toBe(0);
-    });
-
-    // Outbound callbacks - N/A
-
-    // Inbound callbacks - N/A
-  });
-
-  describe("if outward-facing transport state is connecting and ws had been connecting", () => {
+  describe("if transport state is connecting", () => {
     // Events
 
     it("should emit disconnect next tick", async () => {
@@ -2417,7 +1866,6 @@ describe("The client._processWsClose() function", () => {
       const newState = harn.getClientState();
       newState._state = "disconnected";
       newState._wsClient = null;
-      newState._wsPreviousState = null;
       harn.getWs().readyState = harn.getWs().CLOSED;
       harn.getWs().emit("close", "close_code", "close_reason");
       expect(harn.client).toHaveState(newState);
@@ -2446,7 +1894,7 @@ describe("The client._processWsClose() function", () => {
     // Inbound callbacks - N/A
   });
 
-  describe("if outward-facing transport state is connected", () => {
+  describe("if  transport state is connected", () => {
     // Events
 
     it("should emit disconnect next tick", async () => {
@@ -2491,7 +1939,6 @@ describe("The client._processWsClose() function", () => {
       const newState = harn.getClientState();
       newState._state = "disconnected";
       newState._wsClient = null;
-      newState._wsPreviousState = null;
       newState._heartbeatInterval = null;
       newState._heartbeatTimeout = null;
       harn.getWs().readyState = harn.getWs().CLOSED;

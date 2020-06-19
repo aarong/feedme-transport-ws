@@ -3,11 +3,11 @@ import check from "check-types";
 import debug from "debug";
 import config from "./config";
 
-const dbg = debug("feedme-transport-ws:browser");
+const dbg = debug("feedme-transport-ws:client");
 
 /**
  * Browser client transport object.
- * @typedef {Object} Browser
+ * @typedef {Object} Client
  * @extends emitter
  */
 
@@ -17,19 +17,23 @@ emitter(proto);
 /**
  * Browser client factory function.
  *
+ * The WebSocket constructor is injected to facilitate testing.
+ *
  * WebSocket client objects cannot reconnect once disconnected, so a new
  * one is created for each connection attempt.
  *
- * WebSocket clients have a closing state and Feedme transports do not, so
- * the former is subsumed into the transport connecting state if there is a
- * quick sequence of calls to transport.disconnect() and transport.connect().
+ * WebSocket clients have a closing state and Feedme transports do not.
+ * The transport discards closing WebSockets on calls to disconnect() and
+ * then creates a new one if there is a quick call to connect(). This does
+ * not result in a conflict as clients can have multiple connections on the
+ * same port.
  * @param {Function} wsConstructor WebSocket client constructor
- * @param {string} address Endpoint address for WebSocket
+ * @param {string} address Endpoint address
  * @throws {Error} "INVALID_ARGUMENT: ..."
- * @returns {Browser}
+ * @returns {Client}
  */
-export default function browserFactory(...args) {
-  dbg("Initializing Browser object");
+export default function clientFactory(...args) {
+  dbg("Initializing Client object");
 
   // Check wsConstructor
   if (!check.function(args[0])) {
@@ -43,13 +47,11 @@ export default function browserFactory(...args) {
   }
   const address = args[1];
 
-  // Check address format (don't wait until ws initialization to fail)
+  // Check address format (don't wait for WebSocket initialization to fail)
   try {
     new URL(address); // eslint-disable-line no-new
   } catch (e) {
-    const err = new Error("INVALID_ARGUMENT: Invalid address argument.");
-    err.urlError = e;
-    throw err;
+    throw new Error("INVALID_ARGUMENT: Invalid address argument.");
   }
 
   // Success
@@ -66,34 +68,15 @@ export default function browserFactory(...args) {
   browser._wsConstructor = wsConstructor;
 
   /**
-   * WebSocket client instance.
+   * WebSocket client instance. Null if transport is disconnected.
    *
-   * If the previous ws connection finished closing, or there never was one, then
-   * this is null. Otherwise, this is the ws instance.
-   *
-   * If a ws client exists then all event handlers are attached.
+   * If a WebSocket client exists then all event handlers are attached.
    * @memberof Browser
    * @instance
    * @private
    * @type {?Object}
    */
   browser._wsClient = null;
-
-  /**
-   * The previous WebSocket client state. Null if there is no ws client, otherwise
-   * "connecting", "connected", or "disconnecting".
-   *
-   * Needed because when there is a ws close event, you need to know whether it
-   * was because (1) a previous call to ws.close() completed successfully, in
-   * which case if the transport state is connecting you will attempt to
-   * reconnect, or (2) an attempt to initiate a connection failed , in which case
-   * if the transport state is connecting you will emit disconnect.
-   * @memberof Browser
-   * @instance
-   * @private
-   * @type {?string}
-   */
-  browser._wsPreviousState = null;
 
   /**
    * The outward-facing transport state. One of "disconnected", "connecting",
@@ -106,7 +89,7 @@ export default function browserFactory(...args) {
   browser._state = "disconnected";
 
   /**
-   * Endpoint address passed to ws.
+   * Endpoint address passed to WebSocket.
    * @memberof Browser
    * @instance
    * @private
@@ -142,7 +125,7 @@ export default function browserFactory(...args) {
  * @event disconnect
  * @memberof Browser
  * @instance
- * @param {?Error} err "FAILURE: ..." if not due to call to browser.disconnect()
+ * @param {?Error} err "FAILURE: ..." if not due to call to client.disconnect()
  */
 
 // Public API
@@ -161,7 +144,6 @@ proto.state = function state() {
 
 /**
  * The library wants the transport to connect.
- * The WebSocket client state could be anything except connected.
  * @memberof Browser
  * @instance
  * @throws {Error} "INVALID_STATE: ..."
@@ -179,15 +161,35 @@ proto.connect = function connect() {
   this._state = "connecting";
   this._emitAsync("connecting");
 
-  // If the ws client is disconnected then start connecting, otherwise wait for ws event
-  if (!this._wsClient) {
-    this._connect();
+  // Try to create the WebSocket client
+  try {
+    this._wsClient = new this._wsConstructor(
+      this._address,
+      config.wsSubprotocol
+    );
+  } catch (e) {
+    dbg("Failed to initialize WebSocket client");
+
+    // Update state and emit disconnect asynchronously
+    this._state = "disconnected";
+    const err = new Error(
+      "FAILURE: Could not initialize the WebSocket client."
+    );
+    err.wsError = e;
+    this._emitAsync("disconnect", err);
+    return; // Stop
   }
+
+  // Listen for events
+  this._wsClient.onopen = this._processWsOpen.bind(this);
+  this._wsClient.onmessage = this._processWsMessage.bind(this);
+  this._wsClient.onclose = this._processWsClose.bind(this);
+  this._wsClient.onerror = this._processWsError.bind(this);
 };
 
 /**
- * The library wants the transport to disconnect.
- * The ws client state could be anything except disconnected.
+ * The library wants the transport to disconnect. The transport could be
+ * connecting or connected.
  * @memberof Browser
  * @instance
  * @param {?Error} err
@@ -254,36 +256,22 @@ proto.send = function send(msg) {
 // WebSocket event handlers
 
 /**
- * Processes a ws open event.
- * The outward-facing transport state could be disconnected or connecting.
+ * Processes a WebSocket open event.
  * @memberof Browser
  * @instance
  * @private
  * @returns {void}
  */
 proto._processWsOpen = function _processWsOpen() {
-  dbg("Observed ws open event");
+  dbg("Observed WebSocket open event");
 
-  if (this._state === "disconnected") {
-    // The transport is disconnected - there was a call to connect() and
-    // then disconnect() or some sequence of that pair
-    dbg("Transport was disconnected");
-
-    this._wsPreviousState = "disconnecting";
-    this._wsClient.close(1000, "Connection closed by the client.");
-  } else {
-    // The transport is connecting - standard case
-    dbg("Transport was connecting");
-
-    // Update state and emit
-    this._wsPreviousState = "connected";
-    this._state = "connected";
-    this._emitAsync("connect");
-  }
+  // Update state and emit
+  this._state = "connected";
+  this._emitAsync("connect");
 };
 
 /**
- * Processes a ws message event.
+ * Processes a WebSocket message event.
  * @memberof Browser
  * @instance
  * @private
@@ -291,13 +279,13 @@ proto._processWsOpen = function _processWsOpen() {
  * @returns {void}
  */
 proto._processWsMessage = function _processWsMessage(evt) {
-  dbg("Observed ws message event");
+  dbg("Observed WebSocket message event");
 
   // Check data type - could be String, Buffer, ArrayBuffer, Buffer[]
   if (!check.string(evt.data)) {
     dbg("Unexpected WebSocket message type");
     dbg(evt.data);
-    this.disconnect(
+    this._disconnect(
       new Error("FAILURE: Received non-string message on WebSocket connection.")
     );
     return; // Stop
@@ -307,13 +295,10 @@ proto._processWsMessage = function _processWsMessage(evt) {
 };
 
 /**
- * Processes a ws close event.
+ * Processes a WebSocket close event.
  *
- * The WebSocket client will emit a close event if
- *
- *  - The initial connection could not be established
- *  - An open connection is closed normally
- *  - An open connection fails due to an error.
+ * All WebSocket listeners are removed by _disconnect(), so this function is only
+ * called if there is an unexpected connection closure.
  * @memberof Browser
  * @instance
  * @private
@@ -322,58 +307,22 @@ proto._processWsMessage = function _processWsMessage(evt) {
  * @returns {void}
  */
 proto._processWsClose = function _processWsClose(code, reason) {
-  dbg("Observed ws close event");
+  dbg("Observed WebSocket close event");
 
-  // Remove all ws listeners
-  this._wsClient.onopen = null;
-  this._wsClient.onmessage = null;
-  this._wsClient.onclose = null;
-  this._wsClient.onerror = null;
-
-  if (this._state === "disconnected") {
-    // There was a call to transport.disconnect() or the heartbeat failed or
-    // a call to ws.send() threw an exception.
-    // The disconnect event has already been emitted and the heartbeat timers
-    // cleared, and the library still wants the transport disconnected
-    dbg("Transport state was disconnected");
-    this._wsClient = null;
-    this._wsPreviousState = null;
-  } else if (
-    this._state === "connecting" &&
-    this._wsPreviousState === "disconnecting"
-  ) {
-    dbg("Transport state was connecting and ws was disconnecting");
-    // There was a call to transport.connect() when ws was disconnecting due to
-    // a call to transport.disconnect(). The connecting event has already been
-    // fired, so just try to establish a new ws connection
-
-    this._connect();
-  } else {
-    // The transport connection failed unexpectedly. The transport state could
-    // be connecting or connected, but either way you emit disconnect
-    dbg("Transport connection failed unexpectedly");
-
-    // Emit disconnect asynchronously
-    const errMsg =
-      this._state === "connecting"
-        ? "FAILURE: The WebSocket could not be opened."
-        : "FAILURE: The WebSocket closed unexpectedly.";
-    const err = new Error(errMsg);
-    err.wsCode = code;
-    err.wsReason = reason;
-    this._emitAsync("disconnect", err);
-
-    // Update state
-    this._wsClient = null;
-    this._wsPreviousState = null;
-    this._state = "disconnected";
-  }
+  const errMsg =
+    this._state === "connecting"
+      ? "FAILURE: The WebSocket could not be opened."
+      : "FAILURE: The WebSocket closed unexpectedly.";
+  const err = new Error(errMsg);
+  err.wsCode = code;
+  err.wsReason = reason;
+  this._disconnect(err);
 };
 
 /**
- * Processes a ws error event.
- * The WebSocket client also fires a close event when an error occurs, so
- * this is to prevent unhandled error events and for debugging.
+ * Processes a WebSocket error event.
+ * The WebSocket client also fires a close event when an error occurs.
+ * This handler prevents unhandled error events and helps debugging.
  * @memberof Browser
  * @instance
  * @private
@@ -382,72 +331,20 @@ proto._processWsClose = function _processWsClose(code, reason) {
  * @returns {void}
  */
 proto._processWsError = function _processWsError(err) {
-  dbg("Observed ws error event");
+  dbg("Observed WebSocket error event");
   dbg(err);
 };
 
 // Internal Functions
 
 /**
- * Connect the WebSocket.
- *
- * Called from
- *
- *  - Library call to transport.connect()
- *  - WebSocket close event handler (if library has requested reconnect)
- * @memberof Client
- * @instance
- * @private
- * @param {Error} err
- * @returns {void}
- */
-proto._connect = function _connect() {
-  dbg("Connecting the client");
-
-  // Try to create the WebSocket client and emit disconnect asynchronously if constructor throws
-  try {
-    this._wsClient = new this._wsConstructor(
-      this._address,
-      config.wsSubprotocol
-    );
-  } catch (e) {
-    dbg("Failed to initialize WebSocket client");
-    dbg(e);
-
-    // Update state
-    this._state = "disconnected";
-    this._wsClient = null; // May exist if due to close event
-    this._wsPreviousState = null;
-
-    // Emit disconnect
-    const err = new Error(
-      "FAILURE: Could not initialize the WebSocket client."
-    );
-    err.wsError = e;
-    this._emitAsync("disconnect", err);
-    return; // Stop
-  }
-
-  // Update state
-  this._wsPreviousState = "connecting";
-
-  // Listen for events
-  this._wsClient.onopen = this._processWsOpen.bind(this);
-  this._wsClient.onmessage = this._processWsMessage.bind(this);
-  this._wsClient.onclose = this._processWsClose.bind(this);
-  this._wsClient.onerror = this._processWsError.bind(this);
-};
-
-/**
- * Disconnects the transport client:
+ * Disconnect the transport client.
  *
  *  - Call to transport.disconnect()
- *  - WebSocket throws and error on ws.send()
+ *  - Unexpected connection closure
+ *  - WebSocket throws on call to send()
  *
- * Resets the state, emits, and terminates the ws connection as appropriate.
- *
- * Cannot remove ws listeners. Need to listen for the close event to know when
- * you could try to attempt a new connection.
+ * Resets the state, emits, and closes the WebSocket connection as appropriate.
  * @memberof Browser
  * @instance
  * @private
@@ -457,23 +354,39 @@ proto._connect = function _connect() {
 proto._disconnect = function _disconnect(err) {
   dbg("Disconnecting the client");
 
-  // Clear heartbeat (if any)
-  if (this._heartbeatInterval) {
-    clearInterval(this._heartbeatInterval);
-    this._heartbeatInterval = null;
-  }
-  if (this._heartbeatTimeout) {
-    clearTimeout(this._heartbeatTimeout);
-    this._heartbeatTimeout = null;
+  // Remove all WebSocket listeners (if present)
+  if (this._wsClient) {
+    this._wsClient.onopen = null;
+    this._wsClient.onmessage = null;
+    this._wsClient.onclose = null;
+    this._wsClient.onerror = null;
   }
 
-  // Terminate the ws connection if it's still open
-  // You cannot use .terminate() in the browser
-  // Triggers a ws close event asynchronously, which resets _wsClient and _wsPreviousState
-  if (this._wsClient && this._wsClient.readyState === this._wsClient.OPEN) {
-    dbg("Closing client connection");
-    this._wsClient.close(1000);
-    this._wsPreviousState = "disconnecting";
+  // Clear heartbeat (if any)
+  clearInterval(this._heartbeatInterval);
+  this._heartbeatInterval = null;
+  clearTimeout(this._heartbeatTimeout);
+  this._heartbeatTimeout = null;
+
+  // Remove the Websocket client reference
+  const wsClient = this._wsClient;
+  this._wsClient = null;
+
+  // Close the WebSocket connection (if any)
+  if (wsClient) {
+    const close = () => {
+      dbg("Closing client connection");
+      wsClient.close(1000);
+    };
+    if (wsClient.readyState === wsClient.OPEN) {
+      // The WebSocket instance is open - close it
+      dbg("The WebSocket connection is open");
+      close();
+    } else if (wsClient.readyState === wsClient.CONNECTING) {
+      // The WebSocket instance is opening - close it if it opens
+      dbg("The WebSocket connection is opening");
+      wsClient.once("open", close);
+    }
   }
 
   // Update state and emit asynchronously
@@ -489,6 +402,12 @@ proto._disconnect = function _disconnect(err) {
 
 /**
  * Emits an event asynchronously during the next run around the event loop.
+ *
+ * The library only cares that events triggered by the library-facing API
+ * (i.e. methods) are emitted asynchronously. But it is not clear whether
+ * WebSocket may in some cases emit synchronously, so in order to ensure
+ * a correct sequence of transport events, all are emitted asynchronously via
+ * the nextTick queue.
  * @memberof Browser
  * @instance
  * @private
