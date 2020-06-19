@@ -583,7 +583,7 @@ describe("Browser tests", function() {
     );
   };
 
-  for (var i = 0; i < 50; i++) {
+  for (var i = 0; i < 5; i++) {
     describe("Iteration " + i, test);
   }
 });

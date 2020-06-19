@@ -287,23 +287,23 @@ proto._processWsOpen = function _processWsOpen() {
  * @memberof Browser
  * @instance
  * @private
- * @param {*} msg
+ * @param {MessageEvent} evt
  * @returns {void}
  */
-proto._processWsMessage = function _processWsMessage(data) {
+proto._processWsMessage = function _processWsMessage(evt) {
   dbg("Observed ws message event");
 
   // Check data type - could be String, Buffer, ArrayBuffer, Buffer[]
-  if (!check.string(data)) {
+  if (!check.string(evt.data)) {
     dbg("Unexpected WebSocket message type");
-    dbg(data);
+    dbg(evt.data);
     this.disconnect(
       new Error("FAILURE: Received non-string message on WebSocket connection.")
     );
     return; // Stop
   }
 
-  this._emitAsync("message", data);
+  this._emitAsync("message", evt.data);
 };
 
 /**
