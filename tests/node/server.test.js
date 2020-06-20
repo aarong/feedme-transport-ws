@@ -1319,7 +1319,7 @@ describe("The transport.start() function", () => {
       // WS client events - N/A
     });
 
-    describe("if the ws server constructor succeeds - external server, not listening yet", () => {
+    describe("if the ws server constructor succeeds - external server, not listening yet, then listening", () => {
       // Errors and return values - N/A
 
       // State functions
@@ -1473,6 +1473,107 @@ describe("The transport.start() function", () => {
         expect(httpServer.listenerCount("listening")).toBe(2); // One for transport, one for ws
         expect(httpServer.listenerCount("close")).toBe(1);
         expect(httpServer.listenerCount("error")).toBe(2); // One for transport, one for ws
+      });
+
+      // WS client events - N/A
+    });
+
+    describe("if the ws server constructor succeeds - external server, not listening yet, and never listens", () => {
+      // Errors and return values - N/A
+
+      // State functions
+
+      it("should immediately set the state to starting and then eventually stopped", async () => {
+        // Create http server
+        const httpServer = http.createServer((req, res) => {
+          res.writeHead(200);
+          res.end("Webpage");
+        });
+
+        // Create a transport server on the external server
+        const transportServer = transportWsServer({
+          server: httpServer
+        });
+
+        expect(transportServer.state()).toBe("stopped");
+
+        transportServer.start();
+
+        expect(transportServer.state()).toBe("starting");
+
+        await asyncUtil.setTimeout(serverConfig.httpListeningMs + EPSILON);
+
+        expect(transportServer.state()).toBe("stopped");
+      });
+
+      // Transport server events
+
+      it("should asynchronously emit starting and then eventually stopping and stop", async () => {
+        // Create http server
+        const httpServer = http.createServer((req, res) => {
+          res.writeHead(200);
+          res.end("Webpage");
+        });
+
+        // Create a transport server on the external server
+        const transportServer = transportWsServer({
+          server: httpServer
+        });
+
+        const listener = createServerListener(transportServer);
+
+        transportServer.start();
+
+        // Emit nothing synchronously
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
+        expect(listener.stop.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+
+        await asyncUtil.once(transportServer, "starting");
+
+        // Emit starting asynchronously
+        expect(listener.starting.mock.calls.length).toBe(1);
+        expect(listener.starting.mock.calls[0].length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
+        expect(listener.stop.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+        listener.mockClear();
+
+        const eventOrder = [];
+        ["stopping", "stop"].forEach(evt => {
+          transportServer.on(evt, () => {
+            eventOrder.push(evt);
+          });
+        });
+
+        await asyncUtil.setTimeout(serverConfig.httpListeningMs + EPSILON);
+
+        // Emit stopping and stop
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(1);
+        expect(listener.stopping.mock.calls[0].length).toBe(1);
+        expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
+        expect(listener.stopping.mock.calls[0][0].message).toBe(
+          "FAILURE: The external http server did not start within the allocated time."
+        );
+        expect(listener.stop.mock.calls.length).toBe(1);
+        expect(listener.stop.mock.calls[0].length).toBe(1);
+        expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
+        expect(listener.stop.mock.calls[0][0].message).toBe(
+          "FAILURE: The external http server did not start within the allocated time."
+        );
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+        expect(eventOrder).toEqual(["stopping", "stop"]);
       });
 
       // WS client events - N/A
@@ -4132,7 +4233,7 @@ describe("The transport._processServerListening() function", () => {
     it("should change the state to started", async () => {
       const port = getNextPortNumber();
 
-      // Start an http server
+      // Create an http server
       const httpServer = http.createServer((req, res) => {
         res.writeHead(200);
         res.end("Webpage");
@@ -4148,10 +4249,6 @@ describe("The transport._processServerListening() function", () => {
       transportServer.start();
 
       await asyncUtil.once(transportServer, "starting");
-
-      expect(transportServer.state()).toBe("starting");
-
-      await asyncUtil.setTimeout(LATENCY);
 
       expect(transportServer.state()).toBe("starting");
 

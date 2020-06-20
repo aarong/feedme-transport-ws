@@ -43,6 +43,7 @@ State: Object members
   ._heartbeatTimeouts
   ._options
   ._httpHandlers
+  ._httpListeningTimeout
   ._httpPollingInterval
 
 1. State-modifying functionality
@@ -176,7 +177,8 @@ harnessProto.getServerState = function getServerState() {
   });
   state._options = _.clone(this.server._options); // Object copy
   state._httpHandlers = this.server._httpHandlers; // Null or object with three fn references
-  state._httpPollingInterval = check.number(this.server._httpPollingInterval); // Boolean
+  state._httpListeningTimeout = this.server._httpListeningTimeout; // Number
+  state._httpPollingInterval = this.server._httpPollingInterval; // Number
   return state;
 };
 
@@ -296,10 +298,30 @@ const toHaveState = function toHaveState(receivedServer, expectedState) {
     };
   }
 
+  // Check ._httpListeningTimeout (both null or both numbers)
+  if (
+    !(
+      (check.number(receivedServer._httpListeningTimeout) &&
+        check.number(expectedState._httpListeningTimeout)) ||
+      receivedServer._httpListeningTimeout ===
+        expectedState._httpListeningTimeout
+    )
+  ) {
+    return {
+      pass: false,
+      message() {
+        return "expected ._httpListeningTimeout to match, but they didn't";
+      }
+    };
+  }
+
   // Check ._httpPollingInterval (both null or both numbers)
   if (
-    !!receivedServer._httpPollingInterval !==
-    !!expectedState._httpPollingInterval
+    !(
+      (check.number(receivedServer._httpPollingInterval) &&
+        check.number(expectedState._httpPollingInterval)) ||
+      receivedServer._httpPollingInterval === expectedState._httpPollingInterval
+    )
   ) {
     return {
       pass: false,
@@ -426,10 +448,32 @@ describe("The toHaveState() function", () => {
       );
     });
 
+    it("should fail if _httpListeningTimeout values don't match - case 1", () => {
+      const result = toHaveState(
+        { _httpListeningTimeout: 123 },
+        { _httpListeningTimeout: null }
+      );
+      expect(result.pass).toBe(false);
+      expect(result.message()).toBe(
+        "expected ._httpListeningTimeout to match, but they didn't"
+      );
+    });
+
+    it("should fail if _httpListeningTimeout values don't match - case 2", () => {
+      const result = toHaveState(
+        { _httpListeningTimeout: null },
+        { _httpListeningTimeout: 123 }
+      );
+      expect(result.pass).toBe(false);
+      expect(result.message()).toBe(
+        "expected ._httpListeningTimeout to match, but they didn't"
+      );
+    });
+
     it("should fail if _httpPollingInterval values don't match - case 1", () => {
       const result = toHaveState(
-        { _httpPollingInterval: true },
-        { _httpPollingInterval: false }
+        { _httpPollingInterval: 123 },
+        { _httpPollingInterval: null }
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
@@ -439,8 +483,8 @@ describe("The toHaveState() function", () => {
 
     it("should fail if _httpPollingInterval values don't match - case 2", () => {
       const result = toHaveState(
-        { _httpPollingInterval: false },
-        { _httpPollingInterval: true }
+        { _httpPollingInterval: null },
+        { _httpPollingInterval: 123 }
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
@@ -531,10 +575,26 @@ describe("The toHaveState() function", () => {
       expect(result.pass).toBe(true);
     });
 
+    it("should pass if _httpListeningTimeout matches - case 1", () => {
+      const result = toHaveState(
+        { _httpListeningTimeout: 123 },
+        { _httpListeningTimeout: 123 }
+      );
+      expect(result.pass).toBe(true);
+    });
+
+    it("should pass if _httpListeningTimeout matches - case 2", () => {
+      const result = toHaveState(
+        { _httpListeningTimeout: null },
+        { _httpListeningTimeout: null }
+      );
+      expect(result.pass).toBe(true);
+    });
+
     it("should pass if _httpPollingInterval matches - case 1", () => {
       const result = toHaveState(
         { _httpPollingInterval: 123 },
-        { _httpPollingInterval: true }
+        { _httpPollingInterval: 123 }
       );
       expect(result.pass).toBe(true);
     });
@@ -542,7 +602,7 @@ describe("The toHaveState() function", () => {
     it("should pass if _httpPollingInterval matches - case 2", () => {
       const result = toHaveState(
         { _httpPollingInterval: null },
-        { _httpPollingInterval: false }
+        { _httpPollingInterval: null }
       );
       expect(result.pass).toBe(true);
     });
@@ -706,7 +766,8 @@ describe("The server() function", () => {
           heartbeatTimeoutMs: serverConfig.defaults.heartbeatTimeoutMs
         },
         _httpHandlers: null,
-        _httpPollingInterval: false
+        _httpListeningTimeout: null,
+        _httpPollingInterval: null
       });
     });
 
@@ -729,7 +790,8 @@ describe("The server() function", () => {
           heartbeatTimeoutMs: 123
         },
         _httpHandlers: null,
-        _httpPollingInterval: false
+        _httpListeningTimeout: null,
+        _httpPollingInterval: null
       });
     });
 
@@ -1110,6 +1172,7 @@ describe("The server.start() function", () => {
         close: () => {},
         error: () => {}
       };
+      newState._httpListeningTimeout = 123;
       harn.server.start();
       expect(harn.server).toHaveState(newState);
     });
@@ -1135,7 +1198,7 @@ describe("The server.start() function", () => {
         close: () => {},
         error: () => {}
       };
-      newState._httpPollingInterval = true;
+      newState._httpPollingInterval = 123;
       harn.server.start();
       expect(harn.server).toHaveState(newState);
     });
@@ -1238,7 +1301,96 @@ describe("The server.start() function", () => {
 
     // Outbound callbacks - N/A
 
-    // Inbound callbacks (events, state, ws, callbacks) - N/A
+    // Inbound callbacks (events, state, ws, callbacks)
+
+    describe("the httpListeningTimeout callback", () => {
+      it("should asynchronously emit stopping and then stop", async () => {
+        const harn = harness({ server: emitter({}) });
+        harn.server.start();
+        const wsServer = harn.getWs();
+
+        await asyncUtil.nextTick(); // Move past queued events
+
+        const listener = harn.createServerListener();
+
+        jest.advanceTimersByTime(serverConfig.httpListeningMs);
+
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
+        expect(listener.stop.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+
+        await asyncUtil.nextTick();
+
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(1);
+        expect(listener.stopping.mock.calls[0].length).toBe(1);
+        expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
+        expect(listener.stopping.mock.calls[0][0].message).toBe(
+          "FAILURE: The external http server did not start within the allocated time."
+        );
+        expect(listener.stop.mock.calls.length).toBe(0);
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+        listener.mockClear();
+
+        wsServer.close.mock.calls[0][0](); // Run ws.close() callback
+
+        await asyncUtil.nextTick();
+
+        expect(listener.starting.mock.calls.length).toBe(0);
+        expect(listener.start.mock.calls.length).toBe(0);
+        expect(listener.stopping.mock.calls.length).toBe(0);
+        expect(listener.stop.mock.calls.length).toBe(1);
+        expect(listener.stop.mock.calls[0].length).toBe(1);
+        expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
+        expect(listener.stop.mock.calls[0][0].message).toBe(
+          "FAILURE: The external http server did not start within the allocated time."
+        );
+        expect(listener.connect.mock.calls.length).toBe(0);
+        expect(listener.message.mock.calls.length).toBe(0);
+        expect(listener.disconnect.mock.calls.length).toBe(0);
+      });
+
+      it("should update the state appropriately", async () => {
+        const harn = harness({ server: emitter({}) });
+        harn.server.start();
+        const wsServer = harn.getWs();
+
+        const newState = harn.getServerState();
+
+        jest.advanceTimersByTime(serverConfig.httpListeningMs);
+
+        newState._wsServer = null;
+        newState._state = "stopping";
+        newState._httpHandlers = null;
+        newState._httpListeningTimeout = null;
+        expect(harn.server).toHaveState(newState);
+
+        wsServer.close.mock.calls[0][0](); // Run ws.close() callback
+
+        newState._state = "stopped";
+        expect(harn.server).toHaveState(newState);
+      });
+
+      it("should call ws.close()", () => {
+        const harn = harness({ server: emitter({}) });
+        harn.server.start();
+        const wsServer = harn.getWs();
+
+        jest.advanceTimersByTime(serverConfig.httpListeningMs);
+
+        expect(wsServer.close.mock.calls.length).toBe(1);
+        expect(wsServer.close.mock.calls[0].length).toBe(1);
+        expect(wsServer.close.mock.calls[0][0]).toBeInstanceOf(Function);
+        expect(wsServer.handleUpgrade.mock.calls.length).toBe(0);
+      });
+    });
 
     // Return value
 
@@ -1492,7 +1644,7 @@ describe("The server.stop() function", () => {
       newState._heartbeatIntervals = {};
       newState._heartbeatTimeouts = {};
       newState._httpHandlers = null;
-      newState._httpPollingInterval = false;
+      newState._httpPollingInterval = null;
       harn.server.stop();
       expect(harn.server).toHaveState(newState);
     });
@@ -1545,7 +1697,7 @@ describe("The server.stop() function", () => {
       expect(check.integer(clearInterval.mock.calls[2][0])).toBe(true);
     });
 
-    it("should call clearTimeout on client heartbeat timeout", async () => {
+    it("should call clearTimeout on client heartbeat timeout and http listening timeout", async () => {
       // Set up two connected clients
       // One with no heartbeat timeout and one with
       const harn = harness({ port: PORT });
@@ -1561,9 +1713,7 @@ describe("The server.stop() function", () => {
 
       clearTimeout.mockClear();
       harn.server.stop();
-      expect(clearTimeout.mock.calls.length).toBe(1);
-      expect(clearTimeout.mock.calls[0].length).toBe(1);
-      expect(check.integer(clearTimeout.mock.calls[0][0])).toBe(true);
+      expect(clearTimeout.mock.calls.length).toBe(2);
     });
 
     // Calls on ws
@@ -2726,7 +2876,8 @@ describe("The server._processServerListening() function", () => {
 
     const newState = harn.getServerState();
     newState._state = "started";
-    newState._httpPollingInterval = true;
+    newState._httpListeningTimeout = null;
+    newState._httpPollingInterval = 123;
 
     httpServer.emit("listening");
 
@@ -2944,7 +3095,7 @@ describe("The server._processServerListening() function", () => {
       newState._wsServer = null;
       newState._state = "stopping";
       newState._httpHandlers = null;
-      newState._httpPollingInterval = false;
+      newState._httpPollingInterval = null;
 
       httpServer.listening = false;
       jest.advanceTimersByTime(serverConfig.httpPollingMs);
@@ -3214,7 +3365,7 @@ describe("The server._processServerClose() function", () => {
     newState._wsServer = null;
     newState._state = "stopping"; // Ws server still closing
     newState._httpHandlers = null;
-    newState._httpPollingInterval = false;
+    newState._httpPollingInterval = null;
     httpServer.emit("close");
     expect(harn.server).toHaveState(newState);
 
@@ -3226,7 +3377,7 @@ describe("The server._processServerClose() function", () => {
 
   // Function calls
 
-  it("should call clearInterval and clearTimeout for heartbeats and http polling interval", () => {
+  it("should call clearInterval and clearTimeout for heartbeats, http listening timeout, http polling interval", () => {
     // Set up two connected clients
     // One with no heartbeat timeout and one with
     const harn = harness({ port: PORT });
@@ -3242,7 +3393,7 @@ describe("The server._processServerClose() function", () => {
     clearTimeout.mockClear();
     harn.getWs().emit("close");
     expect(clearInterval.mock.calls.length).toBe(3);
-    expect(clearTimeout.mock.calls.length).toBe(1);
+    expect(clearTimeout.mock.calls.length).toBe(2);
   });
 
   // Calls on ws
@@ -3433,6 +3584,7 @@ describe("The server._processServerError() function", () => {
       newState._wsServer = null;
       newState._state = "stopping";
       newState._httpHandlers = null;
+      newState._httpListeningTimeout = null;
 
       httpServer.emit("error", new Error("SOME_ERROR"));
 
@@ -3777,7 +3929,7 @@ describe("The server._processServerError() function", () => {
       newState._wsServer = null;
       newState._state = "stopping";
       newState._httpHandlers = null;
-      newState._httpPollingInterval = false;
+      newState._httpPollingInterval = null;
 
       httpServer.emit("error", new Error("SOME_ERROR"));
 

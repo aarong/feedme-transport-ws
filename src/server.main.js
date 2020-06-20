@@ -223,6 +223,19 @@ export default function serverFactory(wsConstructor, options) {
   server._httpHandlers = null;
 
   /**
+   * Timeout that waits for the external http server to begin listening.
+   *
+   * Number if running in external server mode and there was a call to
+   * transport.start() while the external http server was not yet listening.
+   * Otherwise null.
+   * @memberof Server
+   * @instance
+   * @private
+   * @type {?number}
+   */
+  server._httpListeningTimeout = null;
+
+  /**
    * Interval that polls the external http server to verify that it is still
    * listening. Null if not running in external server mode or transport not
    * started.
@@ -385,6 +398,21 @@ proto.start = function start() {
   ) {
     dbg("External http server is already started or in noServer mode");
     this._start();
+  }
+
+  // If running on non-listening external http server, set timeout for listening
+  // Otherwise, if the external server can't stop, the transport will be stuck
+  // in starting state indefinitely
+  if (this._options.server && !this._options.server.listening) {
+    dbg("Establishing external HTTP server listening timeout");
+    this._httpListeningTimeout = setTimeout(() => {
+      dbg("External HTTP server listening timeout expired");
+      this._stop(
+        new Error(
+          "FAILURE: The external http server did not start within the allocated time."
+        )
+      );
+    }, serverConfig.httpListeningMs);
   }
 };
 
@@ -790,6 +818,10 @@ proto._start = function _start() {
     return; // Stop
   }
 
+  // Clear external server listening timeout (if any)
+  clearTimeout(this._httpListeningTimeout);
+  this._httpListeningTimeout = null;
+
   // If in external server mode, monitor whether the server is still listening
   // Calls to httpServer.close() only trigger a http close event once all
   // WebSocket connections have disconnected, it does not force them closed
@@ -837,6 +869,10 @@ proto._stop = function _stop(err) {
     dbg("Server is not starting or started - exiting");
     return; // Stop
   }
+
+  // Clear external server listening timeout (if any)
+  clearTimeout(this._httpListeningTimeout);
+  this._httpListeningTimeout = null;
 
   // Stop external http server status polling (if applicable)
   clearInterval(this._httpPollingInterval);
@@ -900,9 +936,10 @@ proto._stop = function _stop(err) {
   }
 
   // Close the ws server if it's not already closed
-  // Unfortunately the ws server has no readyState indicator
-  // The ws server won't be closed on call to transport.stop() or if there is
-  // a call to httpServer.close() in external server mode (listening polling fails)
+  // Unfortunately the ws server has no state indicator
+  // The ws server won't be closed on call to transport.stop(), if there is
+  // a call to httpServer.close() in external server mode (listening polling fails),
+  // or if an external http server never starts
   if (!err || this._options.server) {
     dbg("Closing ws server");
     wsServer.close(() => {

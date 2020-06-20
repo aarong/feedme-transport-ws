@@ -224,11 +224,17 @@ When serving a Feedme API in `noServer` mode:
 
 ### WebSocket Errors
 
-The transport makes the following ws-level error information available via the
-Feedme server library.
+The transport makes the following ws-level error information available to
+applications via the Feedme server library.
 
 - If there is a problem initializing the ws module then the error thrown by ws
   is made available to server library
+  [stopping](https://github.com/aarong/feedme-server-core#stopping) and
+  [stop](https://github.com/aarong/feedme-server-core#stop) event handlers as
+  `err.wsError`.
+
+- If the ws module or an external HTTP server emits a `close` event then the
+  associated error is made available to the server library
   [stopping](https://github.com/aarong/feedme-server-core#stopping) and
   [stop](https://github.com/aarong/feedme-server-core#stop) event handlers as
   `err.wsError`.
@@ -307,8 +313,8 @@ Errors thrown:
 
 ### WebSocket Errors
 
-The transport makes the following ws-level error information available via the
-Feedme client library.
+The transport makes the following ws-level error information available to
+applications via the Feedme client library.
 
 - If there is a problem initializing the ws module then the error thrown by ws
   is made available to client library
@@ -381,8 +387,8 @@ Errors thrown:
 
 ### WebSocket Errors
 
-The transport makes the following WebSocket-level error information available
-via the Feedme client library.
+The transport makes the following WebSocket-level error information available to
+applications via the Feedme client library.
 
 - If an error is thrown when initializing a WebSocket object then the error is
   made available to client library
