@@ -239,12 +239,12 @@ applications via the Feedme server library.
   [stop](https://github.com/aarong/feedme-server-core#stop) event handlers as
   `err.wsError`.
 
-- When a client connection closes unexpectedly, the WebSocket disconnect code
+* When a client connection closes unexpectedly, the WebSocket disconnect code
   and reason are made available to server library
   [disconnect](https://github.com/aarong/feedme-server-core#disconnectg) event
   handlers as `err.wsCode` and `err.wsReason`.
 
-- If the ws module calls back an error when attempting to send a message or a
+* If the ws module calls back an error when attempting to send a message or a
   ping to a client then the error is made available to server library
   [disconnect](https://github.com/aarong/feedme-server-core#disconnectg) event
   handlers as `err.wsError`.
