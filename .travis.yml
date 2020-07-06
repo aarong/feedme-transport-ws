@@ -11,26 +11,34 @@ branches:
 
 jobs:
   include:
-    - stage: Test
+    - stage: Test and Deploy
       language: node_js
-      node_js: "6"
+      node_js: "14" # Must build in Node 8+ (for webpack and babel-loader)
       script:
+        # Ensure that you can build in Node 8+ and tests pass in Node 6+
+
+        - nvm use 14
         - npm run build # test-src, build, test-build-node
+
+        - nvm install 12
+        - nvm use 12
+        - npm run build # test-src, build, test-build-node
+        
+        - nvm install 10
+        - nvm use 10
+        - npm run build # test-src, build, test-build-node
+        
+        - nvm install 8
+        - nvm use 8
+        - npm run build # test-src, build, test-build-node
+
+        - nvm install 6
+        - nvm use 6
+        - npm run test-build-node
+
         - npm run test-build-browsers # Browser tests only once
+        
         - npm run coveralls
-    - stage: Test
-      language: node_js
-      node_js: "8"
-      script: npm run build # test-src, build, test-build-node
-    - stage: Test
-      language: node_js
-      node_js: "10"
-      script: npm run build # test-src, build, test-build-node
-    - stage: Deploy # Runs on each build, but only publishes on new version
-      language: node_js
-      node_js: "6" # Maximum compatibility
-      script:
-        - npm run build
       deploy: # Can't use npm provider because you need to publish the build folder
         provider: script
         skip_cleanup: true # Preserve the build so it can be published
