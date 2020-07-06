@@ -1,3 +1,16 @@
+  // Browser queries set based on minimum Sauce test version
 {
-  "presets": ["@babel/preset-env"]
+  "presets": [
+    ["@babel/preset-env", { "targets": [
+      "ie >= 10",
+      "firefox >= 4",
+      "chrome >= 29",
+      "edge >= 13",
+      "safari >= 10",
+      "node >= 6",
+      "not dead", // Capture any non-tested browsers
+      "last 2 versions", // Capture any non-tested browsers
+      "> 0.25%" // Capture any non-tested browsers
+    ] }]
+  ]
 }

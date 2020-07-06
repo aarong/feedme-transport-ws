@@ -1,439 +1,587 @@
-var copyFileSync = require("fs-copy-file-sync"); // Not in Node 6
-var sauceConnectLauncher = require("sauce-connect-launcher");
-var async = require("async");
-var request = require("request");
-var hostile = require("hostile");
-var _ = require("lodash");
-var testingServer = require("./server");
+const dbg = function dbg(msg) {
+  console.log(msg); // eslint-disable-line no-console
+};
+dbg("Starting browser tests");
+
+// Included as <script>s
+/* global feedmeClient, feedmeTransportWsClient, Emitter */
 
 /*
 
-Testing WebSockets on Sauce Labs
+Browser integration functional tests. Tests the browser client against
+(1) a raw WebSocket server, (2) the transport server, and (3) a Feedme server.
 
-Due to the way that Sauce Connect Proxy works, in many browsers you can’t establish
-WebSocket connections directly from the browser to localhost. To get around this,
-you need to route another domain to 127.0.0.1 and have the browser access that domain.
+Check:
 
-This routing is done by adjusting the local hosts file. The Sauce Connect proxy
-routes all VM browser connection requests to the PC running Sauce Connect,
-which then looks up the domain in the hosts file and sees that it is routed to
-localhost.
+  - Errors and return values
+  - State functions - transport.state()
+  - Client transport events
+  - Server events
 
-You can't use a prerun script to edit the VM hosts file, as that does not work
-with the Sauce Connect proxy. So any developers running the Sauce tests need
-to add an entry to their local hosts file. 
+Don't worry about testing invalid arguments (done in unit tests) or that return
+values are empty (only state() returns a value and it's checked everywhere).
+
+The Feedme controller client connection is re-established for each tests, as
+sharing across tests was causing failures even for a small number of tests.
+  -- TRY AGAIN
+
+It's crucial to properly close any open WebSocket connections at the end
+of each test, otherwise many tests will fail.
+
+Sauce seems to limit total test duration to around 5-6 minutes by capping
+maxDuration. So you're limited to a maximum of around 150 tests overall,
+unless you want to build the infrastructure to break them into smaller suites.
+
+Around 1% of tests tend to fail due to connectivity issues, resulting in the
+test timing out or DISCONNECT/TIMEOUT errors. So all tests are retried several
+times on failure.
+
+          // You need masterResolve/reject so that disconnect events can
+          // fail the tests at any time - can't reject a promise once resolved
+          // Otherwise tests hang if the connection is broken --
+
+// Connect to the controller Feedme API before starting each test
+// Keeping the controller connected between tests caused problems on browsers
+*/
+
+// Allow each test to take significant time, given latency (defaults to 5000)
+jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000; // Per test
+
+const PORT = 3000; // Port for controller Feedme API
+const ROOT_URL = "ws://testinghost.com";
+const RETRY_LIMIT = 8; // How many times to attempt each test
+
+// var delay = function(ms) {
+//   return function() {
+//     return new Promise(function(resolve, reject) {
+//       setTimeout(function() {
+//         resolve();
+//       }, ms);
+//     });
+//   };
+// };
+
+/*
+
+Feedme controller API wrapper for WebSocket servers.
 
 */
 
-// Determine mode
-// sauce-automatic: launches Sauce Connect Proxy and a suite of testing VMs on Sauce
-// sauce-live: launches Sauce Connect Proxy so that you log into Sauce and do a live test
-// local: launches only the local web server, which can be accessed from a local browser
-var mode = "sauce-automatic"; // default (for Travis)
-if (process.argv.length >= 3) {
-  if (
-    _.includes(
-      ["sauce-automatic", "sauce-live", "local"],
-      process.argv[2].toLowerCase()
-    )
-  ) {
-    mode = process.argv[2].toLowerCase();
-  } else {
-    throw new Error(
-      "INVALID_ARGUMENT: Mode must be local, sauce-live, or sauce-automatic (default)."
-    );
-  }
-}
+const wsServerProto = Emitter({});
 
-// If the tests are to be run on Sauce, make sure the hosts file has the required entry
-var hasHostsEntry = false;
-if (mode !== "local") {
-  var lines = hostile.get(false);
-  lines.forEach(function(line) {
-    var ip = line[0];
-    var hosts = line[1].split(" "); // Travis routes multiple hosts to 127.0.0.1 delimited by spaces
-    if (ip === "127.0.0.1" && _.includes(hosts, "testinghost.com")) {
-      hasHostsEntry = true;
-    }
-  });
-  if (!hasHostsEntry) {
-    throw new Error(
-      "NO_HOSTS_ENTRY: You need to route testinghost.com to 127.0.0.1 in your hosts file in order to run the Sauce tests."
-    );
-  }
-}
+const createWsServer = function createWsServer(feedmeControllerClient) {
+  dbg("Creating WebSocket server");
 
-// Require Sauce credentials if you're not running locally
-if (
-  mode !== "local" &&
-  (!process.env.SAUCE_USERNAME || !process.env.SAUCE_ACCESS_KEY)
-) {
-  throw new Error(
-    "NO_CREDENTIALS: The SAUCE_USERNAME or SAUCE_ACCESS_KEY environmental variable is missing."
-  );
-}
+  const server = Object.create(wsServerProto);
 
-// Config
-var port = 3000;
-var sauceTunnelId =
-  process.env.TRAVIS_JOB_NUMBER || "feedme-transport-ws-tunnel"; // Travis sets tunnel id to job number
-var saucePollInterval = 10000;
-var saucePlatforms = [
-  // // Available Sauce platforms: https://saucelabs.com/platforms
-  // // General approach is to tests earliest and latest browser versions available on all platforms
+  // Members
+  server.port = null;
+  server._feedmeControllerClient = feedmeControllerClient;
+  server._eventFeed = null;
 
-  // // If you include a bad platform-browser combination, Sauce never returns results even when
-  // // the good ones are done, and does not return an error either (bad tests not listed on dashboard)
-
-  // // REST API only supports desktop platforms, not mobile (confirmed with support)
-  // // For mobile platforms you need to use Appium directly (see their platform
-  // // configurator), or one of their testing frameworks:
-  // // https://github.com/saucelabs-sample-test-frameworks
-
-  // // WebSockets introduced in FireFox 11, but fails on 15 and below with 1006 error
-  // ["Windows 10", "Firefox", "16"],
-
-  // // In 56 and above the tests are shown in the VM to have completed
-  // // successfully (no console errors) but the VM doesn't terminate and
-  // // Sauce eventually kills the VM after 5-6 minutes
-  // // Tests pass locally on recent Firefox version
-  // ["Windows 10", "Firefox", "55"],
-
-  // // In 28 and below tests don't even seem to launch (VM blank)
-  // ["Windows 10", "Chrome", "29"],
-  ["Windows 10", "Chrome", "latest"]
-
-  // ["Windows 10", "MicrosoftEdge", "13"], // Earliest available version
-  // ["Windows 10", "MicrosoftEdge", "latest"],
-
-  // // IE 9 does not support Jasmine
-  // // ["Windows 7", "Internet Explorer", "9"],
-
-  // // IE 10 prevents more than six WebSocket connections from being established
-  // // by one browser instance, apparently even sequentially
-  // // ["Windows 8", "Internet Explorer", "10"],
-
-  // ["Windows 10", "Internet Explorer", "11"],
-
-  // // Same issue was Win 10 FF 56+ - tests seem to pass but don't return results
-  // // ["macOS 10.14", "Safari", "latest"],
-  // // ["macOS 10.14", "Firefox", "latest"],
-
-  // ["macOS 10.14", "Chrome", "latest"],
-
-  // /*
-
-  // macOS 10.13
-
-  // */
-
-  // // 55 works - how early can I go on this? And all others?
-  // // 56+ tests pass but don't return
-  // ["macOS 10.13", "Firefox", "55"],
-
-  // // Tests pass but don't return
-  // //["macOS 10.13", "Firefox", "latest"],
-
-  // ["macOS 10.13", "Chrome", "latest"],
-
-  // // Safari tests all pass but don't return
-  // // ["macOS 10.13", "Safari", "latest"],
-  // // ["macOS 10.13", "Safari", "11"],
-
-  // /*
-
-  // macOS 10.12
-
-  // */
-
-  // // Safari tests pass but don't return
-  // //["macOS 10.12", "Safari", "10"],
-
-  // /*
-
-  // Platforms macOS 10.10 and 10.11 report unsupported OS/browser/version combo
-
-  // */
-
-  // /*
-
-  // Platform: LINUX
-
-  // */
-
-  // // Firefox 15 and below fail with 1006 error
-  // ["Linux", "Firefox", "16"],
-  // ["Linux", "Firefox", "latest"],
-
-  // // Chrome 29 and below tests won't even start
-  // ["Linux", "Chrome", "30"],
-  // ["Linux", "Chrome", "latest"]
-];
-
-// Run the tests
-var server;
-var sauceConnectProcess;
-var sauceTests;
-var sauceResults;
-async.series(
-  [
-    function(cb) {
-      // Set up the webroot with built client.bundle.withmaps
-      copyFileSync(
-        __dirname + "/../../build/browser.bundle.withmaps.js",
-        __dirname + "/webroot/browser.bundle.withmaps.js"
-      );
-      copyFileSync(
-        __dirname + "/../../build/browser.bundle.withmaps.js.map",
-        __dirname + "/webroot/browser.bundle.withmaps.js.map"
-      );
-
-      cb();
-    },
-    function(cb) {
-      // Start the local server
-      console.log("Starting local server to host the tests...");
-      testingServer(port, function(err, s) {
-        if (err) {
-          console.log("Failed to start server.");
-          cb(err);
-        } else {
-          server = s;
-          console.log("Local server started on http://localhost:" + port);
-          if (hasHostsEntry) {
-            console.log(
-              "Also available as http://testinghost.com:3000 via hosts file"
-            );
-          }
-          cb();
-        }
-      });
-    },
-    function(cb) {
-      // If you're running in local mode then stop here
-      if (mode !== "local") {
-        cb();
-      }
-    },
-    function(cb) {
-      // Start Sauce Connect proxy if you aren't on Travis
-      if (process.env.CI) {
-        console.log("Running on Travis - no need to start Sauce Connect.");
-        cb();
-        return;
-      }
-
-      console.log("Starting Sauce Connect proxy...");
-      sauceConnectLauncher(
-        {
-          tunnelIdentifier: sauceTunnelId,
-          logFile: null,
-          noSslBumpDomains: "all", // Needed to get WebSockets working: https://wiki.saucelabs.com/display/DOCS/Sauce+Connect+Proxy+and+SSL+Certificate+Bumping
-          verbose: true
-        },
-        function(err, process) {
-          if (err) {
-            console.log("Failed to start Sauce Connect proxy.");
-            cb(err);
-          } else {
-            console.log("Sauce Connect proxy started.");
-            sauceConnectProcess = process;
-            cb();
-          }
-        }
-      );
-    },
-    function(cb) {
-      // If you're running in sauce-live mode then stop here
-      if (mode !== "sauce-live") {
-        cb();
-      }
-    },
-    function(cb) {
-      // Call the Sauce REST API telling it to run the tests
-      console.log("Calling Sauce REST API telling it to run the tests...");
-
-      request(
-        {
-          url:
-            "https://saucelabs.com/rest/v1/" +
-            process.env.SAUCE_USERNAME +
-            "/js-tests",
-          method: "POST",
-          auth: {
-            username: process.env.SAUCE_USERNAME,
-            password: process.env.SAUCE_ACCESS_KEY
-          },
-          json: true,
-          body: {
-            //url: "http://testinghost.com:" + port,
-            url:
-              "http://localhost:" +
-              port +
-              "/?throwFailures=true&oneFailurePerSpec=true", // &failFast=true (stop tests on first fail)
-            framework: "custom",
-            platforms: saucePlatforms,
-            "tunnel-identifier": sauceTunnelId,
-            extendedDebugging: true, // Works?
-            maxDuration: 1800
-            // maxDuration: 1800 // seconds - DOES work (low fails), but capped at around 5-6 minutes by Sauce
-          }
-        },
-        function(err, response) {
-          if (err) {
-            console.log("Request failed.");
-            cb(err);
-          } else if (response.statusCode !== 200) {
-            console.log("Sauce API returned an error.");
-            cb(response.body); // Use body as error (printed)
-          } else {
-            console.log("API call executed successfully.");
-            sauceTests = response.body;
-            cb();
-          }
-        }
-      );
-    },
-    function(cb) {
-      // Poll Sauce for the test results
-      console.log("Polling Sauce for the test results...");
-
-      var interval = setInterval(function() {
-        console.log("Calling Sauce REST API to check test status...");
-        request(
-          {
-            url:
-              "https://saucelabs.com/rest/v1/" +
-              process.env.SAUCE_USERNAME +
-              "/js-tests/status",
-            method: "POST",
-            auth: {
-              username: process.env.SAUCE_USERNAME,
-              password: process.env.SAUCE_ACCESS_KEY
-            },
-            json: true,
-            body: sauceTests // From the above API call
-          },
-          function(err, response) {
-            if (err) {
-              console.log("Request failed.");
-              cb(err);
-            } else if (response.statusCode !== 200) {
-              console.log("Sauce API returned an error.");
-              cb(response.body); // Use body as error (printed)
-            } else if (!response.body.completed) {
-              console.log(
-                "Sauce API indicated tests not completed. Polling again..."
-              );
-              // No callback
-            } else {
-              sauceResults = response.body["js tests"];
-              clearInterval(interval);
-              cb();
-            }
-          }
-        );
-      }, saucePollInterval);
-    },
-    function(cb) {
-      var allPassed = true;
-
-      // Process and display the test results for each platform
-      for (var i = 0; i < sauceResults.length; i++) {
-        var platformUrl = sauceResults[i].url;
-        var platformName = sauceResults[i].platform.join(":");
-        var platformResult = sauceResults[i].result; // The window.global_test_results object
-
-        // Note platformResult is null if custom data exceeds 64k
-        // Note platformResult.total/passed/failed === 0 if there is a Javascript error (change this)
-
-        // Did the platform pass?
-        // Make sure tests are actually running (ie don't just check that none failed)
-        var platformPassed =
-          platformResult &&
-          platformResult.failed === 0 &&
-          platformResult.passed > 0;
-
-        // Display the platform name and result
-        if (platformPassed) {
-          console.log(platformName + " passed all tests");
-        } else {
-          console.log(
-            "FAILED " +
-              platformName +
-              " passed " +
-              (platformResult ? platformResult.passed : "???") +
-              "/" +
-              (platformResult ? platformResult.total : "???") +
-              " tests"
-          );
-          console.log(platformUrl);
-
-          // Print failed tests
-          if (platformResult && platformResult.tests) {
-            for (var j = 0; j < platformResult.tests.length; j++) {
-              var test = platformResult.tests[j];
-              if (!test.result) {
-                console.log("Failing test: " + test.name);
-                console.log("Message: " + test.message);
-              }
-            }
-          }
-        }
-
-        // Track whether all platforms passed
-        if (!platformPassed) {
-          allPassed = false;
-        }
-
-        console.log("");
-      }
-
-      // Return success/failure
-      if (allPassed) {
-        cb();
+  return new Promise((resolve, reject) => {
+    // Create a WebSocket server port
+    dbg("Running action CreateWsPort");
+    feedmeControllerClient.action("CreateWsPort", {}, (err, ad) => {
+      if (err) {
+        reject(err);
       } else {
-        cb("One or more platforms failed one or more tests.");
+        dbg(`WebSocket port created on ${ad.Port}`);
+        server.port = ad.Port;
+        resolve();
       }
-    }
-  ],
-  function(err) {
-    // Perform any cleanup
-    async.series(
-      [
-        function(cb) {
-          if (sauceConnectProcess) {
-            sauceConnectProcess.close(function() {
-              console.log("Sauce Connect proxy stopped.");
-              cb();
-            });
-          } else {
-            cb();
+    });
+  }).then(
+    () =>
+      new Promise((resolve, reject) => {
+        // Open the server event feed and emit on revelation
+        dbg(`Opening WsEvents feed for port ${server.port}`);
+        const eventFeed = feedmeControllerClient.feed("WsEvents", {
+          Port: `${server.port}`
+        });
+        server._eventFeed = eventFeed;
+        eventFeed.once("open", () => {
+          eventFeed.removeAllListeners("close");
+          resolve(server);
+        });
+        eventFeed.once("close", err => {
+          eventFeed.removeAllListeners("open");
+          reject(err);
+        });
+        eventFeed.on("action", (an, ad) => {
+          dbg(
+            `Event revealed on WsEvents feed for port ${server.port}: ${ad.EventName}`
+          );
+          dbg(ad);
+          const emitArgs = ad.Arguments.slice(); // copy
+          // Prepend with testing server-assigned client id if present
+          // Present for client event emissions
+          if (ad.ClientId) {
+            emitArgs.unshift(ad.ClientId);
           }
-        },
-        function(cb) {
-          if (server) {
-            server.close(function() {
-              console.log("Local server stopped.");
-              cb();
-            });
+          emitArgs.unshift(ad.EventName);
+          server.emit(...emitArgs);
+        });
+        eventFeed.desireOpen();
+      })
+  );
+};
+
+["close"].forEach(method => {
+  // Route ws server method calls to the Feedme API
+  wsServerProto[method] = (...args2) => {
+    dbg(`Received call to WebSocket server method ${method}`);
+    const _this = this;
+    const args = [];
+    for (let i = 0; i < args2.length; i += 1) {
+      args.push(args2[i]);
+    }
+    return new Promise((resolve, reject) => {
+      _this._feedmeControllerClient.action(
+        "InvokeWsMethod",
+        { Port: _this.port, Method: method.toLowerCase(), Arguments: args },
+        (err, ad) => {
+          if (err) {
+            reject(err);
           } else {
-            cb();
+            resolve(ad.ReturnValue);
           }
         }
-      ],
-      function() {
-        // Ignore any cleanup errors
+      );
+    });
+  };
+});
 
+["Send", "Terminate", "Close"].forEach(method => {
+  // Route ws server method calls to the Feedme API
+  const methodName = `client${method}`;
+  wsServerProto[methodName] = (...args2) => {
+    dbg(`Received call to WebSocket server method ${method}`);
+    // First argument is client id, then actual ws client method arguments
+    const _this = this;
+    const args = [];
+    for (let i = 0; i < args2.length; i += 1) {
+      args.push(args2[i]);
+    }
+    const clientId = args.shift();
+    return new Promise((resolve, reject) => {
+      _this._feedmeControllerClient.action(
+        "InvokeWsClientMethod",
+        {
+          ClientId: clientId,
+          Port: _this.port,
+          Method: method.toLowerCase(),
+          Arguments: args
+        },
+        (err, ad) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(ad.ReturnValue);
+          }
+        }
+      );
+    });
+  };
+});
+
+wsServerProto.start = function start() {
+  // Create a WebSocket server
+  dbg("Running action CreateWsServer");
+  this._feedmeControllerClient.action(
+    "CreateWsServer",
+    { Port: this.port },
+    () => {
+      // Do nothing - will fire a listening event
+    }
+  );
+};
+
+wsServerProto.destroy = function destroy() {
+  // Close the event feed and destroy the server (server will stop if not stopped)
+  dbg("Destroying WebSocket server");
+  const _this = this;
+  return new Promise((resolve, reject) => {
+    _this._eventFeed.desireClosed();
+    _this._feedmeControllerClient.action(
+      "DestroyWsServer",
+      { Port: _this.port },
+      err => {
         if (err) {
-          console.log("Finished with error:");
-          console.log(err);
-          process.exit(1); // Return failure
+          reject(err);
         } else {
-          console.log("Tests passed on all platforms.");
-          process.exit(0);
+          resolve();
         }
       }
     );
+  });
+};
+
+// const createWsServerListener = function createWsServerListener(ws) {
+//   const evts = [
+//     "listening",
+//     "close",
+//     "error",
+//     "connection",
+//     "clientMessage",
+//     "clientClose",
+//     "clientError"
+//   ];
+//   const l = {};
+//   evts.forEach(evt => {
+//     l[evt] = jasmine.createSpy();
+//     ws.on(evt, l[evt]);
+//   });
+//   l.mockClear = () => {
+//     evts.forEach(evt => {
+//       l[evt].calls.reset();
+//     });
+//   };
+//   return l;
+// };
+
+/*
+
+Feedme controller API wrapper for transport servers.
+
+*/
+
+const transportServerProto = Emitter({});
+
+// const createTransportServer = function createTransportServer(
+//   feedmeControllerClient
+// ) {
+//   dbg("Creating transport server");
+
+//   const server = Object.create(transportServerProto);
+
+//   // Members
+//   server.port = null;
+//   server._feedmeControllerClient = feedmeControllerClient;
+//   server._eventFeed = null;
+
+//   return new Promise((resolve, reject) => {
+//     // Create a transport server
+//     dbg("Running action CreateTransportServer");
+//     feedmeControllerClient.action("CreateTransportServer", {}, (err, ad) => {
+//       if (err) {
+//         reject(err);
+//       } else {
+//         dbg(`Transport server launched on port ${ad.Port}`);
+//         server.port = ad.Port;
+//         resolve();
+//       }
+//     });
+//   }).then(
+//     () =>
+//       new Promise((resolve, reject) => {
+//         // Open the server event feed and emit on revelation
+//         dbg(`Opening TransportEvents feed for port ${server.port}`);
+//         const eventFeed = feedmeControllerClient.feed("TransportEvents", {
+//           Port: `${server.port}`
+//         });
+//         server._eventFeed = eventFeed;
+//         eventFeed.once("open", () => {
+//           eventFeed.removeAllListeners("close");
+//           resolve(server); // Return the server
+//         });
+//         eventFeed.once("close", err => {
+//           eventFeed.removeAllListeners("open");
+//           reject(err);
+//         });
+//         eventFeed.on("action", (an, ad) => {
+//           dbg(
+//             `Event revealed on TransportEvents feed for port ${server.port}: ${ad.EventName}`
+//           );
+//           dbg(ad);
+//           const emitArgs = ad.Arguments.slice(); // copy
+//           emitArgs.unshift(ad.EventName);
+//           server.emit(...emitArgs);
+//         });
+//         eventFeed.desireOpen();
+//       })
+//   );
+// };
+
+["state", "start", "stop", "send", "disconnect"].forEach(method => {
+  // Route transportServer method calls to the Feedme API
+  transportServerProto[method] = (...args2) => {
+    dbg(`Received call to transport server method ${method}`);
+    const _this = this;
+    const args = [];
+    for (let i = 0; i < args2.length; i += 1) {
+      args.push(args2[i]);
+    }
+    return new Promise((resolve, reject) => {
+      _this._feedmeControllerClient.action(
+        "InvokeTransportMethod",
+        { Port: _this.port, Method: method, Arguments: args },
+        (err, ad) => {
+          if (err) {
+            reject(err);
+          } else {
+            resolve(ad.ReturnValue);
+          }
+        }
+      );
+    });
+  };
+});
+
+transportServerProto.destroy = function destroy() {
+  dbg("Destroying WebSocket server");
+
+  // Close the event feed and destroy the server (server will stop if not stopped)
+  const _this = this;
+  return new Promise((resolve, reject) => {
+    _this._eventFeed.desireClosed();
+    _this._feedmeControllerClient.action(
+      "DestroyTransportServer",
+      { Port: _this.port },
+      err => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve();
+        }
+      }
+    );
+  });
+};
+
+// const createTransportServerListener = function createTransportServerListener(
+//   ts
+// ) {
+//   const evts = [
+//     "starting",
+//     "start",
+//     "stopping",
+//     "stop",
+//     "connect",
+//     "message",
+//     "disconnect"
+//   ];
+//   const l = {};
+//   evts.forEach(evt => {
+//     l[evt] = jasmine.createSpy();
+//     ts.on(evt, l[evt]);
+//   });
+//   l.mockClear = () => {
+//     evts.forEach(evt => {
+//       l[evt].calls.reset();
+//     });
+//   };
+//   return l;
+// };
+
+/*
+
+Wrapper to retry failed tests (almost always a temporary conenctivity issue).
+
+Accepts a function that returns a promise and returns a function that
+returns a promise.
+
+On failure, how do you ensure proper clean-up? Maybe don't worry about it too much -- very few tests fail
+*/
+
+const retry = testPromiseGenerator => () =>
+  new Promise((resolve, reject) => {
+    let attempts = 0;
+
+    // Fucntion to run one attempt - recursive
+    const attempt = () => {
+      attempts += 1;
+      testPromiseGenerator()
+        .then(() => {
+          // Test passed
+          resolve();
+        })
+        .catch(err => {
+          // Attempt failed - retry or fail the test
+          if (attempts < RETRY_LIMIT) {
+            attempt();
+          } else {
+            reject(err); // Only rejects with the latest error
+          }
+        });
+    };
+
+    // Start attempt
+    attempt();
+  });
+
+/*
+
+Feedme controller client functions. You can't put these in beforeEach/afterEach
+because they need to be within individual test retry wrappers -- if they fail,
+they are retried.
+
+*/
+
+const connectControllerClient = () =>
+  new Promise((resolve, reject) => {
+    dbg("Connecting controller client");
+    const client = feedmeClient({
+      transport: feedmeTransportWsClient(`${ROOT_URL}:${PORT}`)
+    });
+    client.once("connect", () => {
+      client.removeAllListeners("disconnect");
+      resolve(client);
+    });
+    client.once("disconnect", err => {
+      client.removeAllListeners("connect");
+      reject(err);
+    });
+    client.connect();
+  });
+
+const disconnectControllerClient = fmClient =>
+  new Promise(resolve => {
+    dbg("Disconnecting controller client");
+    fmClient.removeAllListeners();
+    fmClient.once("disconnect", () => {
+      resolve();
+    });
+    fmClient.disconnect();
+  });
+
+/*
+
+Tests
+
+*/
+
+let testNum = -"";
+
+describe("Browser tests", () => {
+  const test = () => {
+    it(
+      "should work using the JS adapter",
+      retry(
+        () =>
+          new Promise((masterResolve, masterReject) => {
+            let feedmeControllerClient;
+            let wsServer;
+            let transportClient;
+            // let wsServerListener;
+            connectControllerClient()
+              .then(c => {
+                feedmeControllerClient = c;
+                feedmeControllerClient.on("disconnect", () => {
+                  masterReject();
+                });
+                return createWsServer(feedmeControllerClient);
+              })
+              .then(
+                s =>
+                  new Promise(resolve => {
+                    wsServer = s;
+                    wsServer.start();
+                    wsServer.once("listening", resolve);
+                    wsServer.on("close", err => {
+                      masterReject(err);
+                    });
+                  })
+              )
+              .then(
+                () =>
+                  new Promise(resolve => {
+                    // Connect a transport client
+                    transportClient = feedmeTransportWsClient(
+                      `${ROOT_URL}:${wsServer.port}`
+                    );
+                    transportClient.connect();
+                    wsServer.once("connection", () => {
+                      resolve();
+                    });
+                    transportClient.on("disconnect", err => {
+                      masterReject(err);
+                    });
+                  })
+              )
+              .then(
+                () =>
+                  new Promise((resolve, reject) => {
+                    // Make sure the client is connected
+                    if (transportClient.state() === "connected") {
+                      resolve();
+                    } else {
+                      transportClient.once("connect", () => {
+                        transportClient.removeAllListeners("disconnect");
+                        resolve();
+                      });
+                      transportClient.once("disconnect", err => {
+                        transportClient.removeAllListeners("connect");
+                        reject(err);
+                      });
+                    }
+                  })
+              )
+              .then(
+                () =>
+                  new Promise(resolve => {
+                    wsServer.on("clientMessage", () => {
+                      dbg("got client message");
+                    });
+                    transportClient.send("hi"); // Not a promise
+                    wsServer.once("clientMessage", () => {
+                      resolve();
+                    });
+                  })
+              )
+              .then(() => {
+                transportClient.removeAllListeners();
+                return new Promise(resolve => {
+                  transportClient.once("disconnect", () => {
+                    resolve();
+                  });
+                  transportClient.disconnect();
+                });
+              })
+              .then(
+                () =>
+                  new Promise((resolve, reject) => {
+                    // Destroy the server
+                    wsServer.removeAllListeners();
+                    feedmeControllerClient.action(
+                      "DestroyWsServer",
+                      { Port: wsServer.port },
+                      err => {
+                        if (err) {
+                          reject(err);
+                        } else {
+                          resolve();
+                        }
+                      }
+                    );
+                  })
+              )
+              .then(() => disconnectControllerClient(feedmeControllerClient))
+              .then(
+                () =>
+                  // Add a wait every 50 tests
+                  new Promise(resolve => {
+                    testNum += 1;
+                    if (testNum % 50 === 0) {
+                      setTimeout(resolve, 10000);
+                    } else {
+                      resolve();
+                    }
+                  })
+              )
+              .then(() => {
+                expect(1).toBe(1);
+                masterResolve();
+              })
+              .catch(err => {
+                masterReject(err);
+              });
+          })
+      )
+    );
+  };
+
+  for (let i = 0; i < 5; i += 1) {
+    describe(`Iteration ${i}`, test);
   }
-);
+});

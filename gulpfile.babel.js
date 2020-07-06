@@ -1,61 +1,12 @@
 import gulp from "gulp";
 import del from "del";
 import sourcemaps from "gulp-sourcemaps";
-import rename from "gulp-rename";
-import replace from "gulp-replace";
-import browserify from "browserify";
-import source from "vinyl-source-stream";
-import buffer from "vinyl-buffer";
 import babel from "gulp-babel";
-import uglify from "gulp-uglify";
 import path from "path";
 
 const clean = () => del(path.join(__dirname, "build"));
 
-/*
-Browserify was not applying the Babelify plugin to external dependencies, but
-it was rolling up the code. As a result, I use Gulp to pipe the output through
-Babel again and then Uglify it (the latter does not support ES6).
-Works in any path. Gulp.src/dest are always relative to package root (Gulpfile).
-
-Do not have Browserify do the polyfills (its url implementation does not support
-new URL()). Have Babel do it, which requires core-js.
-*/
-const browserBundleWithmaps = () => {
-  const b = browserify({
-    entries: path.join(__dirname, "src/browser.js"),
-    debug: true,
-    standalone: "feedmeTransportWsClient",
-    bare: true // No polyfills here
-  });
-
-  return b
-    .transform("babelify", {
-      presets: [
-        [
-          "@babel/preset-env",
-          { useBuiltIns: "usage", corejs: { version: 3, proposals: true } } // Polyfills
-        ]
-      ] // Uses browserslist config in package.json
-    })
-    .bundle()
-    .pipe(source("browser.bundle.withmaps.js"))
-    .pipe(buffer())
-    .pipe(sourcemaps.init({ loadMaps: true })) // Browserify source maps are piped in
-    .pipe(babel({ plugins: ["add-module-exports"] })) // No .default({})
-    .pipe(uglify())
-    .pipe(sourcemaps.write("."))
-    .pipe(gulp.dest(path.join(__dirname, "build")));
-};
-
-const browserBundleNomaps = () =>
-  gulp
-    .src("build/browser.bundle.withmaps.js")
-    .pipe(replace("//# sourceMappingURL=browser.bundle.withmaps.js.map\n", ""))
-    .pipe(rename("browser.bundle.js"))
-    .pipe(gulp.dest("build/"));
-
-const nodeTranspile = () =>
+const transpile = () =>
   gulp
     .src(["src/*.js"])
     .pipe(sourcemaps.init())
@@ -67,11 +18,5 @@ const nodeTranspile = () =>
 const copy = () =>
   gulp.src("./{package.json,LICENSE,README.md}").pipe(gulp.dest("build/"));
 
-export const build = gulp.series(
-  // eslint-disable-line import/prefer-default-export
-  clean,
-  browserBundleWithmaps,
-  browserBundleNomaps,
-  nodeTranspile,
-  copy
-);
+// eslint-disable-next-line import/prefer-default-export
+export const nodeTranspile = gulp.series(clean, transpile, copy);
