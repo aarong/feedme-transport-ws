@@ -32,11 +32,11 @@ jobs:
         - nvm use 8
         - npm run build # test-src, build, test-build-node
 
+        - npm run test-build-browsers # Browser tests only once on 8+ for transilation
+
         - nvm install 6
         - nvm use 6
         - npm run test-build-node
-
-        - npm run test-build-browsers # Browser tests only once
         
         - npm run coveralls
       deploy: # Can't use npm provider because you need to publish the build folder
