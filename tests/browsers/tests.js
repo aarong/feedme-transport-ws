@@ -1,10 +1,12 @@
+import emitter from "component-emitter";
+
 const dbg = function dbg(msg) {
   console.log(msg); // eslint-disable-line no-console
 };
 dbg("Starting browser tests");
 
-// Included as <script>s
-/* global feedmeClient, feedmeTransportWsClient, Emitter */
+// Included using <script> tags in index.html
+/* global feedmeClient, feedmeTransportWsClient */
 
 /*
 
@@ -44,12 +46,16 @@ times on failure.
 // Keeping the controller connected between tests caused problems on browsers
 */
 
+console.log("STARTING TESTS");
+console.log(feedmeTransportWsClient);
+console.log(feedmeClient);
+
 // Allow each test to take significant time, given latency (defaults to 5000)
 jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000; // Per test
 
 const PORT = 3000; // Port for controller Feedme API
 const ROOT_URL = "ws://testinghost.com";
-const RETRY_LIMIT = 8; // How many times to attempt each test
+const RETRY_LIMIT = 10; // How many times to attempt each test
 
 // var delay = function(ms) {
 //   return function() {
@@ -67,7 +73,7 @@ Feedme controller API wrapper for WebSocket servers.
 
 */
 
-const wsServerProto = Emitter({});
+const wsServerProto = emitter({});
 
 const createWsServer = function createWsServer(feedmeControllerClient) {
   dbg("Creating WebSocket server");
@@ -246,7 +252,7 @@ Feedme controller API wrapper for transport servers.
 
 */
 
-const transportServerProto = Emitter({});
+const transportServerProto = emitter({});
 
 // const createTransportServer = function createTransportServer(
 //   feedmeControllerClient

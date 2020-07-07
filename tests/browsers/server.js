@@ -1,3 +1,5 @@
+// REDO USING IMPORT
+
 const uuid = require("uuid");
 const express = require("express");
 const feedmeServerCore = require("feedme-server-core");
@@ -109,7 +111,9 @@ module.exports = function testServer(port, cb) {
   // Set up the HTTP server and call back when listening
   const e = express();
   e.use("/", express.static(`${__dirname}/webroot`));
-  server._httpServer = e.listen(port, cb);
+  server._httpServer = e.listen(port, () => {
+    cb(null, server._httpServer);
+  });
 
   // Start Feedme controller API
   server._fmControllerServer = feedmeServerCore({

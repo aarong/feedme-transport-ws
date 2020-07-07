@@ -5,13 +5,13 @@
   "main": "index.js",
   "scripts": {
     "docs": "documentation build src/client.node.js src/client.browser.js src/server.js -f html -o docs --access public --access private --access undefined --sort-order alpha",
-    "build": "npm run test-src && gulp nodeTranspile && webpack && npm run test-build-node",
+    "build": "npm run test-src && gulp build && npm run test-build-node",
     "lint-src": "eslint src/**",
     "lint-build-tests": "eslint \"tests/browsers/*.js\" && eslint \"tests/node/*.js\"",
     "test": "npm run test-src",
     "test-src": "npm run lint-src && jest src",
     "test-build-node": "npm run lint-build-tests && jest tests/node",
-    "test-build-browsers": "npm run lint-build-tests && node tests/browsers/test.js",
+    "test-build-browsers": "npm run lint-build-tests && babel-node tests/browsers/test.js",
     "coverage": "jest --coverage",
     "coveralls": "jest --coverage --coverageReporters=text-lcov | coveralls"
   },
@@ -27,6 +27,7 @@
   "devDependencies": {
     "@babel/cli": "^7.10.4",
     "@babel/core": "^7.3.4",
+    "@babel/node": "^7.10.4",
     "@babel/preset-env": "^7.3.4",
     "@babel/register": "^7.0.0",
     "async": "^3.2.0",
@@ -55,11 +56,13 @@
     "jest": "^23.6.0",
     "jest-cli": "^23.6.0",
     "json-expressible": "^1.0.1",
+    "make-promises-safe": "^5.1.0",
     "prettier": "^1.14.3",
     "request": "^2.88.2",
     "sauce-connect-launcher": "^1.2.4",
     "webpack": "^4.43.0",
-    "webpack-cli": "^3.3.12"
+    "webpack-cli": "^3.3.12",
+    "webpack-stream": "^5.2.1"
   },
   "repository": {
     "type": "git",
