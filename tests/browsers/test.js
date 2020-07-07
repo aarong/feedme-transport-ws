@@ -422,7 +422,7 @@ to add an entry to their local hosts file.
     },
     json: true,
     body: {
-      url: `http://localhost:${port}/?throwFailures=true&oneFailurePerSpec=true`, // &failFast=true (stop tests on first fail)
+      url: `http://localhost:${port}/?throwFailures=true&oneFailurePerSpec=true`,
       framework: "custom",
       platforms:
         mode === "sauce-automatic-hanging"

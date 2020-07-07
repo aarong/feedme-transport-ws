@@ -3,7 +3,7 @@
 export default {
   browsers: [
     "ie >= 10",
-    "firefox >= 4",
+    "firefox >= 22",
     "chrome >= 29",
     "edge >= 13",
     "safari >= 10",
