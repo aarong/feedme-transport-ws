@@ -6,11 +6,12 @@ This documentation is for developers of the Feedme WebSocket transport.
 
 - [Getting Started](#getting-started)
 - [Directory Structure](#directory-structure)
-- [Source Modules](#source-modules)
+- [Source Code](#source-code)
   - [Source Files](#source-files)
 - [Target Node and NPM Versions](#target-node-and-npm-versions)
 - [NPM Scripts](#npm-scripts)
-- [Development and Deployment Workflow](#development-and-deployment-workflow)
+- [Committing and Deploying](#committing-and-deploying)
+- [Contributions](#contributions)
 
 <!-- /TOC -->
 
@@ -100,7 +101,7 @@ To enable debugging output set the `debug` environment variable to
 
   Node tests are written in ES6 and browser tests in ES5.
 
-## Source Modules
+## Source Code
 
 Module source code is written in ES6 and is transpiled on build for Node and the
 browser.
@@ -148,15 +149,13 @@ property of an error object breaks sourcemaps in the browser.
 
 The intention is to support Node and NPM back as far as realistically possible.
 
-For a development install, the binding dependency constraint is that Eslint
-requires Node 6+, but package-lock.json is only supported by NPM 5+, which comes
-with Node 8+. Develop on Node 8+ and NPM 5+ to ensure that the repo has
-package-lock.json, and rely on Travis to test on Node 6. The Node 6 build is
-published to NPM, as it should be compatible with later versions of Node.
+For a development install, the binding dependency constraint is that Webpack and
+babel-loader require Node 8+. Also, package-lock.json is only supported by NPM
+5+, which comes with Node 8+. So develop and build on Node 8+ and NPM 5+.
 
-Since production installs run code transpiled for Node 6, there is no guarantee
-that they will support earlier versions of Node even though there are far fewer
-dependency-related version constraints.
+Although the library needs to be developed and built on Node 8+, its production
+dependencies are more lenient and can be run on Node 6+, which is verified on
+the Travis build.
 
 ## NPM Scripts
 
@@ -197,7 +196,13 @@ dependency-related version constraints.
   `npm run test-build-browsers -- local` and then open `http://localhost:3000`
   in your browser.
 
-## Development and Deployment Workflow
+## Committing and Deploying
+
+Commits to the master branch on Github are built and tested by Travis CI. If the
+NPM package version has been incremented, then Travis will deploy by publishing
+the build to NPM.
+
+## Contributions
 
 Contributors can fork the repo, make changes, and submit a pull request.
 
@@ -211,7 +216,3 @@ git commit -m "Added my new feature."
 git push origin my-new-feature
 # Submit a pull request
 ```
-
-Commits to the master branch are built and tested by Travis CI. If the NPM
-package version has been incremented, then Travis will deploy by publishing the
-build to NPM.

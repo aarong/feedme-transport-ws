@@ -30,11 +30,6 @@ to add an entry to their local hosts file.
 
 */
 
-// Throw on unhandled Promise rejections so that the script fails
-process.on("unhandledRejection", err => {
-  throw err;
-});
-
 (async () => {
   // Config
   const port = 3000;
