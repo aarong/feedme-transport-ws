@@ -359,12 +359,11 @@ process.on("unhandledRejection", err => {
   if (webpackStats.hasErrors()) {
     console.log("Webpack reported one or more compilation errors");
     console.log(webpackStats.toString());
-    return; // Stop
+    process.exit(1); // Return failure
   }
   if (webpackStats.hasWarnings()) {
     console.log("Webpack reported one or more warnings");
     console.log(webpackStats.toString());
-    return; // Stop
   }
 
   // Copy the latest client browser bundle and sourcemaps into the webroot
