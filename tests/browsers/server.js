@@ -157,8 +157,11 @@ proto._getNextPort = async function _getNextPort() {
     // eslint-disable-next-line no-await-in-loop
     const result = await new Promise(resolve => {
       ["listening", "close"].forEach(evt => {
-        wss.removeAllListeners();
-        resolve(evt);
+        wss.on(evt, () => {
+          wss.removeAllListeners("listening");
+          wss.removeAllListeners("close");
+          resolve(evt);
+        });
       });
     });
 
