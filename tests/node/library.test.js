@@ -1,6 +1,6 @@
 import feedmeClient from "feedme-client";
 import feedmeServerCore from "feedme-server-core";
-import pEvent from "p-event";
+import promisifyEvent from "promisify-event";
 import transportWsServer from "../../build/server";
 import transportWsClient from "../../build/client";
 
@@ -24,7 +24,7 @@ it("should work through all major operations", async () => {
     transport: transportWsServer({ port })
   });
   fmServer.start();
-  await pEvent(fmServer, "start");
+  await promisifyEvent(fmServer, "start");
 
   // Connect a Feedme client
   const fmClient = feedmeClient({
@@ -32,7 +32,7 @@ it("should work through all major operations", async () => {
     reconnect: false
   });
   fmClient.connect();
-  await pEvent(fmClient, "connect");
+  await promisifyEvent(fmClient, "connect");
 
   // Try a rejected action
   fmServer.once("action", (areq, ares) => {
@@ -70,7 +70,7 @@ it("should work through all major operations", async () => {
     expect(err.serverErrorCode).toBe("SOME_ERROR");
     expect(err.serverErrorData).toEqual({ Error: "Data" });
   });
-  await pEvent(feed, "close");
+  await promisifyEvent(feed, "close");
   feed.desireClosed();
 
   // Try a successful feed open
@@ -81,7 +81,7 @@ it("should work through all major operations", async () => {
   feed.once("open", () => {
     expect(feed.data()).toEqual({ Feed: "Data" });
   });
-  await pEvent(feed, "open");
+  await promisifyEvent(feed, "open");
 
   // Try a feed closure
   feed.once("close", err => {
@@ -91,14 +91,14 @@ it("should work through all major operations", async () => {
   fmServer.once("feedClose", (fcreq, fcres) => {
     fcres.success(); // Needed because you attach a listener to the event
   });
-  await pEvent(fmServer, "feedClose");
+  await promisifyEvent(fmServer, "feedClose");
 
   // Try an action revelation
   fmServer.once("feedOpen", (foreq, fores) => {
     fores.success({ Feed: "Data" });
   });
   feed.desireOpen();
-  await pEvent(feed, "open");
+  await promisifyEvent(feed, "open");
   fmServer.actionRevelation({
     actionName: "SomeAction",
     actionData: { Action: "Data" },
@@ -112,7 +112,7 @@ it("should work through all major operations", async () => {
     expect(nfd).toEqual({ Feed: "DataNew" });
     expect(ofd).toEqual({ Feed: "Data" });
   });
-  await pEvent(feed, "action");
+  await promisifyEvent(feed, "action");
 
   // Try a feed termination
   fmServer.feedTermination({
@@ -127,7 +127,7 @@ it("should work through all major operations", async () => {
     expect(err.serverErrorCode).toBe("SOME_ERROR");
     expect(err.serverErrorData).toEqual({ Error: "Data" });
   });
-  await pEvent(feed, "close");
+  await promisifyEvent(feed, "close");
 
   // Try a server disconnect
   fmServer.disconnect(fmClient.id());
@@ -135,11 +135,11 @@ it("should work through all major operations", async () => {
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toBe("FAILURE: The WebSocket closed unexpectedly.");
   });
-  await pEvent(fmClient, "disconnect");
+  await promisifyEvent(fmClient, "disconnect");
 
   // Try a client disconnect
   fmClient.connect();
-  await pEvent(fmClient, "connect");
+  await promisifyEvent(fmClient, "connect");
   const clientId = fmClient.id();
   fmServer.once("disconnect", (cid, err) => {
     expect(cid).toBe(clientId);
@@ -147,15 +147,15 @@ it("should work through all major operations", async () => {
     expect(err.message).toBe("FAILURE: WebSocket transmission failed.");
   });
   fmClient.disconnect();
-  await pEvent(fmServer, "disconnect");
+  await promisifyEvent(fmServer, "disconnect");
 
   // Try a server stoppage (also cleans up)
   fmClient.connect();
-  await pEvent(fmClient, "connect");
+  await promisifyEvent(fmClient, "connect");
   fmServer.stop();
   fmClient.once("disconnect", err => {
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toBe("FAILURE: The WebSocket closed unexpectedly.");
   });
-  await pEvent(fmClient, "disconnect");
+  await promisifyEvent(fmClient, "disconnect");
 });

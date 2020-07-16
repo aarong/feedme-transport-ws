@@ -6,8 +6,8 @@ import feedmeServerCore from "feedme-server-core";
 import WebSocket from "ws";
 import jsonExpressible from "json-expressible";
 import debug from "debug";
+import promisifyEvent from "promisify-event";
 import feedmeTransportWsServer from "../../build/server";
-import asyncUtil from "./asyncutil";
 
 const dbg = debug("feedme-transport-ws:browser-test-server");
 
@@ -111,7 +111,7 @@ export default async function testServer(port) {
   const e = express();
   e.use("/", express.static(`${__dirname}/webroot`));
   server._httpServer = e.listen(port);
-  await asyncUtil.once(server._httpServer, "listening");
+  await promisifyEvent(server._httpServer, "listening");
 
   // Create the Feedme controller API and wait for it to start
   server._fmControllerServer = feedmeServerCore({
@@ -130,7 +130,7 @@ export default async function testServer(port) {
     fores.success({});
   });
   server._fmControllerServer.start();
-  await asyncUtil.once(server._fmControllerServer, "start");
+  await promisifyEvent(server._fmControllerServer, "start");
 
   return server._httpServer;
 }
@@ -168,7 +168,7 @@ proto._getNextPort = async function _getNextPort() {
     // Found a good port?
     if (result === "listening") {
       wss.close();
-      await asyncUtil.once(wss, "close"); // eslint-disable-line no-await-in-loop
+      await promisifyEvent(wss, "close"); // eslint-disable-line no-await-in-loop
       break;
     }
   } while (true); // eslint-disable-line no-constant-condition

@@ -3,7 +3,7 @@ import http from "http";
 import request from "request";
 import check from "check-types";
 import promisify from "util.promisify"; // Need to be able to run build tests in Node 6
-import pEvent from "p-event";
+import promisifyEvent from "promisify-event";
 import delay from "delay";
 import transportWsServer from "../../build/server";
 import serverConfig from "../../src/server.config";
@@ -117,14 +117,14 @@ describe("The transport configuration options", () => {
         heartbeatTimeoutMs
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client and wait for it to connect
       const wsClient = new WebSocket(`ws://localhost:${port}`);
       transportServer.once("connect", cid => {
         clientId = cid;
       });
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -148,7 +148,7 @@ describe("The transport configuration options", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // WS client events
@@ -163,11 +163,11 @@ describe("The transport configuration options", () => {
         heartbeatTimeoutMs
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client and wait for it to connect
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const cListener = createWsClientListener(wsClient);
 
@@ -186,7 +186,7 @@ describe("The transport configuration options", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
   });
 
@@ -208,14 +208,14 @@ describe("The transport configuration options", () => {
         heartbeatTimeoutMs
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client and wait for it to connect
       const wsClient = new WebSocket(`ws://localhost:${port}`);
       transportServer.once("connect", cid => {
         clientId = cid;
       });
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -250,7 +250,7 @@ describe("The transport configuration options", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // WS client events
@@ -265,11 +265,11 @@ describe("The transport configuration options", () => {
         heartbeatTimeoutMs
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client and wait for it to connect
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       // Run through the ping/pong cycle a few times
       await delay(5 * (heartbeatIntervalMs + LATENCY));
@@ -291,7 +291,7 @@ describe("The transport configuration options", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
   });
 
@@ -313,14 +313,14 @@ describe("The transport configuration options", () => {
         heartbeatTimeoutMs
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client and wait for it to connect
       const wsClient = new WebSocket(`ws://localhost:${port}`);
       transportServer.once("connect", cid => {
         clientId = cid;
       });
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -347,7 +347,7 @@ describe("The transport configuration options", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // WS client events - N/A (ping failure induced by connection closure)
@@ -371,14 +371,14 @@ describe("The transport configuration options", () => {
         heartbeatTimeoutMs
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client and wait for it to connect
       const wsClient = new WebSocket(`ws://localhost:${port}`);
       transportServer.once("connect", cid => {
         clientId = cid;
       });
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -408,7 +408,7 @@ describe("The transport configuration options", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // WS client events - N/A (ping failure induced by secret connection closure)
@@ -431,11 +431,11 @@ describe("The transport configuration options", () => {
         heartbeatTimeoutMs
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client and wait for it to connect
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -452,7 +452,7 @@ describe("The transport configuration options", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // WS client events
@@ -467,11 +467,11 @@ describe("The transport configuration options", () => {
         heartbeatTimeoutMs
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client and wait for it to connect
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const cListener = createWsClientListener(wsClient);
 
@@ -487,7 +487,7 @@ describe("The transport configuration options", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
   });
 
@@ -507,11 +507,11 @@ describe("The transport configuration options", () => {
         heartbeatIntervalMs: 0
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client and wait for it to connect
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -541,7 +541,7 @@ describe("The transport configuration options", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // WS client events
@@ -555,11 +555,11 @@ describe("The transport configuration options", () => {
         heartbeatIntervalMs: 0
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client and wait for it to connect
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const cListener = createWsClientListener(wsClient);
 
@@ -587,7 +587,7 @@ describe("The transport configuration options", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
   });
 });
@@ -600,16 +600,16 @@ describe("Key ws configuration options", () => {
       // Start a transport server
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Try to connect a client with a bad subprotocol
       const wsClient = new WebSocket(`ws://localhost:${port}`); // No protocol
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
       expect(wsClient.readyState).toBe(wsClient.OPEN);
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     it("should accept new connections with only the 'feedme' WebSocket subprotocol", async () => {
@@ -618,16 +618,16 @@ describe("Key ws configuration options", () => {
       // Start a transport server
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Try to connect a client with "feedme"" subprotocol
       const wsClient = new WebSocket(`ws://localhost:${port}`, "feedme");
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
       expect(wsClient.readyState).toBe(wsClient.OPEN);
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     it("should accept new connections with 'feedme' and other WebSocket subprotocols", async () => {
@@ -636,19 +636,19 @@ describe("Key ws configuration options", () => {
       // Start a transport server
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Try to connect a client with "feedne" and other subprotocols
       const wsClient = new WebSocket(
         `ws://localhost:${port}`,
         "something_else,feedme,something_else_2"
       );
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
       expect(wsClient.readyState).toBe(wsClient.OPEN);
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     it("should terminate new connections with specified but unsupported WebSocket subprotocols", async () => {
@@ -657,16 +657,21 @@ describe("Key ws configuration options", () => {
       // Start a transport server
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Try to connect a client with a bad subprotocol
       const wsClient = new WebSocket(`ws://localhost:${port}`, "bad_protocol");
-      await pEvent(wsClient, "error");
+      try {
+        await promisifyEvent(wsClient, "error");
+      } catch (e) {
+        // promisifyEvent rejects on error event
+      }
+
       expect(wsClient.readyState).toBe(wsClient.CLOSING);
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
   });
   describe("The path option", () => {
@@ -679,11 +684,11 @@ describe("Key ws configuration options", () => {
         path: "/somepath"
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client to the specified path
       const wsClient1 = new WebSocket(`ws://localhost:${port}/somepath`);
-      await pEvent(wsClient1, "open");
+      await promisifyEvent(wsClient1, "open");
 
       // Try to connect a ws client to the root path
       let err;
@@ -691,7 +696,11 @@ describe("Key ws configuration options", () => {
       wsClient2.once("error", er => {
         err = er;
       });
-      await pEvent(wsClient2, "error");
+      try {
+        await promisifyEvent(wsClient2, "error");
+      } catch (e) {
+        // promisifyEvent throws on error event
+      }
       expect(err).toBeInstanceOf(Error);
       expect(err.message).toBe("Unexpected server response: 400");
 
@@ -700,13 +709,17 @@ describe("Key ws configuration options", () => {
       wsClient3.once("error", er => {
         err = er;
       });
-      await pEvent(wsClient3, "error");
+      try {
+        await promisifyEvent(wsClient3, "error");
+      } catch (e) {
+        // promisifyEvent throws on error event
+      }
       expect(err).toBeInstanceOf(Error);
       expect(err.message).toBe("Unexpected server response: 400");
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     it("should work as expected if not specified", async () => {
@@ -717,19 +730,19 @@ describe("Key ws configuration options", () => {
         port
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client to the root path
       const wsClient1 = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient1, "open");
+      await promisifyEvent(wsClient1, "open");
 
       // Connect a ws client to some other path
       const wsClient2 = new WebSocket(`ws://localhost:${port}/somepath`);
-      await pEvent(wsClient2, "open");
+      await promisifyEvent(wsClient2, "open");
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
   });
 
@@ -749,11 +762,11 @@ describe("Key ws configuration options", () => {
         maxPayload
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       expect(transportServer.state()).toBe("started");
 
@@ -765,7 +778,7 @@ describe("Key ws configuration options", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // Transport server events
@@ -783,11 +796,11 @@ describe("Key ws configuration options", () => {
         cid = c;
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -830,7 +843,7 @@ describe("Key ws configuration options", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // WS client events
@@ -844,11 +857,11 @@ describe("Key ws configuration options", () => {
         maxPayload
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const cListener = createWsClientListener(wsClient);
 
@@ -878,7 +891,7 @@ describe("Key ws configuration options", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
   });
 
@@ -922,9 +935,9 @@ describe("The transport.start() function", () => {
       }).toThrow(new Error("INVALID_STATE: The server is not stopped."));
 
       // Clean up
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     it("should throw if the state is started", async () => {
@@ -933,7 +946,7 @@ describe("The transport.start() function", () => {
       // Create a transport server and run the test
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
       expect(transportServer.state()).toBe("started");
       expect(() => {
         transportServer.start();
@@ -941,7 +954,7 @@ describe("The transport.start() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     it("should throw if the state is stopping", async () => {
@@ -950,7 +963,7 @@ describe("The transport.start() function", () => {
       // Create a transport server and run the test
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
       transportServer.stop();
       expect(transportServer.state()).toBe("stopping");
       expect(() => {
@@ -958,7 +971,7 @@ describe("The transport.start() function", () => {
       }).toThrow(new Error("INVALID_STATE: The server is not stopped."));
 
       // Clean up
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
   });
 
@@ -1039,12 +1052,12 @@ describe("The transport.start() function", () => {
         transportServer.start();
         expect(transportServer.state()).toBe("starting");
 
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
         expect(transportServer.state()).toBe("started");
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
       });
 
       // Transport server events
@@ -1089,7 +1102,7 @@ describe("The transport.start() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
       });
 
       // WS client events - N/A
@@ -1111,13 +1124,13 @@ describe("The transport.start() function", () => {
         transportServer.start();
         expect(transportServer.state()).toBe("starting");
 
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
 
         expect(transportServer.state()).toBe("stopped");
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // Transport server events
@@ -1149,7 +1162,7 @@ describe("The transport.start() function", () => {
           eventOrder.push(evt);
         });
 
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
 
         // Emit events asynchronously
         expect(listener.starting.mock.calls.length).toBe(1);
@@ -1178,7 +1191,7 @@ describe("The transport.start() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // WS client events - N/A
@@ -1377,7 +1390,7 @@ describe("The transport.start() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         expect(listener.disconnect.mock.calls.length).toBe(0);
 
-        await pEvent(transportServer, "starting");
+        await promisifyEvent(transportServer, "starting");
 
         // Emit starting asynchronously
         expect(listener.starting.mock.calls.length).toBe(1);
@@ -1412,7 +1425,7 @@ describe("The transport.start() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         expect(listener.disconnect.mock.calls.length).toBe(0);
 
-        await pEvent(httpServer, "listening");
+        await promisifyEvent(httpServer, "listening");
 
         // Emit start once http server listening
         expect(listener.starting.mock.calls.length).toBe(0);
@@ -1515,7 +1528,7 @@ describe("The transport.start() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         expect(listener.disconnect.mock.calls.length).toBe(0);
 
-        await pEvent(transportServer, "starting");
+        await promisifyEvent(transportServer, "starting");
 
         // Emit starting asynchronously
         expect(listener.starting.mock.calls.length).toBe(1);
@@ -1643,23 +1656,23 @@ describe("The transport.stop() function", () => {
       }).toThrow(new Error("INVALID_STATE: The server is not started."));
 
       // Clean up
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     it("should throw if the state is stopping", async () => {
       const port = getNextPortNumber();
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
       transportServer.stop();
       expect(() => {
         transportServer.stop();
       }).toThrow(new Error("INVALID_STATE: The server is not started."));
 
       // Clean up
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
   });
 
@@ -1675,14 +1688,14 @@ describe("The transport.stop() function", () => {
         // Start a transport server
         const transportServer = transportWsServer({ port });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         expect(transportServer.state()).toBe("started");
 
         transportServer.stop();
         expect(transportServer.state()).toBe("stopping");
 
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
 
         expect(transportServer.state()).toBe("stopped");
       });
@@ -1695,7 +1708,7 @@ describe("The transport.stop() function", () => {
         // Start a transport server
         const transportServer = transportWsServer({ port });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         const listener = createServerListener(transportServer);
 
@@ -1717,7 +1730,7 @@ describe("The transport.stop() function", () => {
           });
         });
 
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
 
         // Emit stopping and eventually stop
         expect(listener.starting.mock.calls.length).toBe(0);
@@ -1740,11 +1753,11 @@ describe("The transport.stop() function", () => {
         // Start a transport server
         const transportServer = transportWsServer({ port });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const cListener = createWsClientListener(wsClient);
 
@@ -1782,20 +1795,20 @@ describe("The transport.stop() function", () => {
           server: httpServer
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         expect(transportServer.state()).toBe("started");
 
         transportServer.stop();
         expect(transportServer.state()).toBe("stopping");
 
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
 
         expect(transportServer.state()).toBe("stopped");
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // Transport server events
@@ -1815,7 +1828,7 @@ describe("The transport.stop() function", () => {
           server: httpServer
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         const listener = createServerListener(transportServer);
 
@@ -1837,7 +1850,7 @@ describe("The transport.stop() function", () => {
           });
         });
 
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
 
         // Emit stopping and eventually stop
         expect(listener.starting.mock.calls.length).toBe(0);
@@ -1853,7 +1866,7 @@ describe("The transport.stop() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // External http server listeners
@@ -1873,7 +1886,7 @@ describe("The transport.stop() function", () => {
           server: httpServer
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         expect(httpServer.listenerCount("listening")).toBe(2); // One for transport, one for ws
         expect(httpServer.listenerCount("close")).toBe(1);
@@ -1887,7 +1900,7 @@ describe("The transport.stop() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // WS client events
@@ -1907,11 +1920,11 @@ describe("The transport.stop() function", () => {
           server: httpServer
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const cListener = createWsClientListener(wsClient);
 
@@ -1929,7 +1942,7 @@ describe("The transport.stop() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
     });
 
@@ -1944,14 +1957,14 @@ describe("The transport.stop() function", () => {
           noServer: true
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         expect(transportServer.state()).toBe("started");
 
         transportServer.stop();
         expect(transportServer.state()).toBe("stopping");
 
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
 
         expect(transportServer.state()).toBe("stopped");
       });
@@ -1964,7 +1977,7 @@ describe("The transport.stop() function", () => {
           noServer: true
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         const listener = createServerListener(transportServer);
 
@@ -1986,7 +1999,7 @@ describe("The transport.stop() function", () => {
           });
         });
 
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
 
         // Emit stopping and eventually stop
         expect(listener.starting.mock.calls.length).toBe(0);
@@ -2018,7 +2031,7 @@ describe("The transport.stop() function", () => {
           noServer: true
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Route WebSocket upgrade requests
         httpServer.on("upgrade", (req, socket, head) => {
@@ -2027,7 +2040,7 @@ describe("The transport.stop() function", () => {
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const cListener = createWsClientListener(wsClient);
 
@@ -2045,7 +2058,7 @@ describe("The transport.stop() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
     });
   });
@@ -2070,37 +2083,37 @@ describe("The transport.send() function", () => {
       }).toThrow(new Error("INVALID_STATE: The server is not started."));
 
       // Clean up
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     it("should throw if state is stopping", async () => {
       const port = getNextPortNumber();
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
       transportServer.stop();
       expect(() => {
         transportServer.send("cid", "msg");
       }).toThrow(new Error("INVALID_STATE: The server is not started."));
 
       // Clean up
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     it("should throw is started and client not found", async () => {
       const port = getNextPortNumber();
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
       expect(() => {
         transportServer.send("cid", "msg");
       }).toThrow(new Error("INVALID_STATE: The client is not connected."));
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
   });
 
@@ -2116,7 +2129,7 @@ describe("The transport.send() function", () => {
         // Start a transport server
         const transportServer = transportWsServer({ port });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -2124,14 +2137,14 @@ describe("The transport.send() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         // Make the call to send() call back error by having the client
         // disconnect and prevent the transport server from knowing by removing
         // its ws close listener
         transportServer._wsServer.removeAllListeners("close");
         wsClient.close();
-        await pEvent(wsClient, "close");
+        await promisifyEvent(wsClient, "close");
 
         expect(transportServer.state()).toBe("started");
 
@@ -2145,7 +2158,7 @@ describe("The transport.send() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
       });
 
       // Transport server events
@@ -2156,7 +2169,7 @@ describe("The transport.send() function", () => {
         // Start a transport server
         const transportServer = transportWsServer({ port });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -2164,14 +2177,14 @@ describe("The transport.send() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         // Make the call to send() call back error by having the client
         // disconnect and prevent the transport server from knowing by removing
         // its ws close listener
         transportServer._wsServer.removeAllListeners("close");
         wsClient.close();
-        await pEvent(wsClient, "close");
+        await promisifyEvent(wsClient, "close");
 
         const listener = createServerListener(transportServer);
 
@@ -2205,7 +2218,7 @@ describe("The transport.send() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
       });
 
       // WS client events - N/A (need to close client to get ws to throw)
@@ -2222,7 +2235,7 @@ describe("The transport.send() function", () => {
         // Start a transport server
         const transportServer = transportWsServer({ port });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -2230,7 +2243,7 @@ describe("The transport.send() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         expect(transportServer.state()).toBe("started");
 
@@ -2244,7 +2257,7 @@ describe("The transport.send() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
       });
 
       // Transport server events
@@ -2255,7 +2268,7 @@ describe("The transport.send() function", () => {
         // Start a transport server
         const transportServer = transportWsServer({ port });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -2263,7 +2276,7 @@ describe("The transport.send() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const listener = createServerListener(transportServer);
 
@@ -2282,7 +2295,7 @@ describe("The transport.send() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
       });
 
       // WS client events
@@ -2293,7 +2306,7 @@ describe("The transport.send() function", () => {
         // Start a transport server
         const transportServer = transportWsServer({ port });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -2301,7 +2314,7 @@ describe("The transport.send() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const cListener = createWsClientListener(wsClient);
 
@@ -2320,7 +2333,7 @@ describe("The transport.send() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
       });
     });
 
@@ -2344,7 +2357,7 @@ describe("The transport.send() function", () => {
           server: httpServer
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -2352,14 +2365,14 @@ describe("The transport.send() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         // Make the call to send() call back error by having the client
         // disconnect and prevent the transport server from knowing by removing
         // its ws close listener
         transportServer._wsServer.removeAllListeners("close");
         wsClient.close();
-        await pEvent(wsClient, "close");
+        await promisifyEvent(wsClient, "close");
 
         expect(transportServer.state()).toBe("started");
 
@@ -2373,7 +2386,7 @@ describe("The transport.send() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // Transport server events
@@ -2393,7 +2406,7 @@ describe("The transport.send() function", () => {
           server: httpServer
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -2401,14 +2414,14 @@ describe("The transport.send() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         // Make the call to send() call back error by having the client
         // disconnect and prevent the transport server from knowing by removing
         // its ws close listener
         transportServer._wsServer.removeAllListeners("close");
         wsClient.close();
-        await pEvent(wsClient, "close");
+        await promisifyEvent(wsClient, "close");
 
         const listener = createServerListener(transportServer);
 
@@ -2433,7 +2446,7 @@ describe("The transport.send() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // WS client events - N/A (need to close client to get ws to throw)
@@ -2459,7 +2472,7 @@ describe("The transport.send() function", () => {
           server: httpServer
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -2467,7 +2480,7 @@ describe("The transport.send() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         expect(transportServer.state()).toBe("started");
 
@@ -2481,7 +2494,7 @@ describe("The transport.send() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // Transport server events
@@ -2501,7 +2514,7 @@ describe("The transport.send() function", () => {
           server: httpServer
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -2509,7 +2522,7 @@ describe("The transport.send() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const listener = createServerListener(transportServer);
 
@@ -2537,7 +2550,7 @@ describe("The transport.send() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // WS client events
@@ -2557,7 +2570,7 @@ describe("The transport.send() function", () => {
           server: httpServer
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -2565,7 +2578,7 @@ describe("The transport.send() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const cListener = createWsClientListener(wsClient);
 
@@ -2584,7 +2597,7 @@ describe("The transport.send() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
     });
 
@@ -2608,7 +2621,7 @@ describe("The transport.send() function", () => {
           noServer: true
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Route upgrade requests to the transport
         httpServer.on("upgrade", (req, socket, head) => {
@@ -2621,14 +2634,14 @@ describe("The transport.send() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         // Make the call to send() call back error by having the client
         // disconnect and prevent the transport server from knowing by removing
         // its ws close listener
         transportServer._wsServer.removeAllListeners("close");
         wsClient.close();
-        await pEvent(wsClient, "close");
+        await promisifyEvent(wsClient, "close");
 
         expect(transportServer.state()).toBe("started");
 
@@ -2642,9 +2655,9 @@ describe("The transport.send() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // Transport server events
@@ -2664,7 +2677,7 @@ describe("The transport.send() function", () => {
           noServer: true
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Route upgrade requests to the transport
         httpServer.on("upgrade", (req, socket, head) => {
@@ -2677,14 +2690,14 @@ describe("The transport.send() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         // Make the call to send() call back error by having the client
         // disconnect and prevent the transport server from knowing by removing
         // its ws close listener
         transportServer._wsServer.removeAllListeners("close");
         wsClient.close();
-        await pEvent(wsClient, "close");
+        await promisifyEvent(wsClient, "close");
 
         const listener = createServerListener(transportServer);
 
@@ -2718,9 +2731,9 @@ describe("The transport.send() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // WS client events - N/A (need to close client to get ws to throw)
@@ -2746,7 +2759,7 @@ describe("The transport.send() function", () => {
           noServer: true
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Route upgrade requests to the transport
         httpServer.on("upgrade", (req, socket, head) => {
@@ -2759,7 +2772,7 @@ describe("The transport.send() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         expect(transportServer.state()).toBe("started");
 
@@ -2773,9 +2786,9 @@ describe("The transport.send() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // Transport server events
@@ -2795,7 +2808,7 @@ describe("The transport.send() function", () => {
           noServer: true
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Route upgrade requests to the transport
         httpServer.on("upgrade", (req, socket, head) => {
@@ -2808,7 +2821,7 @@ describe("The transport.send() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const listener = createServerListener(transportServer);
 
@@ -2827,9 +2840,9 @@ describe("The transport.send() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // WS client events
@@ -2849,7 +2862,7 @@ describe("The transport.send() function", () => {
           noServer: true
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Route upgrade requests to the transport
         httpServer.on("upgrade", (req, socket, head) => {
@@ -2862,7 +2875,7 @@ describe("The transport.send() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const cListener = createWsClientListener(wsClient);
 
@@ -2881,9 +2894,9 @@ describe("The transport.send() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
     });
   });
@@ -2908,37 +2921,37 @@ describe("The transport.disconnect() function", () => {
       }).toThrow(new Error("INVALID_STATE: The server is not started."));
 
       // Clean up
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     it("should throw if state is stopping", async () => {
       const port = getNextPortNumber();
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
       transportServer.stop();
       expect(() => {
         transportServer.disconnect("cid");
       }).toThrow(new Error("INVALID_STATE: The server is not started."));
 
       // Clean up
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     it("should throw is started and client not found", async () => {
       const port = getNextPortNumber();
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
       expect(() => {
         transportServer.disconnect("cid");
       }).toThrow(new Error("INVALID_STATE: The client is not connected."));
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
   });
 
@@ -2954,7 +2967,7 @@ describe("The transport.disconnect() function", () => {
         // Start a transport server
         const transportServer = transportWsServer({ port });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -2962,7 +2975,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         expect(transportServer.state()).toBe("started");
 
@@ -2976,7 +2989,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
       });
 
       // Transport server events
@@ -2987,7 +3000,7 @@ describe("The transport.disconnect() function", () => {
         // Start a transport server
         const transportServer = transportWsServer({ port });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -2995,7 +3008,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const listener = createServerListener(transportServer);
 
@@ -3025,7 +3038,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
       });
 
       // WS client events
@@ -3036,7 +3049,7 @@ describe("The transport.disconnect() function", () => {
         // Start a transport server
         const transportServer = transportWsServer({ port });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -3044,7 +3057,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const cListener = createWsClientListener(wsClient);
 
@@ -3063,7 +3076,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
       });
     });
 
@@ -3079,7 +3092,7 @@ describe("The transport.disconnect() function", () => {
         // Start a transport server
         const transportServer = transportWsServer({ port });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -3087,7 +3100,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         expect(transportServer.state()).toBe("started");
 
@@ -3101,7 +3114,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
       });
 
       // Transport server events
@@ -3113,7 +3126,7 @@ describe("The transport.disconnect() function", () => {
         // Start a transport server
         const transportServer = transportWsServer({ port });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -3121,7 +3134,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const listener = createServerListener(transportServer);
 
@@ -3152,7 +3165,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
       });
 
       // WS client events
@@ -3164,7 +3177,7 @@ describe("The transport.disconnect() function", () => {
         // Start a transport server
         const transportServer = transportWsServer({ port });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -3172,7 +3185,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const cListener = createWsClientListener(wsClient);
 
@@ -3191,7 +3204,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         transportServer.stop();
-        await pEvent(transportServer, "stop");
+        await promisifyEvent(transportServer, "stop");
       });
     });
 
@@ -3215,7 +3228,7 @@ describe("The transport.disconnect() function", () => {
           server: httpServer
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -3223,7 +3236,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         expect(transportServer.state()).toBe("started");
 
@@ -3237,7 +3250,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // Transport server events
@@ -3257,7 +3270,7 @@ describe("The transport.disconnect() function", () => {
           server: httpServer
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -3265,7 +3278,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const listener = createServerListener(transportServer);
 
@@ -3295,7 +3308,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // WS client events
@@ -3315,7 +3328,7 @@ describe("The transport.disconnect() function", () => {
           server: httpServer
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -3323,7 +3336,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const cListener = createWsClientListener(wsClient);
 
@@ -3342,7 +3355,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
     });
 
@@ -3367,7 +3380,7 @@ describe("The transport.disconnect() function", () => {
           server: httpServer
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -3375,7 +3388,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         expect(transportServer.state()).toBe("started");
 
@@ -3389,7 +3402,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // Transport server events
@@ -3410,7 +3423,7 @@ describe("The transport.disconnect() function", () => {
           server: httpServer
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -3418,7 +3431,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const listener = createServerListener(transportServer);
 
@@ -3449,7 +3462,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // WS client events
@@ -3470,7 +3483,7 @@ describe("The transport.disconnect() function", () => {
           server: httpServer
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Connect a client
         const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -3478,7 +3491,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const cListener = createWsClientListener(wsClient);
 
@@ -3497,7 +3510,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
     });
 
@@ -3521,7 +3534,7 @@ describe("The transport.disconnect() function", () => {
           noServer: true
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Route upgrade requests to the transport
         httpServer.on("upgrade", (req, socket, head) => {
@@ -3534,7 +3547,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         expect(transportServer.state()).toBe("started");
 
@@ -3548,7 +3561,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // Transport server events
@@ -3568,7 +3581,7 @@ describe("The transport.disconnect() function", () => {
           noServer: true
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Route upgrade requests to the transport
         httpServer.on("upgrade", (req, socket, head) => {
@@ -3581,7 +3594,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const listener = createServerListener(transportServer);
 
@@ -3611,7 +3624,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // WS client events
@@ -3631,7 +3644,7 @@ describe("The transport.disconnect() function", () => {
           noServer: true
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Route upgrade requests to the transport
         httpServer.on("upgrade", (req, socket, head) => {
@@ -3644,7 +3657,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const cListener = createWsClientListener(wsClient);
 
@@ -3663,7 +3676,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
     });
 
@@ -3688,7 +3701,7 @@ describe("The transport.disconnect() function", () => {
           noServer: true
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Route upgrade requests to the transport
         httpServer.on("upgrade", (req, socket, head) => {
@@ -3701,7 +3714,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         expect(transportServer.state()).toBe("started");
 
@@ -3715,7 +3728,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // Transport server events
@@ -3736,7 +3749,7 @@ describe("The transport.disconnect() function", () => {
           noServer: true
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Route upgrade requests to the transport
         httpServer.on("upgrade", (req, socket, head) => {
@@ -3749,7 +3762,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const listener = createServerListener(transportServer);
 
@@ -3780,7 +3793,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
 
       // WS client events
@@ -3801,7 +3814,7 @@ describe("The transport.disconnect() function", () => {
           noServer: true
         });
         transportServer.start();
-        await pEvent(transportServer, "start");
+        await promisifyEvent(transportServer, "start");
 
         // Route upgrade requests to the transport
         httpServer.on("upgrade", (req, socket, head) => {
@@ -3814,7 +3827,7 @@ describe("The transport.disconnect() function", () => {
         transportServer.once("connect", cid => {
           clientId = cid;
         });
-        await pEvent(wsClient, "open");
+        await promisifyEvent(wsClient, "open");
 
         const cListener = createWsClientListener(wsClient);
 
@@ -3833,7 +3846,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         httpServer.close();
-        await pEvent(httpServer, "close");
+        await promisifyEvent(httpServer, "close");
       });
     });
   });
@@ -3848,7 +3861,7 @@ describe("The transport.handleUpgrade() function", () => {
       // Start a transport server
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Start an http server
       const httpServer = http.createServer((req, res) => {
@@ -3869,7 +3882,7 @@ describe("The transport.handleUpgrade() function", () => {
 
       // Connect a client
       const wsClient = new WebSocket(`ws://localhost:${httpPort}`);
-      await pEvent(httpServer, "upgrade");
+      await promisifyEvent(httpServer, "upgrade");
 
       expect(() => {
         transportServer.handleUpgrade(req, socket, head);
@@ -3881,9 +3894,9 @@ describe("The transport.handleUpgrade() function", () => {
       wsClient.on("error", () => {}); // Destroy socket will cause uncaught error
       socket.destroy();
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     it("should throw in external server mode", async () => {
@@ -3901,7 +3914,7 @@ describe("The transport.handleUpgrade() function", () => {
         server: httpServer
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Listen for upgrade arguments
       let req;
@@ -3915,7 +3928,7 @@ describe("The transport.handleUpgrade() function", () => {
 
       // Connect a client
       const wsClient = new WebSocket(`ws://localhost:${port}`); // eslint-disable-line no-unused-vars
-      await pEvent(httpServer, "upgrade");
+      await promisifyEvent(httpServer, "upgrade");
 
       expect(() => {
         transportServer.handleUpgrade(req, socket, head);
@@ -3925,9 +3938,9 @@ describe("The transport.handleUpgrade() function", () => {
 
       // // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     it("should throw if the server is stopped", async () => {
@@ -3957,7 +3970,7 @@ describe("The transport.handleUpgrade() function", () => {
 
       // Connect a client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(httpServer, "upgrade");
+      await promisifyEvent(httpServer, "upgrade");
 
       expect(() => {
         transportServer.handleUpgrade(req, socket, head);
@@ -3969,7 +3982,7 @@ describe("The transport.handleUpgrade() function", () => {
       wsClient.on("error", () => {}); // Destroy socket will cause uncaught error
       socket.destroy();
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Can't do starting / stopping as state immediately becomes started/stopped
@@ -3995,7 +4008,7 @@ describe("The transport.handleUpgrade() function", () => {
         noServer: true
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Listen for upgrade arguments
       let req;
@@ -4009,7 +4022,7 @@ describe("The transport.handleUpgrade() function", () => {
 
       // Connect a client
       const wsClient = new WebSocket(`ws://localhost:${port}`); // eslint-disable-line no-unused-vars
-      await pEvent(httpServer, "upgrade");
+      await promisifyEvent(httpServer, "upgrade");
 
       expect(transportServer.state()).toBe("started");
 
@@ -4019,9 +4032,9 @@ describe("The transport.handleUpgrade() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -4041,7 +4054,7 @@ describe("The transport.handleUpgrade() function", () => {
         noServer: true
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Listen for upgrade arguments
       let req;
@@ -4055,7 +4068,7 @@ describe("The transport.handleUpgrade() function", () => {
 
       // Connect a client
       const wsClient = new WebSocket(`ws://localhost:${port}`); // eslint-disable-line no-unused-vars
-      await pEvent(httpServer, "upgrade");
+      await promisifyEvent(httpServer, "upgrade");
 
       const listener = createServerListener(transportServer);
 
@@ -4085,9 +4098,9 @@ describe("The transport.handleUpgrade() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // WS client events
@@ -4107,7 +4120,7 @@ describe("The transport.handleUpgrade() function", () => {
         noServer: true
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Listen for upgrade arguments
       let req;
@@ -4121,7 +4134,7 @@ describe("The transport.handleUpgrade() function", () => {
 
       // Connect a client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(httpServer, "upgrade");
+      await promisifyEvent(httpServer, "upgrade");
 
       const cListener = createWsClientListener(wsClient);
 
@@ -4139,9 +4152,9 @@ describe("The transport.handleUpgrade() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
   });
 });
@@ -4165,13 +4178,13 @@ describe("The transport._processServerListening() function", () => {
 
       expect(transportServer.state()).toBe("starting");
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(transportServer.state()).toBe("started");
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // Transport server events
@@ -4188,7 +4201,7 @@ describe("The transport._processServerListening() function", () => {
         listener = createServerListener(transportServer);
       });
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(1);
@@ -4201,7 +4214,7 @@ describe("The transport._processServerListening() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // WS client events - N/A
@@ -4230,19 +4243,19 @@ describe("The transport._processServerListening() function", () => {
 
       transportServer.start();
 
-      await pEvent(transportServer, "starting");
+      await promisifyEvent(transportServer, "starting");
 
       expect(transportServer.state()).toBe("starting");
 
       httpServer.listen(port);
 
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       expect(transportServer.state()).toBe("started");
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -4268,7 +4281,7 @@ describe("The transport._processServerListening() function", () => {
 
       httpServer.listen(port);
 
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(1);
@@ -4281,7 +4294,7 @@ describe("The transport._processServerListening() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // WS client events - N/A
@@ -4314,13 +4327,13 @@ describe("The transport._processServerListening() function", () => {
 
       expect(transportServer.state()).toBe("started");
 
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       expect(transportServer.state()).toBe("started");
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -4349,7 +4362,7 @@ describe("The transport._processServerListening() function", () => {
       // starting/start, so you can't inject a listener there
       // Simply check that starting/start are emitted once
 
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -4363,7 +4376,7 @@ describe("The transport._processServerListening() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // WS client events - N/A
@@ -4383,18 +4396,18 @@ describe("The transport._processServerListening() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a tranport server
       const transportServer = transportWsServer({
         server: httpServer
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a client (otherwise http will emit close rather than the listening poll triggerin)
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       expect(transportServer.state()).toBe("started");
 
@@ -4418,14 +4431,14 @@ describe("The transport._processServerListening() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a tranport server
       const transportServer = transportWsServer({
         server: httpServer
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a client (otherwise http will emit close rather than the listening poll triggerin)
       let cid;
@@ -4433,7 +4446,7 @@ describe("The transport._processServerListening() function", () => {
         cid = c;
       });
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -4495,18 +4508,18 @@ describe("The transport._processServerListening() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a tranport server
       const transportServer = transportWsServer({
         server: httpServer
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a client (otherwise http will emit close rather than the listening poll triggerin)
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const cListener = createWsClientListener(wsClient);
 
@@ -4541,18 +4554,18 @@ describe("The transport._processServerListening() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a tranport server
       const transportServer = transportWsServer({
         server: httpServer
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a client (otherwise http will emit close rather than the listening poll triggerin)
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       expect(transportServer.state()).toBe("started");
 
@@ -4580,14 +4593,14 @@ describe("The transport._processServerListening() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a tranport server
       const transportServer = transportWsServer({
         server: httpServer
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a client (otherwise http will emit close rather than the listening poll triggerin)
       let cid;
@@ -4595,7 +4608,7 @@ describe("The transport._processServerListening() function", () => {
         cid = c;
       });
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -4668,18 +4681,18 @@ describe("The transport._processServerListening() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a tranport server
       const transportServer = transportWsServer({
         server: httpServer
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a client (otherwise http will emit close rather than the listening poll triggerin)
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const cListener = createWsClientListener(wsClient);
 
@@ -4722,7 +4735,7 @@ describe("The transport._processServerClose() function", () => {
       // Start a transport server
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(transportServer.state()).toBe("started");
 
@@ -4736,7 +4749,7 @@ describe("The transport._processServerClose() function", () => {
         expect(transportServer.state()).toBe("stopped");
       });
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // Transport server events
@@ -4747,7 +4760,7 @@ describe("The transport._processServerClose() function", () => {
       // Start a transport server
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       const listener = createServerListener(transportServer);
 
@@ -4760,7 +4773,7 @@ describe("The transport._processServerClose() function", () => {
         });
       });
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -4799,12 +4812,12 @@ describe("The transport._processServerClose() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({ server: httpServer });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(transportServer.state()).toBe("started");
 
@@ -4818,7 +4831,7 @@ describe("The transport._processServerClose() function", () => {
         expect(transportServer.state()).toBe("stopped");
       });
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // Transport server events
@@ -4832,12 +4845,12 @@ describe("The transport._processServerClose() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({ server: httpServer });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       const listener = createServerListener(transportServer);
 
@@ -4850,7 +4863,7 @@ describe("The transport._processServerClose() function", () => {
         });
       });
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -4885,12 +4898,12 @@ describe("The transport._processServerClose() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({ server: httpServer });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(httpServer.listenerCount("listening")).toBe(2);
       expect(httpServer.listenerCount("close")).toBe(1);
@@ -4905,7 +4918,7 @@ describe("The transport._processServerClose() function", () => {
         });
       });
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(httpServer.listenerCount("listening")).toBe(0);
       expect(httpServer.listenerCount("close")).toBe(0);
@@ -4944,11 +4957,11 @@ describe("The transport._processServerError() function", () => {
         expect(transportServer.state()).toBe("stopped");
       });
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -4976,7 +4989,7 @@ describe("The transport._processServerError() function", () => {
         });
       });
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -5000,7 +5013,7 @@ describe("The transport._processServerError() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // WS client events - N/A
@@ -5047,11 +5060,11 @@ describe("The transport._processServerError() function", () => {
         expect(transportServer.state()).toBe("stopped");
       });
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       // Clean up
       httpServer1.close();
-      await pEvent(httpServer1, "close");
+      await promisifyEvent(httpServer1, "close");
     });
 
     // Transport server events
@@ -5089,7 +5102,7 @@ describe("The transport._processServerError() function", () => {
         });
       });
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -5112,7 +5125,7 @@ describe("The transport._processServerError() function", () => {
 
       // Clean up
       httpServer1.close();
-      await pEvent(httpServer1, "close");
+      await promisifyEvent(httpServer1, "close");
     });
 
     // WS client events - N/A
@@ -5147,7 +5160,7 @@ describe("The transport._processServerError() function", () => {
 
       httpServer.listen(port);
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(httpServer.listenerCount("listening")).toBe(0);
       expect(httpServer.listenerCount("close")).toBe(0);
@@ -5155,7 +5168,7 @@ describe("The transport._processServerError() function", () => {
 
       // Clean up
       httpServer1.close();
-      await pEvent(httpServer1, "close");
+      await promisifyEvent(httpServer1, "close");
     });
   });
 });
@@ -5174,19 +5187,19 @@ describe("The transport._processWsServerConnection() function", () => {
       // Start a transport server
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(transportServer.state()).toBe("started");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       expect(transportServer.state()).toBe("started");
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // Transport server events
@@ -5197,13 +5210,13 @@ describe("The transport._processWsServerConnection() function", () => {
       // Start a transport server
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       const listener = createServerListener(transportServer);
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -5217,7 +5230,7 @@ describe("The transport._processWsServerConnection() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // WS client events
@@ -5228,7 +5241,7 @@ describe("The transport._processWsServerConnection() function", () => {
       // Start a transport server
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -5247,7 +5260,7 @@ describe("The transport._processWsServerConnection() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
   });
 
@@ -5265,26 +5278,26 @@ describe("The transport._processWsServerConnection() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         server: httpServer
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(transportServer.state()).toBe("started");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       expect(transportServer.state()).toBe("started");
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -5298,20 +5311,20 @@ describe("The transport._processWsServerConnection() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         server: httpServer
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       const listener = createServerListener(transportServer);
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -5325,7 +5338,7 @@ describe("The transport._processWsServerConnection() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // WS client events
@@ -5339,14 +5352,14 @@ describe("The transport._processWsServerConnection() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         server: httpServer
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
@@ -5365,7 +5378,7 @@ describe("The transport._processWsServerConnection() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
   });
 
@@ -5383,14 +5396,14 @@ describe("The transport._processWsServerConnection() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         noServer: true
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Route upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -5401,15 +5414,15 @@ describe("The transport._processWsServerConnection() function", () => {
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       expect(transportServer.state()).toBe("started");
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -5423,14 +5436,14 @@ describe("The transport._processWsServerConnection() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         noServer: true
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Route upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -5441,7 +5454,7 @@ describe("The transport._processWsServerConnection() function", () => {
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -5455,9 +5468,9 @@ describe("The transport._processWsServerConnection() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // WS client events
@@ -5471,14 +5484,14 @@ describe("The transport._processWsServerConnection() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         noServer: true
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Route upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -5502,9 +5515,9 @@ describe("The transport._processWsServerConnection() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
   });
 });
@@ -5521,13 +5534,13 @@ describe("The transport._processWsClientMessage() function", () => {
       // Start a transport server
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(transportServer.state()).toBe("started");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       wsClient.send("msg");
 
@@ -5537,7 +5550,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // Transport server events
@@ -5552,11 +5565,11 @@ describe("The transport._processWsClientMessage() function", () => {
         cid = c;
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -5577,7 +5590,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // WS client events
@@ -5588,11 +5601,11 @@ describe("The transport._processWsClientMessage() function", () => {
       // Start a transport server
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const cListener = createWsClientListener(wsClient);
 
@@ -5609,7 +5622,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
   });
 
@@ -5624,13 +5637,13 @@ describe("The transport._processWsClientMessage() function", () => {
       // Start a transport server
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(transportServer.state()).toBe("started");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       wsClient.send(new Float32Array(5));
 
@@ -5640,7 +5653,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // Transport server events
@@ -5655,11 +5668,11 @@ describe("The transport._processWsClientMessage() function", () => {
         cid = c;
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -5683,7 +5696,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // WS client events
@@ -5694,11 +5707,11 @@ describe("The transport._processWsClientMessage() function", () => {
       // Start a transport server
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const cListener = createWsClientListener(wsClient);
 
@@ -5717,7 +5730,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
   });
 
@@ -5735,20 +5748,20 @@ describe("The transport._processWsClientMessage() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         server: httpServer
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(transportServer.state()).toBe("started");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       wsClient.send("msg");
 
@@ -5758,7 +5771,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -5772,7 +5785,7 @@ describe("The transport._processWsClientMessage() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
@@ -5783,11 +5796,11 @@ describe("The transport._processWsClientMessage() function", () => {
         cid = c;
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -5808,7 +5821,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // WS client events
@@ -5822,18 +5835,18 @@ describe("The transport._processWsClientMessage() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         server: httpServer
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const cListener = createWsClientListener(wsClient);
 
@@ -5850,7 +5863,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
   });
 
@@ -5868,20 +5881,20 @@ describe("The transport._processWsClientMessage() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         server: httpServer
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(transportServer.state()).toBe("started");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       wsClient.send(new Float32Array(5));
 
@@ -5891,7 +5904,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -5905,7 +5918,7 @@ describe("The transport._processWsClientMessage() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
@@ -5916,11 +5929,11 @@ describe("The transport._processWsClientMessage() function", () => {
         cid = c;
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -5944,7 +5957,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // WS client events
@@ -5958,18 +5971,18 @@ describe("The transport._processWsClientMessage() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         server: httpServer
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const cListener = createWsClientListener(wsClient);
 
@@ -5988,7 +6001,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
   });
 
@@ -6006,14 +6019,14 @@ describe("The transport._processWsClientMessage() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         noServer: true
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Route upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -6024,7 +6037,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       wsClient.send("msg");
 
@@ -6034,9 +6047,9 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -6050,7 +6063,7 @@ describe("The transport._processWsClientMessage() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
@@ -6061,7 +6074,7 @@ describe("The transport._processWsClientMessage() function", () => {
         cid = c;
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Route upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -6070,7 +6083,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -6091,9 +6104,9 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // WS client events
@@ -6107,14 +6120,14 @@ describe("The transport._processWsClientMessage() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         noServer: true
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Route upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -6123,7 +6136,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const cListener = createWsClientListener(wsClient);
 
@@ -6140,9 +6153,9 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
   });
 
@@ -6160,14 +6173,14 @@ describe("The transport._processWsClientMessage() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         noServer: true
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Route upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -6178,7 +6191,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       wsClient.send(new Float32Array(5));
 
@@ -6188,7 +6201,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -6202,7 +6215,7 @@ describe("The transport._processWsClientMessage() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
@@ -6213,7 +6226,7 @@ describe("The transport._processWsClientMessage() function", () => {
         cid = c;
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Route upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -6222,7 +6235,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -6246,7 +6259,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // WS client events
@@ -6260,14 +6273,14 @@ describe("The transport._processWsClientMessage() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         noServer: true
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Route upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -6276,7 +6289,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const cListener = createWsClientListener(wsClient);
 
@@ -6295,7 +6308,7 @@ describe("The transport._processWsClientMessage() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
   });
 });
@@ -6316,11 +6329,11 @@ describe("The transport._processWsClientClose() function", () => {
       // Start a transport server
       const transportServer = transportWsServer({ port });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       expect(transportServer.state()).toBe("started");
 
@@ -6332,7 +6345,7 @@ describe("The transport._processWsClientClose() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // Transport server events
@@ -6347,11 +6360,11 @@ describe("The transport._processWsClientClose() function", () => {
         cid = c;
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -6377,7 +6390,7 @@ describe("The transport._processWsClientClose() function", () => {
 
       // Clean up
       transportServer.stop();
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
     });
 
     // WS client events - N/A
@@ -6397,20 +6410,20 @@ describe("The transport._processWsClientClose() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         server: httpServer
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(transportServer.state()).toBe("started");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       expect(transportServer.state()).toBe("started");
 
@@ -6422,7 +6435,7 @@ describe("The transport._processWsClientClose() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -6436,7 +6449,7 @@ describe("The transport._processWsClientClose() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
@@ -6447,11 +6460,11 @@ describe("The transport._processWsClientClose() function", () => {
         cid = c;
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -6477,7 +6490,7 @@ describe("The transport._processWsClientClose() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // WS client events - N/A
@@ -6497,14 +6510,14 @@ describe("The transport._processWsClientClose() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
         noServer: true
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Route upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -6515,7 +6528,7 @@ describe("The transport._processWsClientClose() function", () => {
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       expect(transportServer.state()).toBe("started");
 
@@ -6527,7 +6540,7 @@ describe("The transport._processWsClientClose() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -6541,7 +6554,7 @@ describe("The transport._processWsClientClose() function", () => {
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
@@ -6552,7 +6565,7 @@ describe("The transport._processWsClientClose() function", () => {
         cid = c;
       });
       transportServer.start();
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       // Route upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -6561,7 +6574,7 @@ describe("The transport._processWsClientClose() function", () => {
 
       // Connect a ws client
       const wsClient = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient, "open");
+      await promisifyEvent(wsClient, "open");
 
       const listener = createServerListener(transportServer);
 
@@ -6587,7 +6600,7 @@ describe("The transport._processWsClientClose() function", () => {
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // WS client events - N/A
@@ -6619,7 +6632,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       expect(transportServer.state()).toBe("starting");
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(transportServer.state()).toBe("started");
 
@@ -6627,7 +6640,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       expect(transportServer.state()).toBe("stopping");
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(transportServer.state()).toBe("stopped");
 
@@ -6635,7 +6648,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       expect(transportServer.state()).toBe("starting");
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(transportServer.state()).toBe("started");
 
@@ -6643,7 +6656,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       expect(transportServer.state()).toBe("stopping");
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(transportServer.state()).toBe("stopped");
     });
@@ -6674,7 +6687,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -6691,7 +6704,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       transportServer.stop();
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -6716,7 +6729,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -6733,7 +6746,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       transportServer.stop();
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -6768,12 +6781,12 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       expect(transportServer.state()).toBe("starting");
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(transportServer.state()).toBe("started");
 
       const wsClient1 = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient1, "open");
+      await promisifyEvent(wsClient1, "open");
 
       expect(transportServer.state()).toBe("started");
 
@@ -6781,7 +6794,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       expect(transportServer.state()).toBe("stopping");
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(transportServer.state()).toBe("stopped");
 
@@ -6789,12 +6802,12 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       expect(transportServer.state()).toBe("starting");
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(transportServer.state()).toBe("started");
 
       const wsClient2 = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient2, "open");
+      await promisifyEvent(wsClient2, "open");
 
       expect(transportServer.state()).toBe("started");
 
@@ -6802,7 +6815,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       expect(transportServer.state()).toBe("stopping");
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(transportServer.state()).toBe("stopped");
     });
@@ -6840,10 +6853,10 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       const wsClient1 = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient1, "open");
+      await promisifyEvent(wsClient1, "open");
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -6862,7 +6875,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       transportServer.stop();
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -6893,10 +6906,10 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       const wsClient2 = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient2, "open");
+      await promisifyEvent(wsClient2, "open");
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -6915,7 +6928,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       transportServer.stop();
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -6965,12 +6978,12 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(transportServer.state()).toBe("starting");
 
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       expect(transportServer.state()).toBe("started");
 
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
 
       expect(transportServer.state()).toBe("stopped");
 
@@ -6979,12 +6992,12 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(transportServer.state()).toBe("starting");
 
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       expect(transportServer.state()).toBe("started");
 
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
 
       expect(transportServer.state()).toBe("stopped");
     });
@@ -7031,7 +7044,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -7047,7 +7060,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       eventOrder = [];
 
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -7081,7 +7094,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -7097,7 +7110,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       eventOrder = [];
 
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -7149,15 +7162,15 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(transportServer.state()).toBe("starting");
 
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       expect(transportServer.state()).toBe("started");
 
       const wsClient1 = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient1, "open");
+      await promisifyEvent(wsClient1, "open");
 
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
 
       expect(transportServer.state()).toBe("stopped");
 
@@ -7166,15 +7179,15 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(transportServer.state()).toBe("starting");
 
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       expect(transportServer.state()).toBe("started");
 
       const wsClient2 = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient2, "open");
+      await promisifyEvent(wsClient2, "open");
 
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
 
       expect(transportServer.state()).toBe("stopped");
     });
@@ -7221,10 +7234,10 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       const wsClient1 = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient1, "open");
+      await promisifyEvent(wsClient1, "open");
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -7242,7 +7255,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       eventOrder = [];
 
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -7282,10 +7295,10 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       const wsClient2 = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient2, "open");
+      await promisifyEvent(wsClient2, "open");
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -7303,7 +7316,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       eventOrder = [];
 
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -7350,7 +7363,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       const transportServer = transportWsServer({
         server: httpServer
@@ -7366,7 +7379,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       expect(transportServer.state()).toBe("stopping");
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(transportServer.state()).toBe("stopped");
 
@@ -7378,13 +7391,13 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       expect(transportServer.state()).toBe("stopping");
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(transportServer.state()).toBe("stopped");
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -7398,7 +7411,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       const transportServer = transportWsServer({
         server: httpServer
@@ -7430,7 +7443,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -7455,7 +7468,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -7480,7 +7493,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -7505,7 +7518,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -7522,7 +7535,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Ws client events - N/A
@@ -7542,7 +7555,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       const transportServer = transportWsServer({
         server: httpServer
@@ -7555,13 +7568,13 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(transportServer.state()).toBe("started");
 
       const wsClient1 = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient1, "open");
+      await promisifyEvent(wsClient1, "open");
 
       transportServer.stop();
 
       expect(transportServer.state()).toBe("stopping");
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(transportServer.state()).toBe("stopped");
 
@@ -7570,19 +7583,19 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(transportServer.state()).toBe("started");
 
       const wsClient2 = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient2, "open");
+      await promisifyEvent(wsClient2, "open");
 
       transportServer.stop();
 
       expect(transportServer.state()).toBe("stopping");
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(transportServer.state()).toBe("stopped");
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -7596,7 +7609,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       const transportServer = transportWsServer({
         server: httpServer
@@ -7628,7 +7641,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       const wsClient1 = new WebSocket(`ws://localhost:${port}`); // eslint-disable-line no-unused-vars
       await delay(LATENCY);
@@ -7658,7 +7671,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -7689,7 +7702,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       const wsClient2 = new WebSocket(`ws://localhost:${port}`); // eslint-disable-line no-unused-vars
       await delay(LATENCY);
@@ -7719,7 +7732,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -7742,7 +7755,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Ws client events - N/A
@@ -7762,7 +7775,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
@@ -7784,7 +7797,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       expect(transportServer.state()).toBe("stopping");
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(transportServer.state()).toBe("stopped");
 
@@ -7796,13 +7809,13 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       expect(transportServer.state()).toBe("stopping");
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(transportServer.state()).toBe("stopped");
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -7816,7 +7829,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
@@ -7854,7 +7867,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -7879,7 +7892,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -7904,7 +7917,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -7929,7 +7942,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -7946,7 +7959,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Ws client events - N/A
@@ -7966,7 +7979,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
@@ -7985,7 +7998,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(transportServer.state()).toBe("started");
 
       const wsClient1 = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient1, "open");
+      await promisifyEvent(wsClient1, "open");
 
       expect(transportServer.state()).toBe("started");
 
@@ -7993,7 +8006,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       expect(transportServer.state()).toBe("stopping");
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(transportServer.state()).toBe("stopped");
 
@@ -8002,7 +8015,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(transportServer.state()).toBe("started");
 
       const wsClient2 = new WebSocket(`ws://localhost:${port}`);
-      await pEvent(wsClient2, "open");
+      await promisifyEvent(wsClient2, "open");
 
       expect(transportServer.state()).toBe("started");
 
@@ -8010,13 +8023,13 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       expect(transportServer.state()).toBe("stopping");
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(transportServer.state()).toBe("stopped");
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Transport server events
@@ -8030,7 +8043,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
         res.end("Webpage");
       });
       httpServer.listen(port);
-      await pEvent(httpServer, "listening");
+      await promisifyEvent(httpServer, "listening");
 
       // Start a transport server
       const transportServer = transportWsServer({
@@ -8068,7 +8081,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       const wsClient1 = new WebSocket(`ws://localhost:${port}`); // eslint-disable-line no-unused-vars
       await delay(LATENCY);
@@ -8098,7 +8111,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -8129,7 +8142,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "start");
+      await promisifyEvent(transportServer, "start");
 
       const wsClient2 = new WebSocket(`ws://localhost:${port}`); // eslint-disable-line no-unused-vars
       await delay(LATENCY);
@@ -8159,7 +8172,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await pEvent(transportServer, "stop");
+      await promisifyEvent(transportServer, "stop");
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -8182,7 +8195,7 @@ describe("The transport should operate correctly through multiple start/stop cyc
 
       // Clean up
       httpServer.close();
-      await pEvent(httpServer, "close");
+      await promisifyEvent(httpServer, "close");
     });
 
     // Ws client events - N/A

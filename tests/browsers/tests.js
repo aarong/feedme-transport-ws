@@ -1,6 +1,8 @@
 /* eslint-disable import/no-extraneous-dependencies */
 import feedmeClient from "feedme-client/bundle"; // Avoid source-map-support warning
-import asyncUtil from "./asyncutil";
+import promisifyEvent from "promisify-event";
+import promisify from "util.promisify";
+import promiseTimeout from "promise-timeout";
 
 // Included using <script> tags in index.html
 /* global feedmeTransportWsClient */
@@ -62,7 +64,7 @@ const retry = test => async () => {
   for (i = 0; i < RETRY_LIMIT; i += 1) {
     err = null;
     try {
-      await asyncUtil.timeout(test, ATTEMPT_TIMEOUT); // eslint-disable-line no-await-in-loop
+      await promiseTimeout(test, ATTEMPT_TIMEOUT); // eslint-disable-line no-await-in-loop
     } catch (e) {
       err = e;
     }
@@ -81,14 +83,14 @@ const connectController = async () => {
     connectRetryMs: -1 // Do not retry connection attempts here - entire test is retried
   });
   fmController.connect();
-  await asyncUtil.once(fmController, "connect");
+  await promisifyEvent(fmController, "connect");
   return fmController;
 };
 
 // Disconnect a Feedme server controller client
 const disconnectController = async fmClient => {
   fmClient.disconnect();
-  await asyncUtil.once(fmClient, "disconnect");
+  await promisifyEvent(fmClient, "disconnect");
 };
 
 describe("The factory function", () => {
@@ -125,11 +127,11 @@ describe("The transport.connect() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -163,11 +165,11 @@ describe("The transport.connect() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -176,7 +178,7 @@ describe("The transport.connect() function", () => {
           `${TARGET_URL}:${port}`
         );
         transportClient.connect();
-        await asyncUtil.once(transportClient, "connect");
+        await promisifyEvent(transportClient, "connect");
 
         expect(transportClient.state()).toBe("connected");
         expect(() => {
@@ -210,11 +212,11 @@ describe("The transport.connect() function", () => {
             Port: `${port}`
           });
           serverEventFeed.desireOpen();
-          await asyncUtil.once(serverEventFeed, "open");
+          await promisifyEvent(serverEventFeed, "open");
 
           // Initilize WS server an wait until listening
           fmController.action("InitWsServer", { Port: `${port}` });
-          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          const eventArgs = await promisifyEvent(serverEventFeed, "action");
           expect(eventArgs[0]).toBe("Event");
           expect(eventArgs[1].Name).toBe("listening");
 
@@ -249,11 +251,11 @@ describe("The transport.connect() function", () => {
             Port: `${port}`
           });
           serverEventFeed.desireOpen();
-          await asyncUtil.once(serverEventFeed, "open");
+          await promisifyEvent(serverEventFeed, "open");
 
           // Initilize WS server an wait until listening
           fmController.action("InitWsServer", { Port: `${port}` });
-          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          const eventArgs = await promisifyEvent(serverEventFeed, "action");
           expect(eventArgs[0]).toBe("Event");
           expect(eventArgs[1].Name).toBe("listening");
 
@@ -272,7 +274,7 @@ describe("The transport.connect() function", () => {
           expect(clientListener.disconnect.calls.count()).toBe(0);
           expect(clientListener.message.calls.count()).toBe(0);
 
-          await asyncUtil.nextTick();
+          await promisify(process.nextTick)();
 
           // Emit connecting asynchronously
           expect(clientListener.connecting.calls.count()).toBe(1);
@@ -303,11 +305,11 @@ describe("The transport.connect() function", () => {
             Port: `${port}`
           });
           serverEventFeed.desireOpen();
-          await asyncUtil.once(serverEventFeed, "open");
+          await promisifyEvent(serverEventFeed, "open");
 
           // Initilize WS server an wait until listening
           fmController.action("InitWsServer", { Port: `${port}` });
-          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          const eventArgs = await promisifyEvent(serverEventFeed, "action");
           expect(eventArgs[0]).toBe("Event");
           expect(eventArgs[1].Name).toBe("listening");
 
@@ -318,7 +320,7 @@ describe("The transport.connect() function", () => {
 
           transportClient.connect();
 
-          const evtRevelation = await asyncUtil.once(serverEventFeed, "action");
+          const evtRevelation = await promisifyEvent(serverEventFeed, "action");
 
           expect(evtRevelation[0]).toBe("Event");
           expect(evtRevelation[1].Name).toBe("connection");
@@ -348,11 +350,11 @@ describe("The transport.connect() function", () => {
             Port: `${port}`
           });
           serverEventFeed.desireOpen();
-          await asyncUtil.once(serverEventFeed, "open");
+          await promisifyEvent(serverEventFeed, "open");
 
           // Initilize WS server an wait until listening
           fmController.action("InitWsServer", { Port: `${port}` });
-          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          const eventArgs = await promisifyEvent(serverEventFeed, "action");
           expect(eventArgs[0]).toBe("Event");
           expect(eventArgs[1].Name).toBe("listening");
 
@@ -388,11 +390,11 @@ describe("The transport.connect() function", () => {
             Port: `${port}`
           });
           serverEventFeed.desireOpen();
-          await asyncUtil.once(serverEventFeed, "open");
+          await promisifyEvent(serverEventFeed, "open");
 
           // Initilize WS server an wait until listening
           fmController.action("InitWsServer", { Port: `${port}` });
-          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          const eventArgs = await promisifyEvent(serverEventFeed, "action");
           expect(eventArgs[0]).toBe("Event");
           expect(eventArgs[1].Name).toBe("listening");
 
@@ -419,7 +421,7 @@ describe("The transport.connect() function", () => {
             });
           });
 
-          await asyncUtil.nextTick();
+          await promisify(process.nextTick)();
 
           // Emit connecting asynchronously
           expect(clientListener.connecting.calls.count()).toBe(1);
@@ -472,11 +474,11 @@ describe("The transport.disconnect() function", () => {
             Port: `${port}`
           });
           serverEventFeed.desireOpen();
-          await asyncUtil.once(serverEventFeed, "open");
+          await promisifyEvent(serverEventFeed, "open");
 
           // Initilize WS server an wait until listening
           fmController.action("InitWsServer", { Port: `${port}` });
-          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          const eventArgs = await promisifyEvent(serverEventFeed, "action");
           expect(eventArgs[0]).toBe("Event");
           expect(eventArgs[1].Name).toBe("listening");
 
@@ -515,11 +517,11 @@ describe("The transport.disconnect() function", () => {
             Port: `${port}`
           });
           serverEventFeed.desireOpen();
-          await asyncUtil.once(serverEventFeed, "open");
+          await promisifyEvent(serverEventFeed, "open");
 
           // Initilize WS server an wait until listening
           fmController.action("InitWsServer", { Port: `${port}` });
-          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          const eventArgs = await promisifyEvent(serverEventFeed, "action");
           expect(eventArgs[0]).toBe("Event");
           expect(eventArgs[1].Name).toBe("listening");
 
@@ -532,7 +534,7 @@ describe("The transport.disconnect() function", () => {
 
           expect(transportClient.state()).toBe("connecting");
 
-          await asyncUtil.nextTick(); // Move past connecting event
+          await promisify(process.nextTick)(); // Move past connecting event
 
           const clientListener = createClientListener(transportClient);
 
@@ -544,7 +546,7 @@ describe("The transport.disconnect() function", () => {
           expect(clientListener.disconnect.calls.count()).toBe(0);
           expect(clientListener.message.calls.count()).toBe(0);
 
-          await asyncUtil.nextTick();
+          await promisify(process.nextTick)();
 
           // Emit disconnect asynchronously
           expect(clientListener.connecting.calls.count()).toBe(0);
@@ -581,11 +583,11 @@ describe("The transport.disconnect() function", () => {
             Port: `${port}`
           });
           serverEventFeed.desireOpen();
-          await asyncUtil.once(serverEventFeed, "open");
+          await promisifyEvent(serverEventFeed, "open");
 
           // Initilize WS server an wait until listening
           fmController.action("InitWsServer", { Port: `${port}` });
-          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          const eventArgs = await promisifyEvent(serverEventFeed, "action");
           expect(eventArgs[0]).toBe("Event");
           expect(eventArgs[1].Name).toBe("listening");
 
@@ -624,11 +626,11 @@ describe("The transport.disconnect() function", () => {
             Port: `${port}`
           });
           serverEventFeed.desireOpen();
-          await asyncUtil.once(serverEventFeed, "open");
+          await promisifyEvent(serverEventFeed, "open");
 
           // Initilize WS server an wait until listening
           fmController.action("InitWsServer", { Port: `${port}` });
-          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          const eventArgs = await promisifyEvent(serverEventFeed, "action");
           expect(eventArgs[0]).toBe("Event");
           expect(eventArgs[1].Name).toBe("listening");
 
@@ -641,7 +643,7 @@ describe("The transport.disconnect() function", () => {
 
           expect(transportClient.state()).toBe("connecting");
 
-          await asyncUtil.nextTick(); // Move past connecting event
+          await promisify(process.nextTick)(); // Move past connecting event
 
           const clientListener = createClientListener(transportClient);
 
@@ -654,7 +656,7 @@ describe("The transport.disconnect() function", () => {
           expect(clientListener.disconnect.calls.count()).toBe(0);
           expect(clientListener.message.calls.count()).toBe(0);
 
-          await asyncUtil.nextTick();
+          await promisify(process.nextTick)();
 
           // Emit disconnect asynchronously
           expect(clientListener.connecting.calls.count()).toBe(0);
@@ -692,11 +694,11 @@ describe("The transport.disconnect() function", () => {
             Port: `${port}`
           });
           serverEventFeed.desireOpen();
-          await asyncUtil.once(serverEventFeed, "open");
+          await promisifyEvent(serverEventFeed, "open");
 
           // Initilize WS server an wait until listening
           fmController.action("InitWsServer", { Port: `${port}` });
-          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          const eventArgs = await promisifyEvent(serverEventFeed, "action");
           expect(eventArgs[0]).toBe("Event");
           expect(eventArgs[1].Name).toBe("listening");
 
@@ -707,7 +709,7 @@ describe("The transport.disconnect() function", () => {
 
           transportClient.connect();
 
-          await asyncUtil.once(transportClient, "connect");
+          await promisifyEvent(transportClient, "connect");
 
           expect(transportClient.state()).toBe("connected");
 
@@ -737,11 +739,11 @@ describe("The transport.disconnect() function", () => {
             Port: `${port}`
           });
           serverEventFeed.desireOpen();
-          await asyncUtil.once(serverEventFeed, "open");
+          await promisifyEvent(serverEventFeed, "open");
 
           // Initilize WS server an wait until listening
           fmController.action("InitWsServer", { Port: `${port}` });
-          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          const eventArgs = await promisifyEvent(serverEventFeed, "action");
           expect(eventArgs[0]).toBe("Event");
           expect(eventArgs[1].Name).toBe("listening");
 
@@ -752,11 +754,11 @@ describe("The transport.disconnect() function", () => {
 
           transportClient.connect();
 
-          await asyncUtil.once(transportClient, "connect");
+          await promisifyEvent(transportClient, "connect");
 
           expect(transportClient.state()).toBe("connected");
 
-          await asyncUtil.nextTick(); // Move past connecting/connected events
+          await promisify(process.nextTick)(); // Move past connecting/connected events
 
           const clientListener = createClientListener(transportClient);
 
@@ -768,7 +770,7 @@ describe("The transport.disconnect() function", () => {
           expect(clientListener.disconnect.calls.count()).toBe(0);
           expect(clientListener.message.calls.count()).toBe(0);
 
-          await asyncUtil.nextTick();
+          await promisify(process.nextTick)();
 
           // Emit disconnect asynchronously
           expect(clientListener.connecting.calls.count()).toBe(0);
@@ -798,11 +800,11 @@ describe("The transport.disconnect() function", () => {
             Port: `${port}`
           });
           serverEventFeed.desireOpen();
-          await asyncUtil.once(serverEventFeed, "open");
+          await promisifyEvent(serverEventFeed, "open");
 
           // Initilize WS server an wait until listening
           fmController.action("InitWsServer", { Port: `${port}` });
-          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          const eventArgs = await promisifyEvent(serverEventFeed, "action");
           expect(eventArgs[0]).toBe("Event");
           expect(eventArgs[1].Name).toBe("listening");
 
@@ -814,13 +816,13 @@ describe("The transport.disconnect() function", () => {
           transportClient.connect();
 
           await Promise.all([
-            asyncUtil.once(transportClient, "connect"),
-            asyncUtil.once(serverEventFeed, "action") // connection
+            promisifyEvent(transportClient, "connect"),
+            promisifyEvent(serverEventFeed, "action") // connection
           ]);
 
           transportClient.disconnect();
 
-          const evtRevelation = await asyncUtil.once(serverEventFeed, "action");
+          const evtRevelation = await promisifyEvent(serverEventFeed, "action");
 
           expect(evtRevelation[0]).toBe("Event");
           expect(evtRevelation[1].Name).toBe("clientClose");
@@ -850,11 +852,11 @@ describe("The transport.disconnect() function", () => {
             Port: `${port}`
           });
           serverEventFeed.desireOpen();
-          await asyncUtil.once(serverEventFeed, "open");
+          await promisifyEvent(serverEventFeed, "open");
 
           // Initilize WS server an wait until listening
           fmController.action("InitWsServer", { Port: `${port}` });
-          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          const eventArgs = await promisifyEvent(serverEventFeed, "action");
           expect(eventArgs[0]).toBe("Event");
           expect(eventArgs[1].Name).toBe("listening");
 
@@ -865,7 +867,7 @@ describe("The transport.disconnect() function", () => {
 
           transportClient.connect();
 
-          await asyncUtil.once(transportClient, "connect");
+          await promisifyEvent(transportClient, "connect");
 
           expect(transportClient.state()).toBe("connected");
 
@@ -895,11 +897,11 @@ describe("The transport.disconnect() function", () => {
             Port: `${port}`
           });
           serverEventFeed.desireOpen();
-          await asyncUtil.once(serverEventFeed, "open");
+          await promisifyEvent(serverEventFeed, "open");
 
           // Initilize WS server an wait until listening
           fmController.action("InitWsServer", { Port: `${port}` });
-          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          const eventArgs = await promisifyEvent(serverEventFeed, "action");
           expect(eventArgs[0]).toBe("Event");
           expect(eventArgs[1].Name).toBe("listening");
 
@@ -910,11 +912,11 @@ describe("The transport.disconnect() function", () => {
 
           transportClient.connect();
 
-          await asyncUtil.once(transportClient, "connect");
+          await promisifyEvent(transportClient, "connect");
 
           expect(transportClient.state()).toBe("connected");
 
-          await asyncUtil.nextTick(); // Move past connecting/connected events
+          await promisify(process.nextTick)(); // Move past connecting/connected events
 
           const clientListener = createClientListener(transportClient);
 
@@ -927,7 +929,7 @@ describe("The transport.disconnect() function", () => {
           expect(clientListener.disconnect.calls.count()).toBe(0);
           expect(clientListener.message.calls.count()).toBe(0);
 
-          await asyncUtil.nextTick();
+          await promisify(process.nextTick)();
 
           // Emit disconnect asynchronously
           expect(clientListener.connecting.calls.count()).toBe(0);
@@ -958,11 +960,11 @@ describe("The transport.disconnect() function", () => {
             Port: `${port}`
           });
           serverEventFeed.desireOpen();
-          await asyncUtil.once(serverEventFeed, "open");
+          await promisifyEvent(serverEventFeed, "open");
 
           // Initilize WS server an wait until listening
           fmController.action("InitWsServer", { Port: `${port}` });
-          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          const eventArgs = await promisifyEvent(serverEventFeed, "action");
           expect(eventArgs[0]).toBe("Event");
           expect(eventArgs[1].Name).toBe("listening");
 
@@ -974,13 +976,13 @@ describe("The transport.disconnect() function", () => {
           transportClient.connect();
 
           await Promise.all([
-            asyncUtil.once(transportClient, "connect"),
-            asyncUtil.once(serverEventFeed, "action") // connection
+            promisifyEvent(transportClient, "connect"),
+            promisifyEvent(serverEventFeed, "action") // connection
           ]);
 
           transportClient.disconnect(new Error("SOME_ERROR"));
 
-          const evtRevelation = await asyncUtil.once(serverEventFeed, "action");
+          const evtRevelation = await promisifyEvent(serverEventFeed, "action");
 
           expect(evtRevelation[0]).toBe("Event");
           expect(evtRevelation[1].Name).toBe("clientClose");
@@ -1018,11 +1020,11 @@ describe("The transport.send() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -1058,11 +1060,11 @@ describe("The transport.send() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -1071,7 +1073,7 @@ describe("The transport.send() function", () => {
           `${TARGET_URL}:${port}`
         );
         transportClient.connect();
-        await asyncUtil.once(transportClient, "connect");
+        await promisifyEvent(transportClient, "connect");
 
         expect(transportClient.state()).toBe("connected");
 
@@ -1079,7 +1081,7 @@ describe("The transport.send() function", () => {
 
         expect(transportClient.state()).toBe("connected");
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         expect(transportClient.state()).toBe("connected");
 
@@ -1102,11 +1104,11 @@ describe("The transport.send() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -1117,11 +1119,11 @@ describe("The transport.send() function", () => {
 
         transportClient.connect();
 
-        await asyncUtil.once(transportClient, "connect");
+        await promisifyEvent(transportClient, "connect");
 
         expect(transportClient.state()).toBe("connected");
 
-        await asyncUtil.nextTick(); // Move past connecting/connected events
+        await promisify(process.nextTick)(); // Move past connecting/connected events
 
         const clientListener = createClientListener(transportClient);
 
@@ -1133,7 +1135,7 @@ describe("The transport.send() function", () => {
         expect(clientListener.disconnect.calls.count()).toBe(0);
         expect(clientListener.message.calls.count()).toBe(0);
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         // Emit nothing asynchronously
         expect(clientListener.connecting.calls.count()).toBe(0);
@@ -1160,11 +1162,11 @@ describe("The transport.send() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -1176,13 +1178,13 @@ describe("The transport.send() function", () => {
         transportClient.connect();
 
         await Promise.all([
-          asyncUtil.once(transportClient, "connect"),
-          asyncUtil.once(serverEventFeed, "action") // connection
+          promisifyEvent(transportClient, "connect"),
+          promisifyEvent(serverEventFeed, "action") // connection
         ]);
 
         transportClient.send("msg");
 
-        const evtRevelation = await asyncUtil.once(serverEventFeed, "action");
+        const evtRevelation = await promisifyEvent(serverEventFeed, "action");
 
         expect(evtRevelation[0]).toBe("Event");
         expect(evtRevelation[1].Name).toBe("clientMessage");
@@ -1210,11 +1212,11 @@ describe("The transport._processWsOpen() function", () => {
         Port: `${port}`
       });
       serverEventFeed.desireOpen();
-      await asyncUtil.once(serverEventFeed, "open");
+      await promisifyEvent(serverEventFeed, "open");
 
       // Initilize WS server an wait until listening
       fmController.action("InitWsServer", { Port: `${port}` });
-      const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+      const eventArgs = await promisifyEvent(serverEventFeed, "action");
       expect(eventArgs[0]).toBe("Event");
       expect(eventArgs[1].Name).toBe("listening");
 
@@ -1224,11 +1226,11 @@ describe("The transport._processWsOpen() function", () => {
 
       expect(transportClient.state()).toBe("connecting");
 
-      await asyncUtil.once(transportClient, "connect");
+      await promisifyEvent(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(transportClient.state()).toBe("connected");
 
@@ -1251,11 +1253,11 @@ describe("The transport._processWsOpen() function", () => {
         Port: `${port}`
       });
       serverEventFeed.desireOpen();
-      await asyncUtil.once(serverEventFeed, "open");
+      await promisifyEvent(serverEventFeed, "open");
 
       // Initilize WS server an wait until listening
       fmController.action("InitWsServer", { Port: `${port}` });
-      const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+      const eventArgs = await promisifyEvent(serverEventFeed, "action");
       expect(eventArgs[0]).toBe("Event");
       expect(eventArgs[1].Name).toBe("listening");
 
@@ -1266,11 +1268,11 @@ describe("The transport._processWsOpen() function", () => {
 
       expect(transportClient.state()).toBe("connecting");
 
-      await asyncUtil.nextTick(); // Move past connecting event
+      await promisify(process.nextTick)(); // Move past connecting event
 
       const clientListener = createClientListener(transportClient);
 
-      await asyncUtil.once(transportClient, "connect");
+      await promisifyEvent(transportClient, "connect");
 
       // Emit connect asynchronously
       expect(clientListener.connecting.calls.count()).toBe(0);
@@ -1303,11 +1305,11 @@ describe("The transport._processWsMessage() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -1319,8 +1321,8 @@ describe("The transport._processWsMessage() function", () => {
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
-          asyncUtil.once(serverEventFeed, "action"),
-          asyncUtil.once(transportClient, "connect")
+          promisifyEvent(serverEventFeed, "action"),
+          promisifyEvent(transportClient, "connect")
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1334,7 +1336,7 @@ describe("The transport._processWsMessage() function", () => {
           Arguments: ["binary"] // server changes "binary" to actual binary
         });
 
-        await asyncUtil.once(transportClient, "disconnect");
+        await promisifyEvent(transportClient, "disconnect");
 
         expect(transportClient.state()).toBe("disconnected");
 
@@ -1357,11 +1359,11 @@ describe("The transport._processWsMessage() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -1373,8 +1375,8 @@ describe("The transport._processWsMessage() function", () => {
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
-          asyncUtil.once(serverEventFeed, "action"),
-          asyncUtil.once(transportClient, "connect")
+          promisifyEvent(serverEventFeed, "action"),
+          promisifyEvent(transportClient, "connect")
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1387,7 +1389,7 @@ describe("The transport._processWsMessage() function", () => {
           ClientId: serverClientId,
           Arguments: ["binary"] // server changes "binary" to actual binary
         });
-        await asyncUtil.once(transportClient, "disconnect");
+        await promisifyEvent(transportClient, "disconnect");
 
         // Emit disconnect asynchronously
         expect(clientListener.connecting.calls.count()).toBe(0);
@@ -1421,11 +1423,11 @@ describe("The transport._processWsMessage() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -1437,8 +1439,8 @@ describe("The transport._processWsMessage() function", () => {
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
-          asyncUtil.once(serverEventFeed, "action"),
-          asyncUtil.once(transportClient, "connect")
+          promisifyEvent(serverEventFeed, "action"),
+          promisifyEvent(transportClient, "connect")
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1450,7 +1452,7 @@ describe("The transport._processWsMessage() function", () => {
           Arguments: ["binary"] // server changes "binary" to actual binary
         });
 
-        const evt = await asyncUtil.once(serverEventFeed, "action");
+        const evt = await promisifyEvent(serverEventFeed, "action");
         expect(evt[0]).toBe("Event");
         expect(evt[1]).toEqual(jasmine.any(Object));
         expect(evt[1].Name).toBe("clientClose");
@@ -1478,11 +1480,11 @@ describe("The transport._processWsMessage() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -1494,8 +1496,8 @@ describe("The transport._processWsMessage() function", () => {
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
-          asyncUtil.once(serverEventFeed, "action"),
-          asyncUtil.once(transportClient, "connect")
+          promisifyEvent(serverEventFeed, "action"),
+          promisifyEvent(transportClient, "connect")
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1509,11 +1511,11 @@ describe("The transport._processWsMessage() function", () => {
           Arguments: ["msg"]
         });
 
-        await asyncUtil.once(transportClient, "message");
+        await promisifyEvent(transportClient, "message");
 
         expect(transportClient.state()).toBe("connected");
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         expect(transportClient.state()).toBe("connected");
 
@@ -1536,11 +1538,11 @@ describe("The transport._processWsMessage() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -1552,8 +1554,8 @@ describe("The transport._processWsMessage() function", () => {
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
-          asyncUtil.once(serverEventFeed, "action"),
-          asyncUtil.once(transportClient, "connect")
+          promisifyEvent(serverEventFeed, "action"),
+          promisifyEvent(transportClient, "connect")
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1566,7 +1568,7 @@ describe("The transport._processWsMessage() function", () => {
           ClientId: serverClientId,
           Arguments: ["msg"]
         });
-        await asyncUtil.once(transportClient, "message");
+        await promisifyEvent(transportClient, "message");
 
         // Emit message asynchronously
         expect(clientListener.connecting.calls.count()).toBe(0);
@@ -1599,7 +1601,7 @@ describe("The transport._processWsClose() function", () => {
 
         expect(transportClient.state()).toBe("connecting");
 
-        await asyncUtil.once(transportClient, "disconnect");
+        await promisifyEvent(transportClient, "disconnect");
 
         expect(transportClient.state()).toBe("disconnected");
       })
@@ -1614,11 +1616,11 @@ describe("The transport._processWsClose() function", () => {
         const transportClient = feedmeTransportWsClient(BAD_URL);
         transportClient.connect();
 
-        await asyncUtil.nextTick(); // Move past connecting event
+        await promisify(process.nextTick)(); // Move past connecting event
 
         const clientListener = createClientListener(transportClient);
 
-        await asyncUtil.once(transportClient, "disconnect");
+        await promisifyEvent(transportClient, "disconnect");
 
         expect(clientListener.connecting.calls.count()).toBe(0);
         expect(clientListener.connect.calls.count()).toBe(0);
@@ -1651,11 +1653,11 @@ describe("The transport._processWsClose() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -1664,7 +1666,7 @@ describe("The transport._processWsClose() function", () => {
           `${TARGET_URL}:${port}`
         );
         transportClient.connect();
-        await asyncUtil.once(transportClient, "connect");
+        await promisifyEvent(transportClient, "connect");
 
         expect(transportClient.state()).toBe("connected");
 
@@ -1675,7 +1677,7 @@ describe("The transport._processWsClose() function", () => {
           Arguments: []
         });
 
-        await asyncUtil.once(transportClient, "disconnect");
+        await promisifyEvent(transportClient, "disconnect");
 
         expect(transportClient.state()).toBe("disconnected");
 
@@ -1698,11 +1700,11 @@ describe("The transport._processWsClose() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -1711,7 +1713,7 @@ describe("The transport._processWsClose() function", () => {
           `${TARGET_URL}:${port}`
         );
         transportClient.connect();
-        await asyncUtil.once(transportClient, "connect");
+        await promisifyEvent(transportClient, "connect");
 
         const clientListener = createClientListener(transportClient);
 
@@ -1724,7 +1726,7 @@ describe("The transport._processWsClose() function", () => {
           Arguments: []
         });
 
-        await asyncUtil.once(transportClient, "disconnect");
+        await promisifyEvent(transportClient, "disconnect");
 
         // Emit disconnect asynchronously
         expect(clientListener.connecting.calls.count()).toBe(0);
@@ -1764,11 +1766,11 @@ describe("The transport._processWsClose() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -1780,8 +1782,8 @@ describe("The transport._processWsClose() function", () => {
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
-          asyncUtil.once(serverEventFeed, "action"),
-          asyncUtil.once(transportClient, "connect")
+          promisifyEvent(serverEventFeed, "action"),
+          promisifyEvent(transportClient, "connect")
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1795,7 +1797,7 @@ describe("The transport._processWsClose() function", () => {
           ClientId: serverClientId
         });
 
-        await asyncUtil.once(transportClient, "disconnect");
+        await promisifyEvent(transportClient, "disconnect");
 
         expect(transportClient.state()).toBe("disconnected");
 
@@ -1818,11 +1820,11 @@ describe("The transport._processWsClose() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -1834,8 +1836,8 @@ describe("The transport._processWsClose() function", () => {
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
-          asyncUtil.once(serverEventFeed, "action"),
-          asyncUtil.once(transportClient, "connect")
+          promisifyEvent(serverEventFeed, "action"),
+          promisifyEvent(transportClient, "connect")
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1851,7 +1853,7 @@ describe("The transport._processWsClose() function", () => {
           ClientId: serverClientId
         });
 
-        await asyncUtil.once(transportClient, "disconnect");
+        await promisifyEvent(transportClient, "disconnect");
 
         // Emit disconnect asynchronously
         expect(clientListener.connecting.calls.count()).toBe(0);
@@ -1891,11 +1893,11 @@ describe("The transport._processWsClose() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -1907,8 +1909,8 @@ describe("The transport._processWsClose() function", () => {
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
-          asyncUtil.once(serverEventFeed, "action"),
-          asyncUtil.once(transportClient, "connect")
+          promisifyEvent(serverEventFeed, "action"),
+          promisifyEvent(transportClient, "connect")
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1922,7 +1924,7 @@ describe("The transport._processWsClose() function", () => {
           ClientId: serverClientId
         });
 
-        await asyncUtil.once(transportClient, "disconnect");
+        await promisifyEvent(transportClient, "disconnect");
 
         expect(transportClient.state()).toBe("disconnected");
 
@@ -1945,11 +1947,11 @@ describe("The transport._processWsClose() function", () => {
           Port: `${port}`
         });
         serverEventFeed.desireOpen();
-        await asyncUtil.once(serverEventFeed, "open");
+        await promisifyEvent(serverEventFeed, "open");
 
         // Initilize WS server an wait until listening
         fmController.action("InitWsServer", { Port: `${port}` });
-        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        const eventArgs = await promisifyEvent(serverEventFeed, "action");
         expect(eventArgs[0]).toBe("Event");
         expect(eventArgs[1].Name).toBe("listening");
 
@@ -1961,8 +1963,8 @@ describe("The transport._processWsClose() function", () => {
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
-          asyncUtil.once(serverEventFeed, "action"),
-          asyncUtil.once(transportClient, "connect")
+          promisifyEvent(serverEventFeed, "action"),
+          promisifyEvent(transportClient, "connect")
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1978,7 +1980,7 @@ describe("The transport._processWsClose() function", () => {
           ClientId: serverClientId
         });
 
-        await asyncUtil.once(transportClient, "disconnect");
+        await promisifyEvent(transportClient, "disconnect");
 
         // Emit disconnect asynchronously
         expect(clientListener.connecting.calls.count()).toBe(0);
@@ -2023,11 +2025,11 @@ describe("The transport should operate correctly through multiple connection cyc
         Port: `${port}`
       });
       serverEventFeed.desireOpen();
-      await asyncUtil.once(serverEventFeed, "open");
+      await promisifyEvent(serverEventFeed, "open");
 
       // Initilize WS server an wait until listening
       fmController.action("InitWsServer", { Port: `${port}` });
-      const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+      const eventArgs = await promisifyEvent(serverEventFeed, "action");
       expect(eventArgs[0]).toBe("Event");
       expect(eventArgs[1].Name).toBe("listening");
 
@@ -2040,7 +2042,7 @@ describe("The transport should operate correctly through multiple connection cyc
 
       expect(transportClient.state()).toBe("connecting");
 
-      await asyncUtil.once(transportClient, "connect");
+      await promisifyEvent(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
@@ -2052,7 +2054,7 @@ describe("The transport should operate correctly through multiple connection cyc
 
       expect(transportClient.state()).toBe("connecting");
 
-      await asyncUtil.once(transportClient, "connect");
+      await promisifyEvent(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
@@ -2079,11 +2081,11 @@ describe("The transport should operate correctly through multiple connection cyc
         Port: `${port}`
       });
       serverEventFeed.desireOpen();
-      await asyncUtil.once(serverEventFeed, "open");
+      await promisifyEvent(serverEventFeed, "open");
 
       // Initilize WS server an wait until listening
       fmController.action("InitWsServer", { Port: `${port}` });
-      const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+      const eventArgs = await promisifyEvent(serverEventFeed, "action");
       expect(eventArgs[0]).toBe("Event");
       expect(eventArgs[1].Name).toBe("listening");
 
@@ -2100,7 +2102,7 @@ describe("The transport should operate correctly through multiple connection cyc
       expect(clientListener.disconnect.calls.count()).toBe(0);
       expect(clientListener.message.calls.count()).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       // Emit connecting asynchronously
       expect(clientListener.connecting.calls.count()).toBe(1);
@@ -2110,7 +2112,7 @@ describe("The transport should operate correctly through multiple connection cyc
       expect(clientListener.message.calls.count()).toBe(0);
       clientListener.spyClear();
 
-      await asyncUtil.once(transportClient, "connect");
+      await promisifyEvent(transportClient, "connect");
 
       // Emit connect
       expect(clientListener.connecting.calls.count()).toBe(0);
@@ -2128,7 +2130,7 @@ describe("The transport should operate correctly through multiple connection cyc
       expect(clientListener.disconnect.calls.count()).toBe(0);
       expect(clientListener.message.calls.count()).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       // Emit disconnect asynchronously
       expect(clientListener.connecting.calls.count()).toBe(0);
@@ -2146,7 +2148,7 @@ describe("The transport should operate correctly through multiple connection cyc
       expect(clientListener.disconnect.calls.count()).toBe(0);
       expect(clientListener.message.calls.count()).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       // Emit connecting asynchronously
       expect(clientListener.connecting.calls.count()).toBe(1);
@@ -2156,7 +2158,7 @@ describe("The transport should operate correctly through multiple connection cyc
       expect(clientListener.message.calls.count()).toBe(0);
       clientListener.spyClear();
 
-      await asyncUtil.once(transportClient, "connect");
+      await promisifyEvent(transportClient, "connect");
 
       // Emit connect
       expect(clientListener.connecting.calls.count()).toBe(0);
@@ -2174,7 +2176,7 @@ describe("The transport should operate correctly through multiple connection cyc
       expect(clientListener.disconnect.calls.count()).toBe(0);
       expect(clientListener.message.calls.count()).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       // Emit disconnect asynchronously
       expect(clientListener.connecting.calls.count()).toBe(0);
@@ -2203,11 +2205,11 @@ describe("The transport should operate correctly through multiple connection cyc
         Port: `${port}`
       });
       serverEventFeed.desireOpen();
-      await asyncUtil.once(serverEventFeed, "open");
+      await promisifyEvent(serverEventFeed, "open");
 
       // Initilize WS server an wait until listening
       fmController.action("InitWsServer", { Port: `${port}` });
-      const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+      const eventArgs = await promisifyEvent(serverEventFeed, "action");
       expect(eventArgs[0]).toBe("Event");
       expect(eventArgs[1].Name).toBe("listening");
 
@@ -2218,8 +2220,8 @@ describe("The transport should operate correctly through multiple connection cyc
 
       // Server should emit connecting event
       let results = await Promise.all([
-        asyncUtil.once(serverEventFeed, "action"),
-        asyncUtil.once(transportClient, "connect")
+        promisifyEvent(serverEventFeed, "action"),
+        promisifyEvent(transportClient, "connect")
       ]);
       let evt = results[0];
       expect(evt[0]).toBe("Event");
@@ -2230,8 +2232,8 @@ describe("The transport should operate correctly through multiple connection cyc
 
       // Server should emit disconnect event
       results = await Promise.all([
-        asyncUtil.once(serverEventFeed, "action"),
-        asyncUtil.once(transportClient, "disconnect")
+        promisifyEvent(serverEventFeed, "action"),
+        promisifyEvent(transportClient, "disconnect")
       ]);
       [evt] = results;
       expect(evt[0]).toBe("Event");
@@ -2242,8 +2244,8 @@ describe("The transport should operate correctly through multiple connection cyc
 
       // Server should emit connecting event
       results = await Promise.all([
-        asyncUtil.once(serverEventFeed, "action"),
-        asyncUtil.once(transportClient, "connect")
+        promisifyEvent(serverEventFeed, "action"),
+        promisifyEvent(transportClient, "connect")
       ]);
       [evt] = results;
       expect(evt[0]).toBe("Event");
@@ -2254,8 +2256,8 @@ describe("The transport should operate correctly through multiple connection cyc
 
       // Server should emit disconnect event
       results = await Promise.all([
-        asyncUtil.once(serverEventFeed, "action"),
-        asyncUtil.once(transportClient, "disconnect")
+        promisifyEvent(serverEventFeed, "action"),
+        promisifyEvent(transportClient, "disconnect")
       ]);
       [evt] = results;
       expect(evt[0]).toBe("Event");
@@ -2288,7 +2290,7 @@ describe("The transport.connect() function", () => {
         Port: `${port}`
       });
       serverEventFeed.desireOpen();
-      await asyncUtil.once(serverEventFeed, "open");
+      await promisifyEvent(serverEventFeed, "open");
 
       // Start the transport server and wait until started
       fmController.action("InvokeTransportMethod", {
@@ -2308,7 +2310,7 @@ describe("The transport.connect() function", () => {
       // Connect a transport client and check the server event
       const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
       transportClient.connect();
-      const evt = await asyncUtil.once(serverEventFeed, "action");
+      const evt = await promisifyEvent(serverEventFeed, "action");
       expect(evt[0]).toBe("Event");
       expect(evt[1].Name).toBe("connect");
       expect(evt[1].Arguments.length).toBe(1);
@@ -2336,7 +2338,7 @@ describe("The transport.disconnect() function", () => {
         Port: `${port}`
       });
       serverEventFeed.desireOpen();
-      await asyncUtil.once(serverEventFeed, "open");
+      await promisifyEvent(serverEventFeed, "open");
 
       // Start the transport server and wait until started
       fmController.action("InvokeTransportMethod", {
@@ -2357,14 +2359,14 @@ describe("The transport.disconnect() function", () => {
       const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
       transportClient.connect();
       const evts = await Promise.all([
-        asyncUtil.once(transportClient, "connect"),
-        asyncUtil.once(serverEventFeed, "action") // connection
+        promisifyEvent(transportClient, "connect"),
+        promisifyEvent(serverEventFeed, "action") // connection
       ]);
       const serverClientId = evts[1][1].Arguments[0];
 
       // Disconnect the client and check the server event
       transportClient.disconnect();
-      const evt = await asyncUtil.once(serverEventFeed, "action");
+      const evt = await promisifyEvent(serverEventFeed, "action");
       expect(evt[0]).toBe("Event");
       expect(evt[1].Name).toBe("disconnect");
       expect(evt[1].Arguments.length).toBe(2); // Client ID and Error object
@@ -2392,7 +2394,7 @@ describe("The transport.send() function", () => {
         Port: `${port}`
       });
       serverEventFeed.desireOpen();
-      await asyncUtil.once(serverEventFeed, "open");
+      await promisifyEvent(serverEventFeed, "open");
 
       // Start the transport server and wait until started
       fmController.action("InvokeTransportMethod", {
@@ -2413,14 +2415,14 @@ describe("The transport.send() function", () => {
       const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
       transportClient.connect();
       const evts = await Promise.all([
-        asyncUtil.once(transportClient, "connect"),
-        asyncUtil.once(serverEventFeed, "action") // connection
+        promisifyEvent(transportClient, "connect"),
+        promisifyEvent(serverEventFeed, "action") // connection
       ]);
       const serverClientId = evts[1][1].Arguments[0];
 
       // Send the server a message and check the server event
       transportClient.send("msg");
-      const evt = await asyncUtil.once(serverEventFeed, "action");
+      const evt = await promisifyEvent(serverEventFeed, "action");
       expect(evt[0]).toBe("Event");
       expect(evt[1].Name).toBe("message");
       expect(evt[1].Arguments.length).toBe(2);
@@ -2449,7 +2451,7 @@ describe("The server.stop() function", () => {
         Port: `${port}`
       });
       serverEventFeed.desireOpen();
-      await asyncUtil.once(serverEventFeed, "open");
+      await promisifyEvent(serverEventFeed, "open");
 
       // Start the transport server and wait until started
       fmController.action("InvokeTransportMethod", {
@@ -2469,7 +2471,7 @@ describe("The server.stop() function", () => {
       // Connect a transport client
       const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await promisifyEvent(transportClient, "connect");
 
       const clientListener = createClientListener(transportClient);
 
@@ -2481,7 +2483,7 @@ describe("The server.stop() function", () => {
       });
 
       // Check the client event
-      await asyncUtil.once(transportClient, "disconnect");
+      await promisifyEvent(transportClient, "disconnect");
       expect(clientListener.connecting.calls.count()).toBe(0);
       expect(clientListener.connect.calls.count()).toBe(0);
       expect(clientListener.disconnect.calls.count()).toBe(1);
@@ -2516,7 +2518,7 @@ describe("The server.send() function", () => {
         Port: `${port}`
       });
       serverEventFeed.desireOpen();
-      await asyncUtil.once(serverEventFeed, "open");
+      await promisifyEvent(serverEventFeed, "open");
 
       // Start the transport server and wait until started
       fmController.action("InvokeTransportMethod", {
@@ -2537,8 +2539,8 @@ describe("The server.send() function", () => {
       const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
       transportClient.connect();
       const results = await Promise.all([
-        asyncUtil.once(serverEventFeed, "action"),
-        asyncUtil.once(transportClient, "connect")
+        promisifyEvent(serverEventFeed, "action"),
+        promisifyEvent(transportClient, "connect")
       ]);
       const serverClientId = results[0][1].Arguments[0];
 
@@ -2552,7 +2554,7 @@ describe("The server.send() function", () => {
       });
 
       // Check the client event
-      await asyncUtil.once(transportClient, "message");
+      await promisifyEvent(transportClient, "message");
       expect(clientListener.connecting.calls.count()).toBe(0);
       expect(clientListener.connect.calls.count()).toBe(0);
       expect(clientListener.disconnect.calls.count()).toBe(0);
@@ -2582,7 +2584,7 @@ describe("The server.disconnect() function", () => {
         Port: `${port}`
       });
       serverEventFeed.desireOpen();
-      await asyncUtil.once(serverEventFeed, "open");
+      await promisifyEvent(serverEventFeed, "open");
 
       // Start the transport server and wait until started
       fmController.action("InvokeTransportMethod", {
@@ -2603,8 +2605,8 @@ describe("The server.disconnect() function", () => {
       const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
       transportClient.connect();
       const results = await Promise.all([
-        asyncUtil.once(serverEventFeed, "action"),
-        asyncUtil.once(transportClient, "connect")
+        promisifyEvent(serverEventFeed, "action"),
+        promisifyEvent(transportClient, "connect")
       ]);
       const serverClientId = results[0][1].Arguments[0];
 
@@ -2618,7 +2620,7 @@ describe("The server.disconnect() function", () => {
       });
 
       // Check the client event
-      await asyncUtil.once(transportClient, "disconnect");
+      await promisifyEvent(transportClient, "disconnect");
       expect(clientListener.connecting.calls.count()).toBe(0);
       expect(clientListener.connect.calls.count()).toBe(0);
       expect(clientListener.disconnect.calls.count()).toBe(1);
@@ -2653,7 +2655,7 @@ describe("The transport should be able to exchange long messages", () => {
         Port: `${port}`
       });
       serverEventFeed.desireOpen();
-      await asyncUtil.once(serverEventFeed, "open");
+      await promisifyEvent(serverEventFeed, "open");
 
       // Start the transport server and wait until started
       fmController.action("InvokeTransportMethod", {
@@ -2674,8 +2676,8 @@ describe("The transport should be able to exchange long messages", () => {
       const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
       transportClient.connect();
       const results = await Promise.all([
-        asyncUtil.once(serverEventFeed, "action"),
-        asyncUtil.once(transportClient, "connect")
+        promisifyEvent(serverEventFeed, "action"),
+        promisifyEvent(transportClient, "connect")
       ]);
       const serverClientId = results[0][1].Arguments[0];
 
@@ -2691,7 +2693,7 @@ describe("The transport should be able to exchange long messages", () => {
       });
 
       // Check the client event
-      await asyncUtil.once(transportClient, "message");
+      await promisifyEvent(transportClient, "message");
       expect(clientListener.connecting.calls.count()).toBe(0);
       expect(clientListener.connect.calls.count()).toBe(0);
       expect(clientListener.disconnect.calls.count()).toBe(0);
@@ -2719,7 +2721,7 @@ describe("The transport should be able to exchange long messages", () => {
         Port: `${port}`
       });
       serverEventFeed.desireOpen();
-      await asyncUtil.once(serverEventFeed, "open");
+      await promisifyEvent(serverEventFeed, "open");
 
       // Start the transport server and wait until started
       fmController.action("InvokeTransportMethod", {
@@ -2740,8 +2742,8 @@ describe("The transport should be able to exchange long messages", () => {
       const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
       transportClient.connect();
       const results = await Promise.all([
-        asyncUtil.once(serverEventFeed, "action"),
-        asyncUtil.once(transportClient, "connect")
+        promisifyEvent(serverEventFeed, "action"),
+        promisifyEvent(transportClient, "connect")
       ]);
       const serverClientId = results[0][1].Arguments[0];
 
@@ -2751,7 +2753,7 @@ describe("The transport should be able to exchange long messages", () => {
       transportClient.send(msg);
 
       // Check the server event
-      const evt = await asyncUtil.once(serverEventFeed, "action");
+      const evt = await promisifyEvent(serverEventFeed, "action");
       expect(evt[0]).toBe("Event");
       expect(evt[1].Name).toBe("message");
       expect(evt[1].Arguments.length).toBe(2);
@@ -2778,7 +2780,7 @@ it(
       Port: `${port}`
     });
     serverEventFeed.desireOpen();
-    await asyncUtil.once(serverEventFeed, "open");
+    await promisifyEvent(serverEventFeed, "open");
 
     // Start the Feedme server and wait until started
     fmController.action("InvokeFeedmeMethod", {
@@ -2800,7 +2802,7 @@ it(
       transport: feedmeTransportWsClient(`${TARGET_URL}:${port}`)
     });
     fmClient.connect();
-    await asyncUtil.once(fmClient, "connect");
+    await promisifyEvent(fmClient, "connect");
 
     // Try a rejected action
     try {
@@ -2823,7 +2825,7 @@ it(
     // Try a rejected feed open
     const feed1 = fmClient.feed("failing_feed", { Feed: "Args" });
     feed1.desireOpen();
-    const evt1 = await asyncUtil.once(feed1, "close");
+    const evt1 = await promisifyEvent(feed1, "close");
     expect(evt1[0]).toEqual(jasmine.any(Error));
     expect(evt1[0].message).toBe(
       "REJECTED: Server rejected the feed open request."
@@ -2835,16 +2837,16 @@ it(
     // Try a successful feed open
     const feed2 = fmClient.feed("successful_feed", { Feed: "Args" });
     feed2.desireOpen();
-    await asyncUtil.once(feed2, "open");
+    await promisifyEvent(feed2, "open");
     expect(feed2.data()).toEqual({ Feed: "Data" });
 
     // Try a feed closure
     feed2.desireClosed();
-    // await asyncUtil.once(feed2, "close"); // close is emitted synchronously (changing))
+    // await promisifyEvent(feed2, "close"); // close is emitted synchronously (changing))
 
     // Try an action revelation
     feed2.desireOpen();
-    await asyncUtil.once(feed2, "open");
+    await promisifyEvent(feed2, "open");
     fmController.action("InvokeFeedmeMethod", {
       Port: port,
       Method: "actionRevelation",
@@ -2858,7 +2860,7 @@ it(
         }
       ]
     });
-    const evt2 = await asyncUtil.once(feed2, "action");
+    const evt2 = await promisifyEvent(feed2, "action");
     expect(evt2[0]).toBe("SomeAction");
     expect(evt2[1]).toEqual({ Action: "Data" });
     expect(evt2[2]).toEqual({ Feed: "DataNew" });
@@ -2877,7 +2879,7 @@ it(
         }
       ]
     });
-    const evt3 = await asyncUtil.once(feed2, "close");
+    const evt3 = await promisifyEvent(feed2, "close");
     expect(evt3[0]).toEqual(jasmine.any(Error));
     expect(evt3[0].message).toBe("TERMINATED: The server terminated the feed.");
     expect(evt3[0].serverErrorCode).toBe("SOME_ERROR");
@@ -2889,25 +2891,25 @@ it(
       Method: "disconnect",
       Arguments: [fmClient.id()]
     });
-    const evt4 = await asyncUtil.once(fmClient, "disconnect");
+    const evt4 = await promisifyEvent(fmClient, "disconnect");
     expect(evt4[0]).toEqual(jasmine.any(Error));
     expect(evt4[0].message).toBe("FAILURE: The WebSocket closed unexpectedly.");
 
     // Try a client disconnect
     // fmClient.connect();
-    // await asyncUtil.once(fmClient, "connect");
+    // await promisifyEvent(fmClient, "connect");
     // fmClient.disconnect();
-    // await asyncUtil.once(fmClient, "disconnect");
+    // await promisifyEvent(fmClient, "disconnect");
 
     // // Try a server stoppage (also cleans up)
     // fmClient.connect();
-    // await asyncUtil.once(fmClient, "connect");
+    // await promisifyEvent(fmClient, "connect");
     // fmServer.stop();
     // fmClient.once("disconnect", err => {
     //   expect(err).toBeInstanceOf(Error);
     //   expect(err.message).toBe("FAILURE: The WebSocket closed unexpectedly.");
     // });
-    // await asyncUtil.once(fmClient, "disconnect");
+    // await promisifyEvent(fmClient, "disconnect");
 
     // Clean up
     // await fmController.action("DestroyFeedmeServer", { Port: port });

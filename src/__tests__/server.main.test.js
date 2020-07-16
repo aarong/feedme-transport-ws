@@ -3,9 +3,9 @@ import check from "check-types";
 import emitter from "component-emitter";
 import http from "http";
 import stream from "stream";
+import promisify from "util.promisify";
 import server from "../server.main";
 import serverConfig from "../server.config";
-import asyncUtil from "./asyncutil";
 
 /*
 
@@ -840,7 +840,7 @@ describe("The server.start() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -875,7 +875,7 @@ describe("The server.start() function", () => {
         });
       });
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -913,7 +913,7 @@ describe("The server.start() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -950,7 +950,7 @@ describe("The server.start() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -994,7 +994,7 @@ describe("The server.start() function", () => {
         });
       });
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -1033,7 +1033,7 @@ describe("The server.start() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -1078,7 +1078,7 @@ describe("The server.start() function", () => {
         });
       });
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -1117,7 +1117,7 @@ describe("The server.start() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(1);
       expect(listener.starting.mock.calls[0].length).toBe(0);
@@ -1309,7 +1309,7 @@ describe("The server.start() function", () => {
         harn.server.start();
         const wsServer = harn.getWs();
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         const listener = harn.createServerListener();
 
@@ -1323,7 +1323,7 @@ describe("The server.start() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         expect(listener.disconnect.mock.calls.length).toBe(0);
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
@@ -1341,7 +1341,7 @@ describe("The server.start() function", () => {
 
         wsServer.close.mock.calls[0][0](); // Run ws.close() callback
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
@@ -1424,7 +1424,7 @@ describe("The server.stop() function", () => {
       const mockWs2 = harn.createMockWs();
       harn.getWs().emit("connection", mockWs2);
 
-      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+      await promisify(process.nextTick)(); // Get past transport starting, started, and connect events
 
       const listener = harn.createServerListener();
 
@@ -1448,7 +1448,7 @@ describe("The server.stop() function", () => {
         });
       });
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -1477,7 +1477,7 @@ describe("The server.stop() function", () => {
       const cb = mockWs.close.mock.calls[0][0];
       cb();
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -1498,7 +1498,7 @@ describe("The server.stop() function", () => {
       const mockWs2 = harn.createMockWs();
       harn.getWs().emit("connection", mockWs2);
 
-      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+      await promisify(process.nextTick)(); // Get past transport starting, started, and connect events
 
       const listener = harn.createServerListener();
 
@@ -1519,7 +1519,7 @@ describe("The server.stop() function", () => {
         });
       });
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -1553,7 +1553,7 @@ describe("The server.stop() function", () => {
       const mockWs2 = harn.createMockWs();
       harn.getWs().emit("connection", mockWs2);
 
-      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+      await promisify(process.nextTick)(); // Get past transport starting, started, and connect events
 
       const listener = harn.createServerListener();
 
@@ -1574,7 +1574,7 @@ describe("The server.stop() function", () => {
         });
       });
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -1613,7 +1613,7 @@ describe("The server.stop() function", () => {
       const mockWs2 = harn.createMockWs();
       harn.getWs().emit("connection", mockWs2);
 
-      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+      await promisify(process.nextTick)(); // Get past transport starting, started, and connect events
 
       const newState = harn.getServerState();
       newState._wsServer = null;
@@ -1635,7 +1635,7 @@ describe("The server.stop() function", () => {
       const mockWs2 = harn.createMockWs();
       harn.getWs().emit("connection", mockWs2);
 
-      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+      await promisify(process.nextTick)(); // Get past transport starting, started, and connect events
 
       const newState = harn.getServerState();
       newState._wsServer = null;
@@ -1659,7 +1659,7 @@ describe("The server.stop() function", () => {
       const mockWs2 = harn.createMockWs();
       harn.getWs().emit("connection", mockWs2);
 
-      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+      await promisify(process.nextTick)(); // Get past transport starting, started, and connect events
 
       const newState = harn.getServerState();
       newState._wsServer = null;
@@ -1685,7 +1685,7 @@ describe("The server.stop() function", () => {
       const mockWs2 = harn.createMockWs();
       harn.getWs().emit("connection", mockWs2);
 
-      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+      await promisify(process.nextTick)(); // Get past transport starting, started, and connect events
 
       clearInterval.mockClear();
       harn.server.stop();
@@ -1709,7 +1709,7 @@ describe("The server.stop() function", () => {
       const mockWs2 = harn.createMockWs();
       harn.getWs().emit("connection", mockWs2);
 
-      await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+      await promisify(process.nextTick)(); // Get past transport starting, started, and connect events
 
       clearTimeout.mockClear();
       harn.server.stop();
@@ -1723,7 +1723,7 @@ describe("The server.stop() function", () => {
       harn.server.start();
       harn.getWs().emit("listening");
 
-      await asyncUtil.nextTick(); // Get past emitted events
+      await promisify(process.nextTick)(); // Get past emitted events
 
       const prevWs = harn.getWs();
       harn.getWs().mockClear();
@@ -1738,7 +1738,7 @@ describe("The server.stop() function", () => {
       const harn = harness({ server: emitter({ listening: true }) });
       harn.server.start();
 
-      await asyncUtil.nextTick(); // Get past emitted events
+      await promisify(process.nextTick)(); // Get past emitted events
 
       const prevWs = harn.getWs();
       harn.getWs().mockClear();
@@ -1753,7 +1753,7 @@ describe("The server.stop() function", () => {
       const harn = harness({ noServer: true });
       harn.server.start();
 
-      await asyncUtil.nextTick(); // Get past emitted events
+      await promisify(process.nextTick)(); // Get past emitted events
 
       const prevWs = harn.getWs();
       harn.getWs().mockClear();
@@ -1779,7 +1779,7 @@ describe("The server.stop() function", () => {
 
         harn.server.stop();
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         const listener = harn.createServerListener();
         prevWs.close.mock.calls[0][0](); // fire ws.close callback
@@ -1792,7 +1792,7 @@ describe("The server.stop() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         expect(listener.disconnect.mock.calls.length).toBe(0);
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
@@ -1815,7 +1815,7 @@ describe("The server.stop() function", () => {
         const mockWs2 = harn.createMockWs();
         harn.getWs().emit("connection", mockWs2);
 
-        await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+        await promisify(process.nextTick)(); // Get past transport starting, started, and connect events
 
         const prevWs = harn.getWs();
         harn.getWs().mockClear();
@@ -1841,7 +1841,7 @@ describe("The server.stop() function", () => {
 
         harn.server.stop();
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         const listener = harn.createServerListener();
         prevWs.close.mock.calls[0][0](); // fire ws.close callback
@@ -1854,7 +1854,7 @@ describe("The server.stop() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         expect(listener.disconnect.mock.calls.length).toBe(0);
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
@@ -1876,7 +1876,7 @@ describe("The server.stop() function", () => {
         const mockWs2 = harn.createMockWs();
         harn.getWs().emit("connection", mockWs2);
 
-        await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+        await promisify(process.nextTick)(); // Get past transport starting, started, and connect events
 
         const prevWs = harn.getWs();
         harn.getWs().mockClear();
@@ -1902,7 +1902,7 @@ describe("The server.stop() function", () => {
 
         harn.server.stop();
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         const listener = harn.createServerListener();
         prevWs.close.mock.calls[0][0](); // fire ws.close callback
@@ -1915,7 +1915,7 @@ describe("The server.stop() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         expect(listener.disconnect.mock.calls.length).toBe(0);
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
@@ -1937,7 +1937,7 @@ describe("The server.stop() function", () => {
         const mockWs2 = harn.createMockWs();
         harn.getWs().emit("connection", mockWs2);
 
-        await asyncUtil.nextTick(); // Get past transport starting, started, and connect events
+        await promisify(process.nextTick)(); // Get past transport starting, started, and connect events
 
         const prevWs = harn.getWs();
         harn.getWs().mockClear();
@@ -2016,14 +2016,14 @@ describe("The server.send() function", () => {
         });
         harn.getWs().emit("connection", ws);
 
-        await asyncUtil.nextTick(); // Move past starting, start, connect events
+        await promisify(process.nextTick)(); // Move past starting, start, connect events
 
         const listener = harn.createServerListener();
         harn.server.send(cid, "msg");
         const cb = ws.send.mock.calls[0][1];
         cb();
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
@@ -2047,7 +2047,7 @@ describe("The server.send() function", () => {
         });
         harn.getWs().emit("connection", ws);
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         const newState = harn.getServerState();
         harn.server.send(cid, "msg");
@@ -2073,7 +2073,7 @@ describe("The server.send() function", () => {
 
         ws.mockClear();
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         harn.server.send(cid, "msg");
         const cb = ws.send.mock.calls[0][1];
@@ -2104,7 +2104,7 @@ describe("The server.send() function", () => {
         });
         harn.getWs().emit("connection", ws);
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         expect(harn.server.send(cid, "msg")).toBe(undefined);
       });
@@ -2124,7 +2124,7 @@ describe("The server.send() function", () => {
         });
         harn.getWs().emit("connection", ws);
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         const listener = harn.createServerListener();
         harn.server.send(cid, "msg");
@@ -2140,7 +2140,7 @@ describe("The server.send() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         expect(listener.disconnect.mock.calls.length).toBe(0);
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
@@ -2171,7 +2171,7 @@ describe("The server.send() function", () => {
         });
         harn.getWs().emit("connection", ws);
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         const newState = harn.getServerState();
         delete newState._wsClients[cid];
@@ -2197,7 +2197,7 @@ describe("The server.send() function", () => {
         });
         harn.getWs().emit("connection", ws);
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         ws.mockClear();
         harn.server.send(cid, "msg");
@@ -2230,7 +2230,7 @@ describe("The server.send() function", () => {
         });
         harn.getWs().emit("connection", ws);
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         expect(harn.server.send(cid, "msg")).toBe(undefined);
       });
@@ -2250,7 +2250,7 @@ describe("The server.send() function", () => {
         });
         harn.getWs().emit("connection", ws);
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         harn.server.send(cid, "msg");
         const cb = ws.send.mock.calls[0][1];
@@ -2258,13 +2258,13 @@ describe("The server.send() function", () => {
         ws.readyState = ws.CLOSING;
         ws.emit("close");
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         const err = new Error("SOME_ERROR");
         const listener = harn.createServerListener();
         cb(err);
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
@@ -2288,7 +2288,7 @@ describe("The server.send() function", () => {
         });
         harn.getWs().emit("connection", ws);
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         harn.server.send(cid, "msg");
         const cb = ws.send.mock.calls[0][1];
@@ -2316,7 +2316,7 @@ describe("The server.send() function", () => {
         });
         harn.getWs().emit("connection", ws);
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         ws.mockClear();
         harn.server.send(cid, "msg");
@@ -2391,7 +2391,7 @@ describe("The server.disconnect() function", () => {
       });
       harn.getWs().emit("connection", mockWs);
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const listener = harn.createServerListener();
       harn.server.disconnect(cid);
@@ -2404,7 +2404,7 @@ describe("The server.disconnect() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -2429,7 +2429,7 @@ describe("The server.disconnect() function", () => {
       harn.getWs().emit("connection", mockWs);
       const err = new Error("SOMETHING");
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const listener = harn.createServerListener();
       harn.server.disconnect(cid, err);
@@ -2442,7 +2442,7 @@ describe("The server.disconnect() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
       expect(listener.stopping.mock.calls.length).toBe(0);
@@ -2469,7 +2469,7 @@ describe("The server.disconnect() function", () => {
       harn.getWs().emit("connection", mockWs);
       jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const newState = harn.getServerState();
       delete newState._wsClients[cid];
@@ -2493,7 +2493,7 @@ describe("The server.disconnect() function", () => {
       harn.getWs().emit("connection", mockWs);
       jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       clearInterval.mockClear();
       clearTimeout.mockClear();
@@ -2519,7 +2519,7 @@ describe("The server.disconnect() function", () => {
       });
       harn.getWs().emit("connection", mockWs);
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       harn.server.disconnect(cid);
       expect(mockWs.ping.mock.calls.length).toBe(0);
@@ -2548,7 +2548,7 @@ describe("The server.disconnect() function", () => {
       });
       harn.getWs().emit("connection", mockWs);
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       expect(harn.server.disconnect(cid)).toBe(undefined);
     });
@@ -2628,7 +2628,7 @@ describe("The server.handleUpgrade() function", () => {
       const harn = harness({ noServer: true });
       harn.server.start();
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const listener = harn.createServerListener();
       harn.server.handleUpgrade(
@@ -2637,7 +2637,7 @@ describe("The server.handleUpgrade() function", () => {
         Buffer.from("abc")
       );
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -2703,7 +2703,7 @@ describe("The server.handleUpgrade() function", () => {
         );
         const cb = harn.getWs().handleUpgrade.mock.calls[0][3];
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         const listener = harn.createServerListener();
         cb(harn.createMockWs());
@@ -2716,7 +2716,7 @@ describe("The server.handleUpgrade() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         expect(listener.disconnect.mock.calls.length).toBe(0);
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
@@ -2746,7 +2746,7 @@ describe("The server.handleUpgrade() function", () => {
         const newState = harn.getServerState();
 
         cb(harn.createMockWs()); // Do this first to get clientId
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         newState._wsClients[cid] = {};
         newState._heartbeatIntervals[cid] = 123;
@@ -2801,7 +2801,7 @@ describe("The server._processServerListening() function", () => {
     const harn = harness({ port: PORT });
     harn.server.start();
 
-    await asyncUtil.nextTick(); // Move past queued events
+    await promisify(process.nextTick)(); // Move past queued events
 
     const listener = harn.createServerListener();
     harn.getWs().emit("listening");
@@ -2814,7 +2814,7 @@ describe("The server._processServerListening() function", () => {
     expect(listener.message.mock.calls.length).toBe(0);
     expect(listener.disconnect.mock.calls.length).toBe(0);
 
-    await asyncUtil.nextTick();
+    await promisify(process.nextTick)();
 
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(1);
@@ -2831,7 +2831,7 @@ describe("The server._processServerListening() function", () => {
     const harn = harness({ server: httpServer });
     harn.server.start();
 
-    await asyncUtil.nextTick(); // Move past queued events
+    await promisify(process.nextTick)(); // Move past queued events
 
     const listener = harn.createServerListener();
 
@@ -2845,7 +2845,7 @@ describe("The server._processServerListening() function", () => {
     expect(listener.message.mock.calls.length).toBe(0);
     expect(listener.disconnect.mock.calls.length).toBe(0);
 
-    await asyncUtil.nextTick();
+    await promisify(process.nextTick)();
 
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(1);
@@ -2951,7 +2951,7 @@ describe("The server._processServerListening() function", () => {
       httpServer.listening = true;
       httpServer.emit("listening");
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const listener = harn.createServerListener();
 
@@ -2965,7 +2965,7 @@ describe("The server._processServerListening() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -2983,7 +2983,7 @@ describe("The server._processServerListening() function", () => {
       httpServer.listening = true;
       httpServer.emit("listening");
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const newState = harn.getServerState();
 
@@ -2999,7 +2999,7 @@ describe("The server._processServerListening() function", () => {
       httpServer.listening = true;
       httpServer.emit("listening");
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const wsServer = harn.getWs();
       wsServer.mockClear();
@@ -3019,7 +3019,7 @@ describe("The server._processServerListening() function", () => {
       httpServer.listening = true;
       httpServer.emit("listening");
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const wsServer = harn.getWs();
       wsServer.mockClear();
@@ -3038,7 +3038,7 @@ describe("The server._processServerListening() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -3065,7 +3065,7 @@ describe("The server._processServerListening() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -3115,7 +3115,7 @@ describe("The server._processServerListening() function", () => {
       httpServer.listening = true;
       httpServer.emit("listening");
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const wsServer = harn.getWs();
       wsServer.mockClear();
@@ -3142,7 +3142,7 @@ describe("The server._processServerClose() function", () => {
     harn.server.start();
     harn.getWs().emit("listening");
 
-    await asyncUtil.nextTick(); // Move past queued events
+    await promisify(process.nextTick)(); // Move past queued events
 
     const mockWs1 = harn.createMockWs();
     let cid1;
@@ -3151,7 +3151,7 @@ describe("The server._processServerClose() function", () => {
     });
     harn.getWs().emit("connection", mockWs1);
 
-    await asyncUtil.nextTick(); // Move past queued events
+    await promisify(process.nextTick)(); // Move past queued events
 
     const mockWs2 = harn.createMockWs();
     let cid2;
@@ -3160,7 +3160,7 @@ describe("The server._processServerClose() function", () => {
     });
     harn.getWs().emit("connection", mockWs2);
 
-    await asyncUtil.nextTick(); // Move past queued events
+    await promisify(process.nextTick)(); // Move past queued events
 
     const eventOrder = [];
     ["stopping", "stop", "disconnect"].forEach(evt => {
@@ -3180,7 +3180,7 @@ describe("The server._processServerClose() function", () => {
     expect(listener.message.mock.calls.length).toBe(0);
     expect(listener.disconnect.mock.calls.length).toBe(0);
 
-    await asyncUtil.nextTick();
+    await promisify(process.nextTick)();
 
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(0);
@@ -3231,7 +3231,7 @@ describe("The server._processServerClose() function", () => {
     harn.server.start();
     harn.getWs().emit("listening");
 
-    await asyncUtil.nextTick(); // Move past queued events
+    await promisify(process.nextTick)(); // Move past queued events
 
     const mockWs1 = harn.createMockWs();
     let cid1;
@@ -3240,7 +3240,7 @@ describe("The server._processServerClose() function", () => {
     });
     harn.getWs().emit("connection", mockWs1);
 
-    await asyncUtil.nextTick(); // Move past queued events
+    await promisify(process.nextTick)(); // Move past queued events
 
     const mockWs2 = harn.createMockWs();
     let cid2;
@@ -3249,7 +3249,7 @@ describe("The server._processServerClose() function", () => {
     });
     harn.getWs().emit("connection", mockWs2);
 
-    await asyncUtil.nextTick(); // Move past queued events
+    await promisify(process.nextTick)(); // Move past queued events
 
     const eventOrder = [];
     ["stopping", "stop", "disconnect"].forEach(evt => {
@@ -3271,7 +3271,7 @@ describe("The server._processServerClose() function", () => {
     expect(listener.message.mock.calls.length).toBe(0);
     expect(listener.disconnect.mock.calls.length).toBe(0);
 
-    await asyncUtil.nextTick();
+    await promisify(process.nextTick)();
 
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(0);
@@ -3314,7 +3314,7 @@ describe("The server._processServerClose() function", () => {
     expect(listener.message.mock.calls.length).toBe(0);
     expect(listener.disconnect.mock.calls.length).toBe(0);
 
-    await asyncUtil.nextTick();
+    await promisify(process.nextTick)();
 
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(0);
@@ -3443,7 +3443,7 @@ describe("The server._processServerError() function", () => {
       const harn = harness({ port: PORT });
       harn.server.start();
 
-      await asyncUtil.nextTick(); // Move past starting event
+      await promisify(process.nextTick)(); // Move past starting event
 
       const listener = harn.createServerListener();
 
@@ -3463,7 +3463,7 @@ describe("The server._processServerError() function", () => {
         eventOrder.push(evt);
       });
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       // Emit stopping and stop asynchronously
       expect(listener.starting.mock.calls.length).toBe(0);
@@ -3494,7 +3494,7 @@ describe("The server._processServerError() function", () => {
       const harn = harness({ server: httpServer });
       harn.server.start();
 
-      await asyncUtil.nextTick(); // Move past starting event
+      await promisify(process.nextTick)(); // Move past starting event
 
       const wsServer = harn.getWs();
 
@@ -3511,7 +3511,7 @@ describe("The server._processServerError() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       // Emit stopping and stop asynchronously
       expect(listener.starting.mock.calls.length).toBe(0);
@@ -3541,7 +3541,7 @@ describe("The server._processServerError() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       // Emit stopping and stop asynchronously
       expect(listener.starting.mock.calls.length).toBe(0);
@@ -3647,7 +3647,7 @@ describe("The server._processServerError() function", () => {
       const wsServer = harn.getWs();
       harn.getWs().emit("close");
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const listener = harn.createServerListener();
 
@@ -3662,7 +3662,7 @@ describe("The server._processServerError() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       // Emit nothing asynchronously
       expect(listener.starting.mock.calls.length).toBe(0);
@@ -3681,7 +3681,7 @@ describe("The server._processServerError() function", () => {
 
       httpServer.emit("close");
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const listener = harn.createServerListener();
 
@@ -3696,7 +3696,7 @@ describe("The server._processServerError() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       // Emit nothing asynchronously
       expect(listener.starting.mock.calls.length).toBe(0);
@@ -3793,7 +3793,7 @@ describe("The server._processServerError() function", () => {
 
       const wsServer = harn.getWs();
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const listener = harn.createServerListener();
 
@@ -3814,7 +3814,7 @@ describe("The server._processServerError() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -3841,7 +3841,7 @@ describe("The server._processServerError() function", () => {
       const harn = harness({ server: httpServer });
       harn.server.start();
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const wsServer = harn.getWs();
 
@@ -3857,7 +3857,7 @@ describe("The server._processServerError() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -3884,7 +3884,7 @@ describe("The server._processServerError() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -3992,7 +3992,7 @@ describe("The server._processWsServerConnection() function", () => {
       harn.server.start();
       harn.getWs().emit("listening");
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const listener = harn.createServerListener();
       const mockWs = harn.createMockWs();
@@ -4006,7 +4006,7 @@ describe("The server._processWsServerConnection() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -4036,7 +4036,7 @@ describe("The server._processWsServerConnection() function", () => {
       });
       harn.getWs().emit("connection", mockWs);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       newState._wsClients[cid] = harn.server._wsClients[cid]; // Basically checking cid
       newState._heartbeatIntervals[cid] = 123;
@@ -4059,12 +4059,12 @@ describe("The server._processWsServerConnection() function", () => {
         const mockWs = harn.createMockWs();
         harn.getWs().emit("connection", mockWs);
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         const listener = harn.createServerListener();
         jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         expect(listener.starting.mock.calls.length).toBe(0);
         expect(listener.start.mock.calls.length).toBe(0);
@@ -4086,7 +4086,7 @@ describe("The server._processWsServerConnection() function", () => {
         });
         harn.getWs().emit("connection", mockWs);
 
-        await asyncUtil.nextTick(); // Move past queued events
+        await promisify(process.nextTick)(); // Move past queued events
 
         const newState = harn.getServerState();
         jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
@@ -4199,7 +4199,7 @@ describe("The server._processWsServerConnection() function", () => {
             const mockWs = harn.createMockWs();
             harn.getWs().emit("connection", mockWs);
 
-            await asyncUtil.nextTick(); // Move past queued events
+            await promisify(process.nextTick)(); // Move past queued events
 
             jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
@@ -4216,7 +4216,7 @@ describe("The server._processWsServerConnection() function", () => {
             expect(listener.message.mock.calls.length).toBe(0);
             expect(listener.disconnect.mock.calls.length).toBe(0);
 
-            await asyncUtil.nextTick();
+            await promisify(process.nextTick)();
 
             expect(listener.starting.mock.calls.length).toBe(0);
             expect(listener.start.mock.calls.length).toBe(0);
@@ -4245,7 +4245,7 @@ describe("The server._processWsServerConnection() function", () => {
             const mockWs = harn.createMockWs();
             harn.getWs().emit("connection", mockWs);
 
-            await asyncUtil.nextTick(); // Move past queued events
+            await promisify(process.nextTick)(); // Move past queued events
 
             jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
@@ -4355,7 +4355,7 @@ describe("The server._processWsServerConnection() function", () => {
       harn.server.start();
       harn.getWs().emit("listening");
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const listener = harn.createServerListener();
       const mockWs = harn.createMockWs();
@@ -4369,7 +4369,7 @@ describe("The server._processWsServerConnection() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -4399,7 +4399,7 @@ describe("The server._processWsServerConnection() function", () => {
       });
       harn.getWs().emit("connection", mockWs);
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       newState._wsClients[cid] = harn.server._wsClients[cid]; // Basically checking cid
       expect(harn.server).toHaveState(newState);
@@ -4430,7 +4430,7 @@ describe("The server._processWsClientMessage() function", () => {
       });
       harn.getWs().emit("connection", mockWs);
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const listener = harn.createServerListener();
       mockWs.emit("message", "some_msg");
@@ -4443,7 +4443,7 @@ describe("The server._processWsClientMessage() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -4494,7 +4494,7 @@ describe("The server._processWsClientMessage() function", () => {
       });
       harn.getWs().emit("connection", mockWs);
 
-      await asyncUtil.nextTick(); // Move past queued events
+      await promisify(process.nextTick)(); // Move past queued events
 
       const listener = harn.createServerListener();
       mockWs.emit("message", 123);
@@ -4507,7 +4507,7 @@ describe("The server._processWsClientMessage() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
-      await asyncUtil.nextTick();
+      await promisify(process.nextTick)();
 
       expect(listener.starting.mock.calls.length).toBe(0);
       expect(listener.start.mock.calls.length).toBe(0);
@@ -4562,12 +4562,12 @@ describe("The server._processWsClientPong() function", () => {
     harn.getWs().emit("connection", mockWs);
     jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
-    await asyncUtil.nextTick(); // Move past queued events
+    await promisify(process.nextTick)(); // Move past queued events
 
     const listener = harn.createServerListener();
     mockWs.emit("pong");
 
-    await asyncUtil.nextTick();
+    await promisify(process.nextTick)();
 
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(0);
@@ -4591,7 +4591,7 @@ describe("The server._processWsClientPong() function", () => {
     });
     harn.getWs().emit("connection", mockWs);
 
-    await asyncUtil.nextTick(); // Move past queued events
+    await promisify(process.nextTick)(); // Move past queued events
 
     jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
@@ -4653,7 +4653,7 @@ describe("The server._processWsClientClose() function", () => {
     });
     harn.getWs().emit("connection", mockWs);
 
-    await asyncUtil.nextTick(); // Move past queued events
+    await promisify(process.nextTick)(); // Move past queued events
 
     const listener = harn.createServerListener();
     mockWs.readyState = mockWs.CLOSING;
@@ -4667,7 +4667,7 @@ describe("The server._processWsClientClose() function", () => {
     expect(listener.message.mock.calls.length).toBe(0);
     expect(listener.disconnect.mock.calls.length).toBe(0);
 
-    await asyncUtil.nextTick();
+    await promisify(process.nextTick)();
 
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(0);
@@ -4697,7 +4697,7 @@ describe("The server._processWsClientClose() function", () => {
     });
     harn.getWs().emit("connection", mockWs);
 
-    await asyncUtil.nextTick(); // Move past queued events
+    await promisify(process.nextTick)(); // Move past queued events
 
     jest.advanceTimersByTime(serverConfig.defaults.heartbeatIntervalMs);
 
@@ -4773,7 +4773,7 @@ describe("The server.state() function", () => {
     const listener = harn.createServerListener();
     harn.server.state();
 
-    await asyncUtil.nextTick();
+    await promisify(process.nextTick)();
 
     expect(listener.starting.mock.calls.length).toBe(0);
     expect(listener.start.mock.calls.length).toBe(0);
