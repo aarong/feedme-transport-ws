@@ -3,7 +3,7 @@ import check from "check-types";
 import emitter from "component-emitter";
 import http from "http";
 import stream from "stream";
-import promisify from "util.promisify";
+import promisify from "promisify-function";
 import server from "../server.main";
 import serverConfig from "../server.config";
 

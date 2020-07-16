@@ -1213,7 +1213,7 @@ describe("The transport.start() function", () => {
         await promisify(httpServer.listen.bind(httpServer))(port);
 
         // Check that the webpage is available
-        const { body } = await promisify(request)(`http://localhost:${port}`);
+        const [{ body }] = await promisify(request)(`http://localhost:${port}`);
         expect(body).toBe("Webpage");
 
         // Create a transport server on the external server
@@ -1240,7 +1240,7 @@ describe("The transport.start() function", () => {
         await promisify(httpServer.listen.bind(httpServer))(port);
 
         // Check that the webpage is available
-        const { body } = await promisify(request)(`http://localhost:${port}`);
+        const [{ body }] = await promisify(request)(`http://localhost:${port}`);
         expect(body).toBe("Webpage");
 
         // Create a transport server on the external server
@@ -1354,7 +1354,7 @@ describe("The transport.start() function", () => {
         expect(transportServer.state()).toBe("started");
 
         // Check that the webpage is available
-        const { body } = await promisify(request)(`http://localhost:${port}`);
+        const [{ body }] = await promisify(request)(`http://localhost:${port}`);
         expect(body).toBe("Webpage");
 
         // Clean up
@@ -1438,7 +1438,7 @@ describe("The transport.start() function", () => {
         expect(listener.disconnect.mock.calls.length).toBe(0);
 
         // Check that the webpage is available
-        const { body } = await promisify(request)(`http://localhost:${port}`);
+        const [{ body }] = await promisify(request)(`http://localhost:${port}`);
         expect(body).toBe("Webpage");
 
         // Clean up

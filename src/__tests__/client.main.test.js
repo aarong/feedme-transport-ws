@@ -1,7 +1,7 @@
 import _ from "lodash";
 import check from "check-types";
 import emitter from "component-emitter";
-import promisify from "util.promisify";
+import promisify from "promisify-function";
 import client from "../client.main";
 import clientConfig from "../client.config";
 
