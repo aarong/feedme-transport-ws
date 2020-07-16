@@ -19,7 +19,7 @@
     "check-types": "^7.4.0",
     "component-emitter": "^1.2.1",
     "debug": "^4.1.1",
-    "lodash": "^4.17.15",
+    "lodash": "^4.17.19",
     "source-map-support": "^0.5.11",
     "uuid": "^3.3.2",
     "ws": "^6.2.1"
