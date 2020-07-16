@@ -1,7 +1,7 @@
 /* eslint-disable import/no-extraneous-dependencies */
 import feedmeClient from "feedme-client/bundle"; // Avoid source-map-support warning
 import promisifyEvent from "promisify-event";
-import promisify from "util.promisify";
+import promisify from "promisify-function"; // Node's util.promisify and other major promisification packages do not transpily/polyfill properly
 import { timeout as promiseTimeout } from "promise-timeout";
 
 // Included using <script> tags in index.html

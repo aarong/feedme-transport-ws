@@ -2,7 +2,7 @@ import WebSocket from "ws";
 import http from "http";
 import request from "request";
 import check from "check-types";
-import promisify from "util.promisify"; // Need to be able to run build tests in Node 6
+import promisify from "promisify-function"; // Need to be able to run build tests in Node 6
 import promisifyEvent from "promisify-event";
 import delay from "delay";
 import transportWsServer from "../../build/server";
