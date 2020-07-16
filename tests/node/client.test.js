@@ -1,6 +1,8 @@
 import WebSocket from "ws";
+import pEvent from "p-event";
+import delay from "delay";
+import promisify from "util.promisify"; // Need to be able to run build tests in Node 6
 import transportWsClient from "../../build/client";
-import asyncUtil from "./asyncutil";
 
 /*
 
@@ -33,8 +35,8 @@ be set conservatively (high), otherwise tests will intermittently pass/fail.
 
 */
 
-const EPSILON = 20;
-const LATENCY = 50;
+const EPSILON = 50;
+const LATENCY = 100;
 
 let nextPortNumber = 3000; // Do not interfere with other test suites
 const getNextPortNumber = () => {
@@ -114,7 +116,7 @@ describe("The transport client configuration options", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
@@ -122,21 +124,19 @@ describe("The transport client configuration options", () => {
         heartbeatTimeoutMs
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
       // Disable ws server ping listener and wait for the heartbeat to timeout
       wsServerClient._receiver._events.ping = () => {};
-      await asyncUtil.setTimeout(
-        heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON
-      );
+      await delay(heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON);
 
       expect(transportClient.state()).toBe("disconnected");
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // transport client events
@@ -150,7 +150,7 @@ describe("The transport client configuration options", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
@@ -158,15 +158,13 @@ describe("The transport client configuration options", () => {
         heartbeatTimeoutMs
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const listener = createClientListener(transportClient);
 
       // Disable ws server ping listener and wait for the heartbeat to timeout
       wsServerClient._receiver._events.ping = () => {};
-      await asyncUtil.setTimeout(
-        heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON
-      );
+      await delay(heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -180,7 +178,7 @@ describe("The transport client configuration options", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // WS server events
@@ -194,7 +192,7 @@ describe("The transport client configuration options", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
@@ -202,16 +200,14 @@ describe("The transport client configuration options", () => {
         heartbeatTimeoutMs
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const sListener = createWsServerListener(wsServer);
       const cListener = createWsServerClientListener(wsServerClient);
 
       // Disable ws server ping listener and wait for the heartbeat to timeout
       wsServerClient._receiver._events.ping = () => {};
-      await asyncUtil.setTimeout(
-        heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON
-      );
+      await delay(heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -230,7 +226,7 @@ describe("The transport client configuration options", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
   });
 
@@ -248,7 +244,7 @@ describe("The transport client configuration options", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
@@ -256,26 +252,24 @@ describe("The transport client configuration options", () => {
         heartbeatTimeoutMs
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
+      await delay(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(transportClient.state()).toBe("connected");
 
       // Disable ws server ping listener and wait for the heartbeat to timeout
       wsServerClient._receiver._events.ping = () => {};
-      await asyncUtil.setTimeout(
-        heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON
-      );
+      await delay(heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON);
 
       expect(transportClient.state()).toBe("disconnected");
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // transport client events
@@ -289,7 +283,7 @@ describe("The transport client configuration options", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
@@ -297,12 +291,12 @@ describe("The transport client configuration options", () => {
         heartbeatTimeoutMs
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const listener = createClientListener(transportClient);
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
+      await delay(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -311,9 +305,7 @@ describe("The transport client configuration options", () => {
 
       // Disable ws server ping listener and wait for the heartbeat to timeout
       wsServerClient._receiver._events.ping = () => {};
-      await asyncUtil.setTimeout(
-        heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON
-      );
+      await delay(heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -327,7 +319,7 @@ describe("The transport client configuration options", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // WS server events
@@ -341,7 +333,7 @@ describe("The transport client configuration options", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
@@ -349,13 +341,13 @@ describe("The transport client configuration options", () => {
         heartbeatTimeoutMs
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const sListener = createWsServerListener(wsServer);
       const cListener = createWsServerClientListener(wsServerClient);
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
+      await delay(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -373,9 +365,7 @@ describe("The transport client configuration options", () => {
 
       // Disable ws server ping listener and wait for the heartbeat to timeout
       wsServerClient._receiver._events.ping = () => {};
-      await asyncUtil.setTimeout(
-        heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON
-      );
+      await delay(heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -394,7 +384,7 @@ describe("The transport client configuration options", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
   });
 
@@ -408,7 +398,7 @@ describe("The transport client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
@@ -416,7 +406,7 @@ describe("The transport client configuration options", () => {
         heartbeatTimeoutMs
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
@@ -425,13 +415,13 @@ describe("The transport client configuration options", () => {
       // Then wait for the client to attempt a heartbeat
       transportClient._wsClient.removeAllListeners("close");
       transportClient._wsClient.close();
-      await asyncUtil.setTimeout(heartbeatIntervalMs + EPSILON);
+      await delay(heartbeatIntervalMs + EPSILON);
 
       expect(transportClient.state()).toBe("disconnected");
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // transport client events
@@ -441,7 +431,7 @@ describe("The transport client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
@@ -449,7 +439,7 @@ describe("The transport client configuration options", () => {
         heartbeatTimeoutMs
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const listener = createClientListener(transportClient);
 
@@ -458,7 +448,7 @@ describe("The transport client configuration options", () => {
       // Then wait for the client to attempt a heartbeat
       transportClient._wsClient.removeAllListeners("close");
       transportClient._wsClient.close();
-      await asyncUtil.setTimeout(heartbeatIntervalMs + EPSILON);
+      await delay(heartbeatIntervalMs + EPSILON);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -472,7 +462,7 @@ describe("The transport client configuration options", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // WS server events - N/A (ping callback error induced by connection closure)
@@ -488,7 +478,7 @@ describe("The transport client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
@@ -496,12 +486,12 @@ describe("The transport client configuration options", () => {
         heartbeatTimeoutMs
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
+      await delay(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(transportClient.state()).toBe("connected");
 
@@ -510,13 +500,13 @@ describe("The transport client configuration options", () => {
       // Then wait for the client to attempt a heartbeat
       transportClient._wsClient.removeAllListeners("close");
       transportClient._wsClient.close();
-      await asyncUtil.setTimeout(heartbeatIntervalMs + EPSILON);
+      await delay(heartbeatIntervalMs + EPSILON);
 
       expect(transportClient.state()).toBe("disconnected");
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // transport client events
@@ -526,7 +516,7 @@ describe("The transport client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
@@ -534,12 +524,12 @@ describe("The transport client configuration options", () => {
         heartbeatTimeoutMs
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const listener = createClientListener(transportClient);
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
+      await delay(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -551,7 +541,7 @@ describe("The transport client configuration options", () => {
       // Then wait for the client to attempt a heartbeat
       transportClient._wsClient.removeAllListeners("close");
       transportClient._wsClient.close();
-      await asyncUtil.setTimeout(heartbeatIntervalMs + EPSILON);
+      await delay(heartbeatIntervalMs + EPSILON);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -565,7 +555,7 @@ describe("The transport client configuration options", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // WS server events - N/A (ping failure induced by secret connection closure)
@@ -581,7 +571,7 @@ describe("The transport client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
@@ -589,18 +579,18 @@ describe("The transport client configuration options", () => {
         heartbeatTimeoutMs
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
       // Run through the ping/pong cycle a bunch of times
-      await asyncUtil.setTimeout(20 * (heartbeatIntervalMs + LATENCY));
+      await delay(20 * (heartbeatIntervalMs + LATENCY));
 
       expect(transportClient.state()).toBe("connected");
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // transport client events
@@ -610,7 +600,7 @@ describe("The transport client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
@@ -618,12 +608,12 @@ describe("The transport client configuration options", () => {
         heartbeatTimeoutMs
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const listener = createClientListener(transportClient);
 
       // Run through the ping/pong cycle a bunch of times
-      await asyncUtil.setTimeout(20 * (heartbeatIntervalMs + LATENCY));
+      await delay(20 * (heartbeatIntervalMs + LATENCY));
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -632,7 +622,7 @@ describe("The transport client configuration options", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // WS server events
@@ -646,7 +636,7 @@ describe("The transport client configuration options", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
@@ -654,13 +644,13 @@ describe("The transport client configuration options", () => {
         heartbeatTimeoutMs
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const sListener = createWsServerListener(wsServer);
       const cListener = createWsServerClientListener(wsServerClient);
 
       // Run through the ping/pong cycle a bunch of times
-      await asyncUtil.setTimeout(20 * (heartbeatIntervalMs + LATENCY));
+      await delay(20 * (heartbeatIntervalMs + LATENCY));
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -676,7 +666,7 @@ describe("The transport client configuration options", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
   });
 
@@ -694,34 +684,32 @@ describe("The transport client configuration options", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs: 0
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
+      await delay(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(transportClient.state()).toBe("connected");
 
       // Disable ws server ping listener and run through the ping/pong cycle a
       // few more times
       wsServerClient._receiver._events.ping = () => {};
-      await asyncUtil.setTimeout(
-        5 * (heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON)
-      );
+      await delay(5 * (heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON));
 
       expect(transportClient.state()).toBe("connected");
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // transport client events
@@ -735,19 +723,19 @@ describe("The transport client configuration options", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs: 0
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const listener = createClientListener(transportClient);
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
+      await delay(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -757,9 +745,7 @@ describe("The transport client configuration options", () => {
       // Disable ws server ping listener and run through the ping/pong cycle a
       // few more times
       wsServerClient._receiver._events.ping = () => {};
-      await asyncUtil.setTimeout(
-        5 * (heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON)
-      );
+      await delay(5 * (heartbeatIntervalMs + heartbeatTimeoutMs + 2 * EPSILON));
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -768,7 +754,7 @@ describe("The transport client configuration options", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // WS server events
@@ -782,20 +768,20 @@ describe("The transport client configuration options", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs: 0
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const sListener = createWsServerListener(wsServer);
       const cListener = createWsServerClientListener(wsServerClient);
 
       // Run through the ping/pong cycle a few times
-      await asyncUtil.setTimeout(5 * (heartbeatIntervalMs + LATENCY));
+      await delay(5 * (heartbeatIntervalMs + LATENCY));
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -811,7 +797,7 @@ describe("The transport client configuration options", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
   });
 });
@@ -832,32 +818,32 @@ describe("Key ws client configuration options", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         maxPayload
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
       // Have the server not violate max payload
       wsServerClient.send("z".repeat(maxPayload));
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(transportClient.state()).toBe("connected");
 
       // Have the server violate max payload
       wsServerClient.send("z".repeat(maxPayload + 1));
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(transportClient.state()).toBe("disconnected");
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // Transport client events
@@ -871,20 +857,20 @@ describe("Key ws client configuration options", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         maxPayload: 100
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const listener = createClientListener(transportClient);
 
       // Have the server not violate max payload
       wsServerClient.send("z".repeat(maxPayload));
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -897,7 +883,7 @@ describe("Key ws client configuration options", () => {
 
       // Have the server violate max payload
       wsServerClient.send("z".repeat(maxPayload + 1));
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -912,7 +898,7 @@ describe("Key ws client configuration options", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // WS server events
@@ -926,21 +912,21 @@ describe("Key ws client configuration options", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         maxPayload: 100
       });
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const sListener = createWsServerListener(wsServer);
       const cListener = createWsServerClientListener(wsServerClient);
 
       // Have the server not violate max payload
       wsServerClient.send("z".repeat(maxPayload));
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -956,7 +942,7 @@ describe("Key ws client configuration options", () => {
 
       // Have the server violate max payload
       wsServerClient.send("z".repeat(maxPayload + 1));
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -975,7 +961,7 @@ describe("Key ws client configuration options", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
   });
 });
@@ -1007,7 +993,7 @@ describe("The transport.connect() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Create a transport client and confirm failure on double-call to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`);
@@ -1018,7 +1004,7 @@ describe("The transport.connect() function", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     it("should fail if transport is connected", async () => {
@@ -1026,12 +1012,12 @@ describe("The transport.connect() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       expect(() => {
         transportClient.connect();
@@ -1039,7 +1025,7 @@ describe("The transport.connect() function", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
   });
 
@@ -1086,7 +1072,7 @@ describe("The transport.connect() function", () => {
           });
         });
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         // Emit connecting and then disconnect asynchronously
         expect(listener.connecting.mock.calls.length).toBe(1);
@@ -1116,7 +1102,7 @@ describe("The transport.connect() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Create a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
@@ -1127,12 +1113,12 @@ describe("The transport.connect() function", () => {
         expect(transportClient.state()).toBe("connecting");
 
         // State should become connected later
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
         expect(transportClient.state()).toBe("connected");
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
 
       // transport client events
@@ -1142,7 +1128,7 @@ describe("The transport.connect() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Begin connecting a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
@@ -1156,7 +1142,7 @@ describe("The transport.connect() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
 
         // Emit connecting asynchronouly
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
         expect(listener.connecting.mock.calls.length).toBe(1);
         expect(listener.connecting.mock.calls[0].length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
@@ -1165,7 +1151,7 @@ describe("The transport.connect() function", () => {
         listener.mockClear();
 
         // Emit connect later
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
         expect(listener.connecting.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(1);
         expect(listener.connect.mock.calls[0].length).toBe(0);
@@ -1174,7 +1160,7 @@ describe("The transport.connect() function", () => {
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
 
       // WS server events
@@ -1184,14 +1170,14 @@ describe("The transport.connect() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         const sListener = createWsServerListener(wsServer);
 
         // Connect a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
         transportClient.connect();
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
 
         expect(sListener.close.mock.calls.length).toBe(0);
         expect(sListener.connection.mock.calls.length).toBe(1);
@@ -1200,7 +1186,7 @@ describe("The transport.connect() function", () => {
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
     });
 
@@ -1212,7 +1198,7 @@ describe("The transport.connect() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Create a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
@@ -1223,7 +1209,7 @@ describe("The transport.connect() function", () => {
         expect(transportClient.state()).toBe("connecting");
 
         // State should become connected later
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
         expect(transportClient.state()).toBe("connected");
 
         // Make the previous ws client closing
@@ -1236,12 +1222,12 @@ describe("The transport.connect() function", () => {
         expect(transportClient.state()).toBe("connecting");
 
         // State should become connected later
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
         expect(transportClient.state()).toBe("connected");
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
 
       // transport client events
@@ -1251,7 +1237,7 @@ describe("The transport.connect() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Begin connecting a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
@@ -1266,7 +1252,7 @@ describe("The transport.connect() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
 
         // Emit connecting asynchronouly
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
         expect(listener.connecting.mock.calls.length).toBe(1);
         expect(listener.connecting.mock.calls[0].length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
@@ -1275,7 +1261,7 @@ describe("The transport.connect() function", () => {
         listener.mockClear();
 
         // Emit connect later
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
         expect(listener.connecting.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(1);
         expect(listener.connect.mock.calls[0].length).toBe(0);
@@ -1297,7 +1283,7 @@ describe("The transport.connect() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
 
         // Emit disconnect and connecting asynchronouly
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
         expect(listener.connecting.mock.calls.length).toBe(1);
         expect(listener.connecting.mock.calls[0].length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
@@ -1307,7 +1293,7 @@ describe("The transport.connect() function", () => {
         listener.mockClear();
 
         // Emit connect later
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
         expect(listener.connecting.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(1);
         expect(listener.connect.mock.calls[0].length).toBe(0);
@@ -1316,7 +1302,7 @@ describe("The transport.connect() function", () => {
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
 
       // WS server events
@@ -1326,14 +1312,14 @@ describe("The transport.connect() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         const sListener = createWsServerListener(wsServer);
 
         // Connect a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
         transportClient.connect();
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
 
         expect(sListener.close.mock.calls.length).toBe(0);
         expect(sListener.connection.mock.calls.length).toBe(1);
@@ -1348,7 +1334,7 @@ describe("The transport.connect() function", () => {
 
         // Reconnect transport client
         transportClient.connect();
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
 
         expect(sListener.close.mock.calls.length).toBe(0);
         expect(sListener.connection.mock.calls.length).toBe(1);
@@ -1357,7 +1343,7 @@ describe("The transport.connect() function", () => {
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
     });
   });
@@ -1382,7 +1368,7 @@ describe("The transport.disconnect() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Create a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
@@ -1394,13 +1380,13 @@ describe("The transport.disconnect() function", () => {
 
         expect(transportClient.state()).toBe("disconnected");
 
-        await asyncUtil.setTimeout(LATENCY); // ws has disconnected
+        await delay(LATENCY); // ws has disconnected
 
         expect(transportClient.state()).toBe("disconnected");
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
 
       // transport client events
@@ -1411,13 +1397,13 @@ describe("The transport.disconnect() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Create a transport client and begin connecting
         const transportClient = transportWsClient(`ws://localhost:${port}`);
         transportClient.connect();
 
-        await asyncUtil.nextTick(); // Move past connecting event
+        await promisify(process.nextTick)(); // Move past connecting event
 
         const listener = createClientListener(transportClient);
 
@@ -1429,7 +1415,7 @@ describe("The transport.disconnect() function", () => {
         expect(listener.disconnect.mock.calls.length).toBe(0);
         expect(listener.message.mock.calls.length).toBe(0);
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         // Emit disconnect asynchronously
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1440,7 +1426,7 @@ describe("The transport.disconnect() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         listener.mockClear();
 
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
 
         // Emit nothing when ws actually disconnects
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1450,7 +1436,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
 
       it("should asynchronously emit disconnect - no err", async () => {
@@ -1458,13 +1444,13 @@ describe("The transport.disconnect() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Create a transport client and begin connecting
         const transportClient = transportWsClient(`ws://localhost:${port}`);
         transportClient.connect();
 
-        await asyncUtil.nextTick(); // Move past connecting event
+        await promisify(process.nextTick)(); // Move past connecting event
 
         const listener = createClientListener(transportClient);
 
@@ -1476,7 +1462,7 @@ describe("The transport.disconnect() function", () => {
         expect(listener.disconnect.mock.calls.length).toBe(0);
         expect(listener.message.mock.calls.length).toBe(0);
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         // Emit disconnect asynchronously
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1486,7 +1472,7 @@ describe("The transport.disconnect() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         listener.mockClear();
 
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
 
         // Emit nothing when ws actually disconnects
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1496,7 +1482,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
 
       // WS server events
@@ -1506,7 +1492,7 @@ describe("The transport.disconnect() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Create a transport client and begin connecting
         const transportClient = transportWsClient(`ws://localhost:${port}`);
@@ -1520,7 +1506,7 @@ describe("The transport.disconnect() function", () => {
 
         transportClient.disconnect();
 
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
 
         // Don't worry about event ordering, since server connection event
         // must fire before client close event in order to register a listener
@@ -1540,7 +1526,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
     });
 
@@ -1552,12 +1538,12 @@ describe("The transport.disconnect() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Connect a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
         transportClient.connect();
-        await asyncUtil.once(transportClient, "connect");
+        await pEvent(transportClient, "connect");
 
         expect(transportClient.state()).toBe("connected");
 
@@ -1565,13 +1551,13 @@ describe("The transport.disconnect() function", () => {
 
         expect(transportClient.state()).toBe("disconnected");
 
-        await asyncUtil.setTimeout(LATENCY); // ws actually disconnected
+        await delay(LATENCY); // ws actually disconnected
 
         expect(transportClient.state()).toBe("disconnected");
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
 
       // transport client events
@@ -1582,12 +1568,12 @@ describe("The transport.disconnect() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Connect a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
         transportClient.connect();
-        await asyncUtil.once(transportClient, "connect");
+        await pEvent(transportClient, "connect");
 
         const listener = createClientListener(transportClient);
 
@@ -1599,7 +1585,7 @@ describe("The transport.disconnect() function", () => {
         expect(listener.disconnect.mock.calls.length).toBe(0);
         expect(listener.message.mock.calls.length).toBe(0);
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         // Emit disconnect asynchronously
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1610,7 +1596,7 @@ describe("The transport.disconnect() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         listener.mockClear();
 
-        await asyncUtil.setTimeout(LATENCY); // ws actually disconnected
+        await delay(LATENCY); // ws actually disconnected
 
         // Emit nothing when ws actually disconnects
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1620,7 +1606,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
 
       it("should aynchronously emit disconnect - no err", async () => {
@@ -1628,12 +1614,12 @@ describe("The transport.disconnect() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Connect a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
         transportClient.connect();
-        await asyncUtil.once(transportClient, "connect");
+        await pEvent(transportClient, "connect");
 
         const listener = createClientListener(transportClient);
 
@@ -1645,7 +1631,7 @@ describe("The transport.disconnect() function", () => {
         expect(listener.disconnect.mock.calls.length).toBe(0);
         expect(listener.message.mock.calls.length).toBe(0);
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         // Emit disconnect asynchronously
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1655,7 +1641,7 @@ describe("The transport.disconnect() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         listener.mockClear();
 
-        await asyncUtil.setTimeout(LATENCY); // ws actually disconnected
+        await delay(LATENCY); // ws actually disconnected
 
         // Emit nothign when ws actually disconnects
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1665,7 +1651,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
 
       // WS server events
@@ -1675,7 +1661,7 @@ describe("The transport.disconnect() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Create client/server listeners
         let cListener;
@@ -1687,14 +1673,14 @@ describe("The transport.disconnect() function", () => {
         // Connect a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
         transportClient.connect();
-        await asyncUtil.once(transportClient, "connect");
+        await pEvent(transportClient, "connect");
 
         cListener.mockClear();
         sListener.mockClear();
 
         transportClient.disconnect();
 
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
 
         expect(sListener.close.mock.calls.length).toBe(0);
         expect(sListener.connection.mock.calls.length).toBe(0);
@@ -1710,7 +1696,7 @@ describe("The transport.disconnect() function", () => {
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
     });
   });
@@ -1735,12 +1721,12 @@ describe("The transport.send() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Connect a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
         transportClient.connect();
-        await asyncUtil.once(transportClient, "connect");
+        await pEvent(transportClient, "connect");
 
         expect(transportClient.state()).toBe("connected");
 
@@ -1748,13 +1734,13 @@ describe("The transport.send() function", () => {
 
         expect(transportClient.state()).toBe("connected");
 
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
 
         expect(transportClient.state()).toBe("connected");
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
 
       // transport client events
@@ -1764,18 +1750,18 @@ describe("The transport.send() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Connect a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
         transportClient.connect();
-        await asyncUtil.once(transportClient, "connect");
+        await pEvent(transportClient, "connect");
 
         const listener = createClientListener(transportClient);
 
         transportClient.send("msg");
 
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
 
         expect(listener.connecting.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
@@ -1784,7 +1770,7 @@ describe("The transport.send() function", () => {
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
 
       // WS server events
@@ -1794,7 +1780,7 @@ describe("The transport.send() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Create client/server listeners
         let cListener;
@@ -1806,14 +1792,14 @@ describe("The transport.send() function", () => {
         // Connect a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
         transportClient.connect();
-        await asyncUtil.once(transportClient, "connect");
+        await pEvent(transportClient, "connect");
 
         cListener.mockClear();
         sListener.mockClear();
 
         transportClient.send("msg");
 
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
 
         expect(sListener.close.mock.calls.length).toBe(0);
         expect(sListener.connection.mock.calls.length).toBe(0);
@@ -1831,7 +1817,7 @@ describe("The transport.send() function", () => {
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
     });
 
@@ -1843,12 +1829,12 @@ describe("The transport.send() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Connect a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
         transportClient.connect();
-        await asyncUtil.once(transportClient, "connect");
+        await pEvent(transportClient, "connect");
 
         // Make the call to send() call back error by closing the connection
         // and remove the transport close listener so it doesn't know about it
@@ -1861,13 +1847,13 @@ describe("The transport.send() function", () => {
 
         expect(transportClient.state()).toBe("disconnected");
 
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
 
         expect(transportClient.state()).toBe("disconnected");
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
 
       // transport client events
@@ -1877,12 +1863,12 @@ describe("The transport.send() function", () => {
 
         // Start a ws server and wait for it to start listening
         const wsServer = new WebSocket.Server({ port });
-        await asyncUtil.once(wsServer, "listening");
+        await pEvent(wsServer, "listening");
 
         // Connect a transport client
         const transportClient = transportWsClient(`ws://localhost:${port}`);
         transportClient.connect();
-        await asyncUtil.once(transportClient, "connect");
+        await pEvent(transportClient, "connect");
 
         // Make the call to send() call back error by closing the connection
         // and remove the transport close listener so it doesn't know about it
@@ -1899,7 +1885,7 @@ describe("The transport.send() function", () => {
         expect(listener.disconnect.mock.calls.length).toBe(0);
         expect(listener.message.mock.calls.length).toBe(0);
 
-        await asyncUtil.nextTick();
+        await promisify(process.nextTick)();
 
         // Emit disconnect asynchronously
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1916,7 +1902,7 @@ describe("The transport.send() function", () => {
         expect(listener.message.mock.calls.length).toBe(0);
         listener.mockClear();
 
-        await asyncUtil.setTimeout(LATENCY);
+        await delay(LATENCY);
 
         // Emit nothing when ws actually disconnects
         expect(listener.connecting.mock.calls.length).toBe(0);
@@ -1926,7 +1912,7 @@ describe("The transport.send() function", () => {
 
         // Clean up
         wsServer.close();
-        await asyncUtil.once(wsServer, "close");
+        await pEvent(wsServer, "close");
       });
 
       // WS server events - N/A
@@ -1944,7 +1930,7 @@ describe("The transport._processWsOpen() function", () => {
 
     // Start a ws server and wait for it to start listening
     const wsServer = new WebSocket.Server({ port });
-    await asyncUtil.once(wsServer, "listening");
+    await pEvent(wsServer, "listening");
 
     // Start connecting a transport client
     const transportClient = transportWsClient(`ws://localhost:${port}`);
@@ -1952,13 +1938,13 @@ describe("The transport._processWsOpen() function", () => {
 
     expect(transportClient.state()).toBe("connecting");
 
-    await asyncUtil.setTimeout(LATENCY);
+    await delay(LATENCY);
 
     expect(transportClient.state()).toBe("connected");
 
     // Clean up
     wsServer.close();
-    await asyncUtil.once(wsServer, "close");
+    await pEvent(wsServer, "close");
   });
 
   // transport client events
@@ -1968,17 +1954,17 @@ describe("The transport._processWsOpen() function", () => {
 
     // Start a ws server and wait for it to start listening
     const wsServer = new WebSocket.Server({ port });
-    await asyncUtil.once(wsServer, "listening");
+    await pEvent(wsServer, "listening");
 
     // Start connecting a transport client
     const transportClient = transportWsClient(`ws://localhost:${port}`);
     transportClient.connect();
 
-    await asyncUtil.nextTick(); // Get past connecting event
+    await promisify(process.nextTick)(); // Get past connecting event
 
     const listener = createClientListener(transportClient);
 
-    await asyncUtil.setTimeout(LATENCY);
+    await delay(LATENCY);
 
     expect(listener.connect.mock.calls.length).toBe(1);
     expect(listener.connect.mock.calls[0].length).toBe(0);
@@ -1988,7 +1974,7 @@ describe("The transport._processWsOpen() function", () => {
 
     // Clean up
     wsServer.close();
-    await asyncUtil.once(wsServer, "close");
+    await pEvent(wsServer, "close");
   });
 
   // WS server events
@@ -1998,7 +1984,7 @@ describe("The transport._processWsOpen() function", () => {
 
     // Start a ws server and wait for it to start listening
     const wsServer = new WebSocket.Server({ port });
-    await asyncUtil.once(wsServer, "listening");
+    await pEvent(wsServer, "listening");
 
     // Create client/server listeners
     let cListener;
@@ -2013,7 +1999,7 @@ describe("The transport._processWsOpen() function", () => {
 
     sListener.mockClear();
 
-    await asyncUtil.setTimeout(LATENCY);
+    await delay(LATENCY);
 
     expect(sListener.close.mock.calls.length).toBe(0);
     expect(sListener.connection.mock.calls.length).toBe(1);
@@ -2029,7 +2015,7 @@ describe("The transport._processWsOpen() function", () => {
 
     // Clean up
     wsServer.close();
-    await asyncUtil.once(wsServer, "close");
+    await pEvent(wsServer, "close");
   });
 });
 
@@ -2046,25 +2032,25 @@ describe("The transport._processWsMessage() function", () => {
       wsServer.on("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
       // Send a message from the server and await response
       wsServerClient.send(new Float32Array(5));
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(transportClient.state()).toBe("disconnected");
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // transport client events
@@ -2078,18 +2064,18 @@ describe("The transport._processWsMessage() function", () => {
       wsServer.on("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const listener = createClientListener(transportClient);
 
       wsServerClient.send(new Float32Array(5));
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2103,7 +2089,7 @@ describe("The transport._processWsMessage() function", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // WS server events
@@ -2117,19 +2103,19 @@ describe("The transport._processWsMessage() function", () => {
       wsServer.on("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const sListener = createWsServerListener(wsServer);
       const cListener = createWsServerClientListener(wsServerClient);
 
       wsServerClient.send(new Float32Array(5));
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -2145,7 +2131,7 @@ describe("The transport._processWsMessage() function", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
   });
 
@@ -2161,25 +2147,25 @@ describe("The transport._processWsMessage() function", () => {
       wsServer.on("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
       // Send a message from the server and await response
       wsServerClient.send("msg");
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(transportClient.state()).toBe("connected");
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // transport client events
@@ -2193,18 +2179,18 @@ describe("The transport._processWsMessage() function", () => {
       wsServer.on("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const listener = createClientListener(transportClient);
 
       wsServerClient.send("msg");
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2215,7 +2201,7 @@ describe("The transport._processWsMessage() function", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // WS server events
@@ -2229,19 +2215,19 @@ describe("The transport._processWsMessage() function", () => {
       wsServer.on("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const sListener = createWsServerListener(wsServer);
       const cListener = createWsServerClientListener(wsServerClient);
 
       wsServerClient.send("msg");
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -2257,7 +2243,7 @@ describe("The transport._processWsMessage() function", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
   });
 });
@@ -2275,25 +2261,25 @@ describe("The transport._processWsClose() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       transportClient.disconnect();
       transportClient.connect(); // ws still disconnecting
 
       expect(transportClient.state()).toBe("connecting");
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(transportClient.state()).toBe("connected");
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // transport client events
@@ -2303,21 +2289,21 @@ describe("The transport._processWsClose() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       transportClient.disconnect();
       transportClient.connect(); // ws still disconnecting
 
-      await asyncUtil.nextTick(); // Move past disconnect/connecting events
+      await promisify(process.nextTick)(); // Move past disconnect/connecting events
 
       const listener = createClientListener(transportClient);
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(1);
       expect(listener.connect.mock.calls[0].length).toBe(0);
@@ -2327,7 +2313,7 @@ describe("The transport._processWsClose() function", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // WS server events
@@ -2337,19 +2323,19 @@ describe("The transport._processWsClose() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       transportClient.disconnect();
       transportClient.connect(); // ws still disconnecting
 
       const sListener = createWsServerListener(wsServer);
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(1);
@@ -2358,7 +2344,7 @@ describe("The transport._processWsClose() function", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
   });
 
@@ -2370,24 +2356,24 @@ describe("The transport._processWsClose() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
       wsServer.close();
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(transportClient.state()).toBe("disconnected");
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // transport client events
@@ -2397,18 +2383,18 @@ describe("The transport._processWsClose() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const listener = createClientListener(transportClient);
 
       wsServer.close();
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2424,7 +2410,7 @@ describe("The transport._processWsClose() function", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // WS server events - N/A (ws server is stopping)
@@ -2442,24 +2428,24 @@ describe("The transport._processWsClose() function", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
       wsServerClient.close(1000);
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(transportClient.state()).toBe("disconnected");
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // transport client events
@@ -2473,18 +2459,18 @@ describe("The transport._processWsClose() function", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const listener = createClientListener(transportClient);
 
       wsServerClient.close(1000);
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2500,7 +2486,7 @@ describe("The transport._processWsClose() function", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // WS server events
@@ -2514,18 +2500,18 @@ describe("The transport._processWsClose() function", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const sListener = createWsServerListener(wsServer);
 
       wsServerClient.close(1000);
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -2534,7 +2520,7 @@ describe("The transport._processWsClose() function", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
   });
 
@@ -2550,24 +2536,24 @@ describe("The transport._processWsClose() function", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       expect(transportClient.state()).toBe("connected");
 
       wsServerClient.terminate();
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(transportClient.state()).toBe("disconnected");
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // transport client events
@@ -2581,18 +2567,18 @@ describe("The transport._processWsClose() function", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const listener = createClientListener(transportClient);
 
       wsServerClient.terminate();
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2608,7 +2594,7 @@ describe("The transport._processWsClose() function", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
 
     // WS server events
@@ -2622,18 +2608,18 @@ describe("The transport._processWsClose() function", () => {
       wsServer.once("connection", ws => {
         wsServerClient = ws;
       });
-      await asyncUtil.once(wsServer, "listening");
+      await pEvent(wsServer, "listening");
 
       // Connect a transport client
       const transportClient = transportWsClient(`ws://localhost:${port}`);
       transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
+      await pEvent(transportClient, "connect");
 
       const sListener = createWsServerListener(wsServer);
 
       wsServerClient.terminate();
 
-      await asyncUtil.setTimeout(LATENCY);
+      await delay(LATENCY);
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
@@ -2642,7 +2628,7 @@ describe("The transport._processWsClose() function", () => {
 
       // Clean up
       wsServer.close();
-      await asyncUtil.once(wsServer, "close");
+      await pEvent(wsServer, "close");
     });
   });
 });
@@ -2661,7 +2647,7 @@ describe("The transport should operate correctly through multiple connection cyc
 
     // Start a ws server and wait for it to start listening
     const wsServer = new WebSocket.Server({ port });
-    await asyncUtil.once(wsServer, "listening");
+    await pEvent(wsServer, "listening");
 
     // Run through some connection cycles
 
@@ -2673,13 +2659,13 @@ describe("The transport should operate correctly through multiple connection cyc
 
     expect(transportClient.state()).toBe("connecting");
 
-    await asyncUtil.setTimeout(LATENCY);
+    await delay(LATENCY);
 
     expect(transportClient.state()).toBe("connected");
 
     transportClient.disconnect();
 
-    await asyncUtil.setTimeout(LATENCY);
+    await delay(LATENCY);
 
     expect(transportClient.state()).toBe("disconnected");
 
@@ -2687,19 +2673,19 @@ describe("The transport should operate correctly through multiple connection cyc
 
     expect(transportClient.state()).toBe("connecting");
 
-    await asyncUtil.setTimeout(LATENCY);
+    await delay(LATENCY);
 
     expect(transportClient.state()).toBe("connected");
 
     transportClient.disconnect();
 
-    await asyncUtil.setTimeout(LATENCY);
+    await delay(LATENCY);
 
     expect(transportClient.state()).toBe("disconnected");
 
     // Clean up
     wsServer.close();
-    await asyncUtil.once(wsServer, "close");
+    await pEvent(wsServer, "close");
   });
 
   // transport client events
@@ -2709,7 +2695,7 @@ describe("The transport should operate correctly through multiple connection cyc
 
     // Start a ws server and wait for it to start listening
     const wsServer = new WebSocket.Server({ port });
-    await asyncUtil.once(wsServer, "listening");
+    await pEvent(wsServer, "listening");
 
     // Run through some connection cycles
 
@@ -2725,7 +2711,7 @@ describe("The transport should operate correctly through multiple connection cyc
     expect(listener.disconnect.mock.calls.length).toBe(0);
     expect(listener.message.mock.calls.length).toBe(0);
 
-    await asyncUtil.nextTick();
+    await promisify(process.nextTick)();
 
     // Emit connecting asynchronously
     expect(listener.connecting.mock.calls.length).toBe(1);
@@ -2735,7 +2721,7 @@ describe("The transport should operate correctly through multiple connection cyc
     expect(listener.message.mock.calls.length).toBe(0);
     listener.mockClear();
 
-    await asyncUtil.setTimeout(LATENCY);
+    await delay(LATENCY);
 
     // Emit connect asynchronously
     expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2753,7 +2739,7 @@ describe("The transport should operate correctly through multiple connection cyc
     expect(listener.disconnect.mock.calls.length).toBe(0);
     expect(listener.message.mock.calls.length).toBe(0);
 
-    await asyncUtil.nextTick();
+    await promisify(process.nextTick)();
 
     // Emit disconnect asynchronously
     expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2771,7 +2757,7 @@ describe("The transport should operate correctly through multiple connection cyc
     expect(listener.disconnect.mock.calls.length).toBe(0);
     expect(listener.message.mock.calls.length).toBe(0);
 
-    await asyncUtil.nextTick();
+    await promisify(process.nextTick)();
 
     // Emit connecting asynchronously
     expect(listener.connecting.mock.calls.length).toBe(1);
@@ -2781,7 +2767,7 @@ describe("The transport should operate correctly through multiple connection cyc
     expect(listener.message.mock.calls.length).toBe(0);
     listener.mockClear();
 
-    await asyncUtil.setTimeout(LATENCY);
+    await delay(LATENCY);
 
     // Emit connect asynchronously
     expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2799,7 +2785,7 @@ describe("The transport should operate correctly through multiple connection cyc
     expect(listener.disconnect.mock.calls.length).toBe(0);
     expect(listener.message.mock.calls.length).toBe(0);
 
-    await asyncUtil.nextTick();
+    await promisify(process.nextTick)();
 
     // Emit disconnect asynchronously
     expect(listener.connecting.mock.calls.length).toBe(0);
@@ -2810,7 +2796,7 @@ describe("The transport should operate correctly through multiple connection cyc
 
     // Clean up
     wsServer.close();
-    await asyncUtil.once(wsServer, "close");
+    await pEvent(wsServer, "close");
   });
 
   // WS server events
@@ -2821,7 +2807,7 @@ describe("The transport should operate correctly through multiple connection cyc
 
     // Start a ws server and wait for it to start listening
     const wsServer = new WebSocket.Server({ port });
-    await asyncUtil.once(wsServer, "listening");
+    await pEvent(wsServer, "listening");
 
     // Run through some connection cycles
 
@@ -2835,7 +2821,7 @@ describe("The transport should operate correctly through multiple connection cyc
 
     transportClient.connect();
 
-    await asyncUtil.setTimeout(LATENCY);
+    await delay(LATENCY);
 
     // Emit connection
     expect(sListener.close.mock.calls.length).toBe(0);
@@ -2846,7 +2832,7 @@ describe("The transport should operate correctly through multiple connection cyc
 
     transportClient.disconnect();
 
-    await asyncUtil.setTimeout(LATENCY);
+    await delay(LATENCY);
 
     // Emit client close
     expect(cListener.close.mock.calls.length).toBe(1);
@@ -2858,7 +2844,7 @@ describe("The transport should operate correctly through multiple connection cyc
 
     transportClient.connect();
 
-    await asyncUtil.setTimeout(LATENCY);
+    await delay(LATENCY);
 
     // Emit connection
     expect(sListener.close.mock.calls.length).toBe(0);
@@ -2869,7 +2855,7 @@ describe("The transport should operate correctly through multiple connection cyc
 
     transportClient.disconnect();
 
-    await asyncUtil.setTimeout(LATENCY);
+    await delay(LATENCY);
 
     // Emit client close
     expect(cListener.close.mock.calls.length).toBe(1);
@@ -2881,6 +2867,6 @@ describe("The transport should operate correctly through multiple connection cyc
 
     // Clean up
     wsServer.close();
-    await asyncUtil.once(wsServer, "close");
+    await pEvent(wsServer, "close");
   });
 });

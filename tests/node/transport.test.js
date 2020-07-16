@@ -1,8 +1,9 @@
 import check from "check-types";
 import http from "http";
+import pEvent from "p-event";
+import delay from "delay";
 import transportWsServer from "../../build/server";
 import transportWsClient from "../../build/client";
-import asyncUtil from "./asyncutil";
 
 /*
 
@@ -69,7 +70,7 @@ describe("The client.connect() function", () => {
       // Start a transport server
       const server = transportWsServer({ port });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
@@ -77,13 +78,13 @@ describe("The client.connect() function", () => {
       expect(server.state()).toBe("started");
 
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(server.state()).toBe("started");
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
     });
 
     // Server events
@@ -94,7 +95,7 @@ describe("The client.connect() function", () => {
       // Start a transport server
       const server = transportWsServer({ port });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
@@ -102,7 +103,7 @@ describe("The client.connect() function", () => {
       const sListener = createServerListener(server);
 
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(sListener.starting.mock.calls.length).toBe(0);
       expect(sListener.start.mock.calls.length).toBe(0);
@@ -116,7 +117,7 @@ describe("The client.connect() function", () => {
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
     });
   });
 
@@ -129,12 +130,12 @@ describe("The client.connect() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
@@ -142,13 +143,13 @@ describe("The client.connect() function", () => {
       expect(server.state()).toBe("started");
 
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(server.state()).toBe("started");
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
 
     // Server events
@@ -159,12 +160,12 @@ describe("The client.connect() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
@@ -172,7 +173,7 @@ describe("The client.connect() function", () => {
       const sListener = createServerListener(server);
 
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(sListener.starting.mock.calls.length).toBe(0);
       expect(sListener.start.mock.calls.length).toBe(0);
@@ -186,7 +187,7 @@ describe("The client.connect() function", () => {
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
   });
 
@@ -199,12 +200,12 @@ describe("The client.connect() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ noServer: true });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Route WebSocket upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -217,15 +218,15 @@ describe("The client.connect() function", () => {
       expect(server.state()).toBe("started");
 
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(server.state()).toBe("started");
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
 
     // Server events
@@ -236,12 +237,12 @@ describe("The client.connect() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ noServer: true });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Route WebSocket upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -254,7 +255,7 @@ describe("The client.connect() function", () => {
       const sListener = createServerListener(server);
 
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(sListener.starting.mock.calls.length).toBe(0);
       expect(sListener.start.mock.calls.length).toBe(0);
@@ -268,9 +269,9 @@ describe("The client.connect() function", () => {
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
   });
 });
@@ -285,23 +286,23 @@ describe("The client.disconnect() function", () => {
       // Start a transport server
       const server = transportWsServer({ port });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(server.state()).toBe("started");
 
       client.disconnect();
-      await asyncUtil.once(server, "disconnect");
+      await pEvent(server, "disconnect");
 
       expect(server.state()).toBe("started");
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
     });
 
     // Server events
@@ -316,17 +317,17 @@ describe("The client.disconnect() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const sListener = createServerListener(server);
 
       client.disconnect();
-      await asyncUtil.once(server, "disconnect");
+      await pEvent(server, "disconnect");
 
       expect(sListener.starting.mock.calls.length).toBe(0);
       expect(sListener.start.mock.calls.length).toBe(0);
@@ -344,7 +345,7 @@ describe("The client.disconnect() function", () => {
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
     });
   });
 
@@ -357,28 +358,28 @@ describe("The client.disconnect() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(server.state()).toBe("started");
 
       client.disconnect();
-      await asyncUtil.once(server, "disconnect");
+      await pEvent(server, "disconnect");
 
       expect(server.state()).toBe("started");
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
 
     // Server events
@@ -389,7 +390,7 @@ describe("The client.disconnect() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
@@ -398,17 +399,17 @@ describe("The client.disconnect() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const sListener = createServerListener(server);
 
       client.disconnect();
-      await asyncUtil.once(server, "disconnect");
+      await pEvent(server, "disconnect");
 
       expect(sListener.starting.mock.calls.length).toBe(0);
       expect(sListener.start.mock.calls.length).toBe(0);
@@ -426,7 +427,7 @@ describe("The client.disconnect() function", () => {
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
   });
 
@@ -439,12 +440,12 @@ describe("The client.disconnect() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ noServer: true });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Route WebSocket upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -454,20 +455,20 @@ describe("The client.disconnect() function", () => {
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(server.state()).toBe("started");
 
       client.disconnect();
-      await asyncUtil.once(server, "disconnect");
+      await pEvent(server, "disconnect");
 
       expect(server.state()).toBe("started");
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
 
     // Server events
@@ -478,7 +479,7 @@ describe("The client.disconnect() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ noServer: true });
@@ -487,7 +488,7 @@ describe("The client.disconnect() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Route WebSocket upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -497,12 +498,12 @@ describe("The client.disconnect() function", () => {
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const sListener = createServerListener(server);
 
       client.disconnect();
-      await asyncUtil.once(server, "disconnect");
+      await pEvent(server, "disconnect");
 
       expect(sListener.starting.mock.calls.length).toBe(0);
       expect(sListener.start.mock.calls.length).toBe(0);
@@ -520,9 +521,9 @@ describe("The client.disconnect() function", () => {
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
   });
 });
@@ -537,23 +538,23 @@ describe("The client.send() function", () => {
       // Start a transport server
       const server = transportWsServer({ port });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(server.state()).toBe("started");
 
       client.send("msg");
-      await asyncUtil.once(server, "message");
+      await pEvent(server, "message");
 
       expect(server.state()).toBe("started");
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
     });
 
     // Server events
@@ -568,17 +569,17 @@ describe("The client.send() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const sListener = createServerListener(server);
 
       client.send("msg");
-      await asyncUtil.once(server, "message");
+      await pEvent(server, "message");
 
       expect(sListener.starting.mock.calls.length).toBe(0);
       expect(sListener.start.mock.calls.length).toBe(0);
@@ -593,7 +594,7 @@ describe("The client.send() function", () => {
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
     });
   });
 
@@ -606,28 +607,28 @@ describe("The client.send() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(server.state()).toBe("started");
 
       client.send("msg");
-      await asyncUtil.once(server, "message");
+      await pEvent(server, "message");
 
       expect(server.state()).toBe("started");
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
 
     // Server events
@@ -638,7 +639,7 @@ describe("The client.send() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
@@ -647,17 +648,17 @@ describe("The client.send() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const sListener = createServerListener(server);
 
       client.send("msg");
-      await asyncUtil.once(server, "message");
+      await pEvent(server, "message");
 
       expect(sListener.starting.mock.calls.length).toBe(0);
       expect(sListener.start.mock.calls.length).toBe(0);
@@ -672,7 +673,7 @@ describe("The client.send() function", () => {
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
   });
 
@@ -685,12 +686,12 @@ describe("The client.send() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ noServer: true });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Route WebSocket upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -700,20 +701,20 @@ describe("The client.send() function", () => {
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(server.state()).toBe("started");
 
       client.send("msg");
-      await asyncUtil.once(server, "message");
+      await pEvent(server, "message");
 
       expect(server.state()).toBe("started");
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
 
     // Server events
@@ -724,7 +725,7 @@ describe("The client.send() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ noServer: true });
@@ -733,7 +734,7 @@ describe("The client.send() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Route WebSocket upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -743,12 +744,12 @@ describe("The client.send() function", () => {
       // Create a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const sListener = createServerListener(server);
 
       client.send("msg");
-      await asyncUtil.once(server, "message");
+      await pEvent(server, "message");
 
       expect(sListener.starting.mock.calls.length).toBe(0);
       expect(sListener.start.mock.calls.length).toBe(0);
@@ -763,9 +764,9 @@ describe("The client.send() function", () => {
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
   });
 });
@@ -786,17 +787,17 @@ describe("The server.stop() function", () => {
       // Start a transport server
       const server = transportWsServer({ port });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(client.state()).toBe("connected");
 
       server.stop();
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(client.state()).toBe("disconnected");
     });
@@ -809,17 +810,17 @@ describe("The server.stop() function", () => {
       // Start a transport server
       const server = transportWsServer({ port });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const listener = createClientListener(client);
 
       server.stop();
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -842,28 +843,28 @@ describe("The server.stop() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(client.state()).toBe("connected");
 
       server.stop();
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(client.state()).toBe("disconnected");
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
 
     // Client events
@@ -874,22 +875,22 @@ describe("The server.stop() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const listener = createClientListener(client);
 
       server.stop();
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -903,7 +904,7 @@ describe("The server.stop() function", () => {
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
   });
 
@@ -916,12 +917,12 @@ describe("The server.stop() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ noServer: true });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Route WebSocket upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -931,18 +932,18 @@ describe("The server.stop() function", () => {
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(client.state()).toBe("connected");
 
       server.stop();
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(client.state()).toBe("disconnected");
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
 
     // Client events
@@ -953,12 +954,12 @@ describe("The server.stop() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ noServer: true });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Route WebSocket upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -968,12 +969,12 @@ describe("The server.stop() function", () => {
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const listener = createClientListener(client);
 
       server.stop();
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -987,7 +988,7 @@ describe("The server.stop() function", () => {
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
   });
 });
@@ -1002,22 +1003,22 @@ describe("The httpServer.close() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(client.state()).toBe("connected");
 
       httpServer.close();
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(client.state()).toBe("disconnected");
     });
@@ -1030,22 +1031,22 @@ describe("The httpServer.close() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const listener = createClientListener(client);
 
       httpServer.close();
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -1068,12 +1069,12 @@ describe("The httpServer.close() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ noServer: true });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Route WebSocket upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -1083,17 +1084,17 @@ describe("The httpServer.close() function", () => {
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(client.state()).toBe("connected");
 
       httpServer.close(); // Will not emit close due to outstanding ws connection
-      await asyncUtil.setTimeout(500);
+      await delay(500);
 
       expect(client.state()).toBe("connected");
 
       server.stop();
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(client.state()).toBe("disconnected");
     });
@@ -1106,12 +1107,12 @@ describe("The httpServer.close() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ noServer: true });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Route WebSocket upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -1121,12 +1122,12 @@ describe("The httpServer.close() function", () => {
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const listener = createClientListener(client);
 
       httpServer.close(); // Will not emit close due to outstanding ws connection
-      await asyncUtil.setTimeout(500);
+      await delay(500);
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -1134,7 +1135,7 @@ describe("The httpServer.close() function", () => {
       expect(listener.message.mock.calls.length).toBe(0);
 
       server.stop();
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -1164,23 +1165,23 @@ describe("The server.send() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(client.state()).toBe("connected");
 
       server.send(cid, "msg");
-      await asyncUtil.once(client, "message");
+      await pEvent(client, "message");
 
       expect(client.state()).toBe("connected");
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
     });
 
     // Client events
@@ -1195,17 +1196,17 @@ describe("The server.send() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const listener = createClientListener(client);
 
       server.send(cid, "msg");
-      await asyncUtil.once(client, "message");
+      await pEvent(client, "message");
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -1216,7 +1217,7 @@ describe("The server.send() function", () => {
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
     });
   });
 
@@ -1229,7 +1230,7 @@ describe("The server.send() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
@@ -1238,23 +1239,23 @@ describe("The server.send() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(client.state()).toBe("connected");
 
       server.send(cid, "msg");
-      await asyncUtil.once(client, "message");
+      await pEvent(client, "message");
 
       expect(client.state()).toBe("connected");
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
 
     // Client events
@@ -1265,7 +1266,7 @@ describe("The server.send() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
@@ -1274,17 +1275,17 @@ describe("The server.send() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const listener = createClientListener(client);
 
       server.send(cid, "msg");
-      await asyncUtil.once(client, "message");
+      await pEvent(client, "message");
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -1295,7 +1296,7 @@ describe("The server.send() function", () => {
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
   });
 
@@ -1308,7 +1309,7 @@ describe("The server.send() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ noServer: true });
@@ -1317,7 +1318,7 @@ describe("The server.send() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Route WebSocket upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -1327,20 +1328,20 @@ describe("The server.send() function", () => {
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(client.state()).toBe("connected");
 
       server.send(cid, "msg");
-      await asyncUtil.once(client, "message");
+      await pEvent(client, "message");
 
       expect(client.state()).toBe("connected");
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
 
     // Client events
@@ -1351,7 +1352,7 @@ describe("The server.send() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ noServer: true });
@@ -1360,7 +1361,7 @@ describe("The server.send() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Route WebSocket upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -1370,12 +1371,12 @@ describe("The server.send() function", () => {
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const listener = createClientListener(client);
 
       server.send(cid, "msg");
-      await asyncUtil.once(client, "message");
+      await pEvent(client, "message");
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -1386,9 +1387,9 @@ describe("The server.send() function", () => {
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
   });
 });
@@ -1407,23 +1408,23 @@ describe("The server.disconnect() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(client.state()).toBe("connected");
 
       server.disconnect(cid);
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(client.state()).toBe("disconnected");
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
     });
 
     // Client events
@@ -1438,17 +1439,17 @@ describe("The server.disconnect() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const listener = createClientListener(client);
 
       server.disconnect(cid);
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -1462,7 +1463,7 @@ describe("The server.disconnect() function", () => {
 
       // Clean up
       server.stop();
-      await asyncUtil.once(server, "stop");
+      await pEvent(server, "stop");
     });
   });
 
@@ -1475,7 +1476,7 @@ describe("The server.disconnect() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
@@ -1484,23 +1485,23 @@ describe("The server.disconnect() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(client.state()).toBe("connected");
 
       server.disconnect(cid);
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(client.state()).toBe("disconnected");
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
 
     // Client events
@@ -1511,7 +1512,7 @@ describe("The server.disconnect() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
@@ -1520,17 +1521,17 @@ describe("The server.disconnect() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const listener = createClientListener(client);
 
       server.disconnect(cid);
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -1544,7 +1545,7 @@ describe("The server.disconnect() function", () => {
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
   });
 
@@ -1557,7 +1558,7 @@ describe("The server.disconnect() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ noServer: true });
@@ -1566,7 +1567,7 @@ describe("The server.disconnect() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Route WebSocket upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -1576,18 +1577,18 @@ describe("The server.disconnect() function", () => {
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       expect(client.state()).toBe("connected");
 
       server.disconnect(cid);
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(client.state()).toBe("disconnected");
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
 
     // Client events
@@ -1598,7 +1599,7 @@ describe("The server.disconnect() function", () => {
       // Start an http server
       const httpServer = http.createServer(() => {});
       httpServer.listen(port);
-      await asyncUtil.once(httpServer, "listening");
+      await pEvent(httpServer, "listening");
 
       // Start a transport server
       const server = transportWsServer({ noServer: true });
@@ -1607,7 +1608,7 @@ describe("The server.disconnect() function", () => {
         cid = c;
       });
       server.start();
-      await asyncUtil.once(server, "start");
+      await pEvent(server, "start");
 
       // Route WebSocket upgrade requests
       httpServer.on("upgrade", (req, socket, head) => {
@@ -1617,12 +1618,12 @@ describe("The server.disconnect() function", () => {
       // Connect a client
       const client = transportWsClient(`ws://localhost:${port}`);
       client.connect();
-      await asyncUtil.once(client, "connect");
+      await pEvent(client, "connect");
 
       const listener = createClientListener(client);
 
       server.disconnect(cid);
-      await asyncUtil.once(client, "disconnect");
+      await pEvent(client, "disconnect");
 
       expect(listener.connecting.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -1636,7 +1637,7 @@ describe("The server.disconnect() function", () => {
 
       // Clean up
       httpServer.close();
-      await asyncUtil.once(httpServer, "close");
+      await pEvent(httpServer, "close");
     });
   });
 });
@@ -1658,26 +1659,26 @@ it("The transport should be able to exchange long messages", async () => {
     cid = c;
   });
   server.start();
-  await asyncUtil.once(server, "start");
+  await pEvent(server, "start");
 
   // Connnect a client
   const client = transportWsClient(`ws://localhost:${port}`);
   client.connect();
-  await asyncUtil.once(client, "connect");
+  await pEvent(client, "connect");
 
   // Client-to-server message
   const sListner = createServerListener(server);
   client.send(msg);
-  await asyncUtil.once(server, "message");
+  await pEvent(server, "message");
   expect(sListner.message.mock.calls[0][1]).toBe(msg);
 
   // Server-to-client message
   const cListener = createClientListener(client);
   server.send(cid, msg);
-  await asyncUtil.once(client, "message");
+  await pEvent(client, "message");
   expect(cListener.message.mock.calls[0][0]).toBe(msg);
 
   // Clean up
   server.stop();
-  await asyncUtil.once(server, "stop");
+  await pEvent(server, "stop");
 });

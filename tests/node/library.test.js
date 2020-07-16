@@ -1,8 +1,9 @@
 import feedmeClient from "feedme-client";
 import feedmeServerCore from "feedme-server-core";
+import pEvent from "p-event";
 import transportWsServer from "../../build/server";
 import transportWsClient from "../../build/client";
-import asyncUtil from "./asyncutil";
+
 /*
 
 End-to-end test of key Feedme client-server functionality.
@@ -23,7 +24,7 @@ it("should work through all major operations", async () => {
     transport: transportWsServer({ port })
   });
   fmServer.start();
-  await asyncUtil.once(fmServer, "start");
+  await pEvent(fmServer, "start");
 
   // Connect a Feedme client
   const fmClient = feedmeClient({
@@ -31,7 +32,7 @@ it("should work through all major operations", async () => {
     reconnect: false
   });
   fmClient.connect();
-  await asyncUtil.once(fmClient, "connect");
+  await pEvent(fmClient, "connect");
 
   // Try a rejected action
   fmServer.once("action", (areq, ares) => {
@@ -69,7 +70,7 @@ it("should work through all major operations", async () => {
     expect(err.serverErrorCode).toBe("SOME_ERROR");
     expect(err.serverErrorData).toEqual({ Error: "Data" });
   });
-  await asyncUtil.once(feed, "close");
+  await pEvent(feed, "close");
   feed.desireClosed();
 
   // Try a successful feed open
@@ -80,7 +81,7 @@ it("should work through all major operations", async () => {
   feed.once("open", () => {
     expect(feed.data()).toEqual({ Feed: "Data" });
   });
-  await asyncUtil.once(feed, "open");
+  await pEvent(feed, "open");
 
   // Try a feed closure
   feed.once("close", err => {
@@ -90,14 +91,14 @@ it("should work through all major operations", async () => {
   fmServer.once("feedClose", (fcreq, fcres) => {
     fcres.success(); // Needed because you attach a listener to the event
   });
-  await asyncUtil.once(fmServer, "feedClose");
+  await pEvent(fmServer, "feedClose");
 
   // Try an action revelation
   fmServer.once("feedOpen", (foreq, fores) => {
     fores.success({ Feed: "Data" });
   });
   feed.desireOpen();
-  await asyncUtil.once(feed, "open");
+  await pEvent(feed, "open");
   fmServer.actionRevelation({
     actionName: "SomeAction",
     actionData: { Action: "Data" },
@@ -111,7 +112,7 @@ it("should work through all major operations", async () => {
     expect(nfd).toEqual({ Feed: "DataNew" });
     expect(ofd).toEqual({ Feed: "Data" });
   });
-  await asyncUtil.once(feed, "action");
+  await pEvent(feed, "action");
 
   // Try a feed termination
   fmServer.feedTermination({
@@ -126,7 +127,7 @@ it("should work through all major operations", async () => {
     expect(err.serverErrorCode).toBe("SOME_ERROR");
     expect(err.serverErrorData).toEqual({ Error: "Data" });
   });
-  await asyncUtil.once(feed, "close");
+  await pEvent(feed, "close");
 
   // Try a server disconnect
   fmServer.disconnect(fmClient.id());
@@ -134,11 +135,11 @@ it("should work through all major operations", async () => {
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toBe("FAILURE: The WebSocket closed unexpectedly.");
   });
-  await asyncUtil.once(fmClient, "disconnect");
+  await pEvent(fmClient, "disconnect");
 
   // Try a client disconnect
   fmClient.connect();
-  await asyncUtil.once(fmClient, "connect");
+  await pEvent(fmClient, "connect");
   const clientId = fmClient.id();
   fmServer.once("disconnect", (cid, err) => {
     expect(cid).toBe(clientId);
@@ -146,15 +147,15 @@ it("should work through all major operations", async () => {
     expect(err.message).toBe("FAILURE: WebSocket transmission failed.");
   });
   fmClient.disconnect();
-  await asyncUtil.once(fmServer, "disconnect");
+  await pEvent(fmServer, "disconnect");
 
   // Try a server stoppage (also cleans up)
   fmClient.connect();
-  await asyncUtil.once(fmClient, "connect");
+  await pEvent(fmClient, "connect");
   fmServer.stop();
   fmClient.once("disconnect", err => {
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toBe("FAILURE: The WebSocket closed unexpectedly.");
   });
-  await asyncUtil.once(fmClient, "disconnect");
+  await pEvent(fmClient, "disconnect");
 });
