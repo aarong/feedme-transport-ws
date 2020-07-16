@@ -60,6 +60,7 @@
     "prettier": "^1.14.3",
     "request": "^2.88.2",
     "sauce-connect-launcher": "^1.2.4",
+    "util.promisify": "^1.0.1",
     "webpack": "^4.43.0",
     "webpack-stream": "^5.2.1"
   },
