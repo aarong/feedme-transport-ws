@@ -2,7 +2,7 @@
 import feedmeClient from "feedme-client/bundle"; // Avoid source-map-support warning
 import promisifyEvent from "promisify-event";
 import promisify from "util.promisify";
-import promiseTimeout from "promise-timeout";
+import { timeout as promiseTimeout } from "promise-timeout";
 
 // Included using <script> tags in index.html
 /* global feedmeTransportWsClient */
@@ -64,7 +64,7 @@ const retry = test => async () => {
   for (i = 0; i < RETRY_LIMIT; i += 1) {
     err = null;
     try {
-      await promiseTimeout(test, ATTEMPT_TIMEOUT); // eslint-disable-line no-await-in-loop
+      await promiseTimeout(test(), ATTEMPT_TIMEOUT); // eslint-disable-line no-await-in-loop
     } catch (e) {
       err = e;
     }
@@ -2826,12 +2826,12 @@ it(
     const feed1 = fmClient.feed("failing_feed", { Feed: "Args" });
     feed1.desireOpen();
     const evt1 = await promisifyEvent(feed1, "close");
-    expect(evt1[0]).toEqual(jasmine.any(Error));
-    expect(evt1[0].message).toBe(
+    expect(evt1).toEqual(jasmine.any(Error));
+    expect(evt1.message).toBe(
       "REJECTED: Server rejected the feed open request."
     );
-    expect(evt1[0].serverErrorCode).toBe("SOME_ERROR");
-    expect(evt1[0].serverErrorData).toEqual({ Error: "Data" });
+    expect(evt1.serverErrorCode).toBe("SOME_ERROR");
+    expect(evt1.serverErrorData).toEqual({ Error: "Data" });
     feed1.desireClosed();
 
     // Try a successful feed open
@@ -2880,10 +2880,10 @@ it(
       ]
     });
     const evt3 = await promisifyEvent(feed2, "close");
-    expect(evt3[0]).toEqual(jasmine.any(Error));
-    expect(evt3[0].message).toBe("TERMINATED: The server terminated the feed.");
-    expect(evt3[0].serverErrorCode).toBe("SOME_ERROR");
-    expect(evt3[0].serverErrorData).toEqual({ Error: "Data" });
+    expect(evt3).toEqual(jasmine.any(Error));
+    expect(evt3.message).toBe("TERMINATED: The server terminated the feed.");
+    expect(evt3.serverErrorCode).toBe("SOME_ERROR");
+    expect(evt3.serverErrorData).toEqual({ Error: "Data" });
 
     // Try a server disconnect
     fmController.action("InvokeFeedmeMethod", {
@@ -2892,8 +2892,8 @@ it(
       Arguments: [fmClient.id()]
     });
     const evt4 = await promisifyEvent(fmClient, "disconnect");
-    expect(evt4[0]).toEqual(jasmine.any(Error));
-    expect(evt4[0].message).toBe("FAILURE: The WebSocket closed unexpectedly.");
+    expect(evt4).toEqual(jasmine.any(Error));
+    expect(evt4.message).toBe("FAILURE: The WebSocket closed unexpectedly.");
 
     // Try a client disconnect
     // fmClient.connect();
