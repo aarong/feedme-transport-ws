@@ -6,14 +6,14 @@ import request from "request";
 import _ from "lodash";
 import path from "path";
 import fs from "fs";
-import promisify from "util.promisify"; // Only in Node 8+ and want to test in 6+
 import webpack from "webpack";
-import testingServer from "./server";
+import util from "util";
+import testServer from "./server";
 import targets from "../../targets";
 
 /*
 
-Testing WebSockets on Sauce Labs
+-- Testing WebSockets on Sauce Labs --
 
 Due to the way that Sauce Connect Proxy works, in many browsers you can’t establish
 WebSocket connections directly from the browser to localhost. To get around this,
@@ -26,16 +26,26 @@ localhost.
 
 You can't use a prerun script to edit the VM hosts file, as that does not work
 with the Sauce Connect proxy. So any developers running the Sauce tests need
-to add an entry to their local hosts file. 
+to add an entry to their local hosts file.
+
+-- Test Batching ---
+
+Sauce seems to implement a ~10-minute global timeout for tests associated with
+a given API call. Since tests are fairly long-running and only five platforms
+run concurrently on Sauce, the tests are run in batches. Failing platforms are
+retried in subsequent batches (to a limit), as Sauce seems to periodically cut
+off tests midway through execution even when the global timeout has not been hit.
 
 */
 
 (async () => {
   // Config
-  const port = 3000;
+  const PORT = 3000;
+  const POLLING_INTERVAL = 10000;
+  const ATTEMPTS_PER_PLATFORM = 3; // Platforms can fail due to temporary issues on Sauce or with connectivity
+  const PLATFORMS_PER_BATCH = 5; // Number of platforms to run on each Sauce API call
   const sauceTunnelId =
     process.env.TRAVIS_JOB_NUMBER || "feedme-transport-ws-tunnel"; // Travis sets tunnel id to job number
-  const pollInterval = 10000;
 
   // Determine testing mode
   // sauce-automatic: launches Sauce Connect Proxy and a suite of testing VMs on Sauce
@@ -152,7 +162,6 @@ to add an entry to their local hosts file.
     // Trivial Jasmine test fails on 56+ (appears to pass but no return)
     ["Windows 7", "Firefox", "22"],
     ["Windows 7", "Firefox", "55"],
-
     // Sauce has IE 9-11
     // Trivial Jasmine test fails on all (9 does not support Jasmine, 10-11 appear to pass but no return)
 
@@ -249,21 +258,26 @@ to add an entry to their local hosts file.
     ["Windows 8.1", "Firefox", "56"],
     ["Windows 8.1", "Firefox", "latest"],
 
-    ["Windows 8.1", "Internet Explorer", "11"],
+    // After around 20 WS connections, IE 11 on Windows 8.1 can no longer connect
+    // WebSocket Error: Incorrect HTTP response. Status code 502, Bad Gateway
+    // Works on Windows 7 and 10
+    // ["Windows 8.1", "Internet Explorer", "11"],
 
     // ///////////// Windows 8
 
     ["Windows 8", "Firefox", "56"],
     ["Windows 8", "Firefox", "latest"],
 
-    ["Windows 8", "Internet Explorer", "10"],
+    // IE 10 would pass but only supports 6 concurrent WebSockets
+    // and (seemingly) only 13 cumulative WebSocket connections
 
     // ///////////// Windows 7
 
     ["Windows 7", "Firefox", "56"],
     ["Windows 7", "Firefox", "latest"],
 
-    ["Windows 7", "Internet Explorer", "10"],
+    // IE 10 would pass but only supports 6 concurrent WebSockets
+    // and (seemingly) only 13 cumulative WebSocket connections
     ["Windows 7", "Internet Explorer", "11"],
 
     // ///////////// macOS 10.14
@@ -296,7 +310,7 @@ to add an entry to their local hosts file.
   console.log("Transpiling and bundling tests...");
   let webpackStats;
   try {
-    webpackStats = await promisify(webpack)({
+    webpackStats = await util.promisify(webpack)({
       entry: path.resolve(__dirname, "tests.js"),
       mode: "production",
       module: {
@@ -339,11 +353,11 @@ to add an entry to their local hosts file.
       optimization: {
         minimize: false
       },
-      devtool: "source-maps"
-      // performance: {
-      //   maxAssetSize: 400000,
-      //   maxEntrypointSize: 400000
-      // }
+      devtool: "source-maps",
+      performance: {
+        maxAssetSize: 2000000,
+        maxEntrypointSize: 2000000
+      }
       // stats: "verbose"
     });
   } catch (e) {
@@ -364,24 +378,24 @@ to add an entry to their local hosts file.
   // Copy the latest client browser bundle and sourcemaps into the webroot
   // Note that Node 6 does not have fs.copyFile()
   console.log("Copying browser bundle and sourcemaps...");
-  const bundle = await promisify(fs.readFile)(
+  const bundle = await util.promisify(fs.readFile)(
     `${__dirname}/../../build/browser.bundle.withmaps.js`
   );
-  await promisify(fs.writeFile)(
+  await util.promisify(fs.writeFile)(
     `${__dirname}/webroot/browser.bundle.withmaps.js`,
     bundle
   );
-  const maps = await promisify(fs.readFile)(
+  const maps = await util.promisify(fs.readFile)(
     `${__dirname}/../../build/browser.bundle.withmaps.js.map`
   );
-  await promisify(fs.writeFile)(
+  await util.promisify(fs.writeFile)(
     `${__dirname}/webroot/browser.bundle.withmaps.js.map`,
     maps
   );
 
   // Start the local webserver (adapted from Jasmine-standalone)
-  const webserver = await promisify(testingServer)(port);
-  console.log(`Local server started on http://localhost:${port}`);
+  const webserver = await testServer(PORT);
+  console.log(`Local server started on http://localhost:${PORT}`);
   if (hasHostsEntry) {
     console.log("Also available as http://testinghost.com:3000 via hosts file");
   }
@@ -397,7 +411,7 @@ to add an entry to their local hosts file.
     console.log("Running on Travis - no need to start Sauce Connect proxy.");
   } else {
     console.log("Starting Sauce Connect proxy...");
-    sauceConnectProcess = await promisify(sauceConnectLauncher)({
+    sauceConnectProcess = await util.promisify(sauceConnectLauncher)({
       tunnelIdentifier: sauceTunnelId,
       logFile: null,
       noSslBumpDomains: "all", // Needed to get WebSockets working: https://wiki.saucelabs.com/display/DOCS/Sauce+Connect+Proxy+and+SSL+Certificate+Bumping
@@ -411,123 +425,180 @@ to add an entry to their local hosts file.
     return;
   }
 
-  // Call the Sauce REST API telling it to run the tests
-  console.log("Calling Sauce REST API telling it to run the tests...");
-  const response = await promisify(request)({
-    url: `https://saucelabs.com/rest/v1/${process.env.SAUCE_USERNAME}/js-tests`,
-    method: "POST",
-    auth: {
-      username: process.env.SAUCE_USERNAME,
-      password: process.env.SAUCE_ACCESS_KEY
-    },
-    json: true,
-    body: {
-      url: `http://localhost:${port}/?throwFailures=true&oneFailurePerSpec=true`,
-      framework: "custom",
-      platforms:
-        mode === "sauce-automatic-hanging"
-          ? saucePlatformsHanging
-          : saucePlatforms,
-      maxDuration: 180, // Seconds/platform (doesn't appear to work beyond 5-6 min)
-      "tunnel-identifier": sauceTunnelId
-    }
+  // Assemble object to record test status by platform
+  const platforms =
+    mode === "sauce-automatic-hanging" ? saucePlatformsHanging : saucePlatforms;
+  const platformStatus = {};
+  platforms.forEach(platformArr => {
+    platformStatus[platformArr.join(":")] = {
+      platformArray: platformArr, // Passed to Sauce
+      passed: false,
+      attemptResults: [], // window.global_test_results for each attempt
+      attemptUrls: [] // Sauce URL for each attempt
+    };
   });
 
-  // Process REST API results
-  let sauceTests;
-  if (response.statusCode !== 200) {
-    console.log("Sauce API returned an error.");
-    throw response.body; // Use body as error (printed)
-  } else {
-    console.log("API call executed successfully.");
-    sauceTests = response.body;
-  }
-
-  // Poll Sauce for the test results
-  let sauceResults;
+  // Run the platforms in batches on Sauce
   do {
-    console.log("Calling Sauce REST API to check test status...");
+    // Get the platforms to run in this batch (stop if done)
+    const platformNames = Object.keys(platformStatus);
+    const batchPlatforms = []; // Array of platform arrays passed to sauce
+    const maxPlatforms =
+      mode === "sauce-automatic-hanging"
+        ? 1 // Max 1 attempt if running hanging platforms
+        : ATTEMPTS_PER_PLATFORM;
+    for (
+      let i = 0;
+      i < platformNames.length && batchPlatforms.length < PLATFORMS_PER_BATCH;
+      i += 1
+    ) {
+      const platform = platformStatus[platformNames[i]];
+      if (!platform.passed && platform.attemptResults.length < maxPlatforms) {
+        console.log(`Adding platform to Sauce batch: ${platformNames[i]}`);
+        batchPlatforms.push(platform.platformArray);
+      }
+    }
+    if (batchPlatforms.length === 0) {
+      console.log("Done all platforms.");
+      break;
+    }
+
+    // Call the Sauce REST API telling it to run the tests
+    console.log("Calling Sauce REST API telling it to run the tests...");
     // eslint-disable-next-line no-await-in-loop
-    const response2 = await promisify(request)({
-      url: `https://saucelabs.com/rest/v1/${process.env.SAUCE_USERNAME}/js-tests/status`,
+    const response = await util.promisify(request)({
+      url: `https://saucelabs.com/rest/v1/${process.env.SAUCE_USERNAME}/js-tests`,
       method: "POST",
       auth: {
         username: process.env.SAUCE_USERNAME,
         password: process.env.SAUCE_ACCESS_KEY
       },
       json: true,
-      body: sauceTests // From the above API call
+      body: {
+        url: `http://localhost:${PORT}/?throwFailures=true&oneFailurePerSpec=true`,
+        framework: "custom",
+        platforms: batchPlatforms,
+        maxDuration: 1800, // Seconds/platform (doesn't appear to work beyond 5-6 min)
+        "tunnel-identifier": sauceTunnelId
+      }
     });
 
-    if (response2.statusCode !== 200) {
+    // Process REST API results
+    let sauceTests;
+    if (response.statusCode !== 200) {
       console.log("Sauce API returned an error.");
-      throw response2.body; // Use body as error (printed)
-    } else if (!response2.body.completed) {
-      console.log("Sauce API indicated tests not completed. Polling again...");
-      // eslint-disable-next-line no-await-in-loop
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      throw response.body; // Use body as error (printed)
     } else {
-      sauceResults = response2.body["js tests"];
+      console.log("API call executed successfully.");
+      sauceTests = response.body;
     }
-  } while (!sauceResults); // eslint-disable-line no-constant-conditions
 
-  // Process and display the test results
+    // Poll Sauce for the test results
+    let sauceResults;
+    do {
+      console.log("Calling Sauce REST API to check test status...");
+      // eslint-disable-next-line no-await-in-loop
+      const response2 = await util.promisify(request)({
+        url: `https://saucelabs.com/rest/v1/${process.env.SAUCE_USERNAME}/js-tests/status`,
+        method: "POST",
+        auth: {
+          username: process.env.SAUCE_USERNAME,
+          password: process.env.SAUCE_ACCESS_KEY
+        },
+        json: true,
+        body: sauceTests // From the above API call
+      });
+
+      if (response2.statusCode !== 200) {
+        console.log("Sauce API returned an error.");
+        throw response2.body; // Use body as error (printed)
+      } else if (!response2.body.completed) {
+        console.log(
+          "Sauce API indicated tests not completed. Polling again..."
+        );
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
+      } else {
+        sauceResults = response2.body["js tests"];
+      }
+    } while (!sauceResults); // eslint-disable-line no-constant-conditions
+
+    // Process and store the test results
+    console.log("Got Sauce test results.");
+    for (let i = 0; i < sauceResults.length; i += 1) {
+      const platformName = sauceResults[i].platform.join(":");
+      const platformResult = sauceResults[i].result; // The window.global_test_results object
+      const platformUrl = sauceResults[i].url;
+
+      // Did the platform pass?
+      // Note platformResult is null if custom data exceeds 64k (don't know if it passed)
+      // Note platformResult.total/passed/failed === 0 if there is a Javascript error
+      const platformPassed =
+        platformResult &&
+        platformResult.failed === 0 &&
+        platformResult.passed > 0;
+
+      platformStatus[platformName].passed = platformPassed;
+      platformStatus[platformName].attemptResults.push(platformResult);
+      platformStatus[platformName].attemptUrls.push(platformUrl);
+
+      if (platformPassed) {
+        console.log(`${platformName} passed.`);
+      } else {
+        console.log(`${platformName} failed.`);
+      }
+    }
+  } while (true); // eslint-disable-line no-constant-condition
+
+  // Display test results
+  console.log("Finished running all Sauce tests.");
+  const platformNames = Object.keys(platformStatus);
   let allPassed = true;
-  for (let i = 0; i < sauceResults.length; i += 1) {
-    const platformUrl = sauceResults[i].url;
-    const platformName = sauceResults[i].platform.join(":");
-    const platformResult = sauceResults[i].result; // The window.global_test_results object
-    // Note platformResult is null if custom data exceeds 64k
-    // Note platformResult.total/passed/failed === 0 if there is a Javascript error (change this)
-    // Did the platform pass?
-    // Make sure tests are actually running (ie don't just check that none failed)
-    const platformPassed =
-      platformResult &&
-      platformResult.failed === 0 &&
-      platformResult.passed > 0;
-    // Display the platform name and result
-    if (platformPassed) {
-      console.log(`PASSED ${platformName} passed all tests`);
+  for (let i = 0; i < platformNames.length; i += 1) {
+    const platform = platformStatus[platformNames[i]];
+    allPassed = allPassed && platform.passed;
+
+    if (platform.passed) {
+      console.log(`--- PASSED ${platformNames[i]} passed all tests`);
     } else {
-      console.log(
-        `FAILED ${platformName} passed ${
-          platformResult ? platformResult.passed : "???"
-        }/${platformResult ? platformResult.total : "???"} tests`
-      );
-      console.log(`       ${platformUrl}`);
-      // Print failed tests
-      if (platformResult && platformResult.tests) {
-        for (let j = 0; j < platformResult.tests.length; j += 1) {
-          const test = platformResult.tests[j];
-          if (!test.result) {
-            console.log(`         Failing test: ${test.name}`);
-            console.log(`         Message: ${test.message}`);
+      console.log(`--- FAILED ${platformNames[i]}`);
+      for (let j = 0; j < platform.attemptResults.length; j += 1) {
+        const platformResult = platform.attemptResults[i]; // Could be null
+        const passed = platformResult ? platformResult.passed : "???";
+        const total = platformResult ? platformResult.total : "???";
+
+        console.log(`------ Attempt #${j + 1} passed ${passed}/${total}`);
+        console.log(platform.attemptUrls[i]);
+
+        if (platformResult && platformResult.tests) {
+          for (let k = 0; k < platformResult.tests.length; k += 1) {
+            const test = platformResult.tests[k];
+            if (!test.result) {
+              console.log(`Failing test: ${test.name}`);
+              console.log(test.message);
+            }
           }
         }
       }
-    }
-    // Track whether all platforms passed
-    if (!platformPassed) {
-      allPassed = false;
     }
   }
 
   // Close the Sauce Connect proxy (if not on Travis)
   if (sauceConnectProcess) {
     console.log("Stopping Sauce Connect proxy...");
-    await promisify(sauceConnectProcess.close)();
+    await util.promisify(sauceConnectProcess.close)();
   }
 
   // Stop the webserver
   console.log("Stopping the webserver...");
-  await promisify(webserver.close.bind(webserver))();
+  await util.promisify(webserver.close.bind(webserver))();
 
   // Return success/failure
   if (allPassed) {
     console.log("Tests passed on all platforms.");
     process.exit(0);
   } else {
-    console.log("Tests did not pass on all platforms");
+    console.log("Tests did not pass on all platforms.");
     process.exit(1); // Return failure
   }
 })();

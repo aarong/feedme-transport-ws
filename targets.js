@@ -2,7 +2,7 @@
 // Browser queries set based on minimum Sauce test version
 export default {
   browsers: [
-    "ie >= 10",
+    "ie >= 11",
     "firefox >= 22",
     "chrome >= 29",
     "edge >= 13",

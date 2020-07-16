@@ -1002,7 +1002,7 @@ describe("The factory function", () => {
 
 describe("The transport.connect() function", () => {
   describe("It may fail", () => {
-    it("should fail if transport is connecting and ws is connecting", async () => {
+    it("should fail if transport is connecting", async () => {
       const port = getNextPortNumber();
 
       // Start a ws server and wait for it to start listening
@@ -1021,31 +1021,7 @@ describe("The transport.connect() function", () => {
       await asyncUtil.once(wsServer, "close");
     });
 
-    it("should fail if transport is connecting and ws is disconnecting", async () => {
-      const port = getNextPortNumber();
-
-      // Start a ws server and wait for it to start listening
-      const wsServer = new WebSocket.Server({ port });
-      await asyncUtil.once(wsServer, "listening");
-
-      // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`);
-      transportClient.connect();
-      await asyncUtil.once(transportClient, "connect");
-
-      // Create test conditions
-      transportClient.disconnect(); // ws now disconnecting
-      transportClient.connect(); // transport now connecting
-      expect(() => {
-        transportClient.connect();
-      }).toThrow(new Error("INVALID_STATE: Already connecting or connected."));
-
-      // Clean up
-      wsServer.close();
-      await asyncUtil.once(wsServer, "close");
-    });
-
-    it("should fail if transport is connected (ws is connected)", async () => {
+    it("should fail if transport is connected", async () => {
       const port = getNextPortNumber();
 
       // Start a ws server and wait for it to start listening

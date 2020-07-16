@@ -27,7 +27,8 @@ it("should work through all major operations", async () => {
 
   // Connect a Feedme client
   const fmClient = feedmeClient({
-    transport: transportWsClient(`ws://localhost:${port}`)
+    transport: transportWsClient(`ws://localhost:${port}`),
+    reconnect: false
   });
   fmClient.connect();
   await asyncUtil.once(fmClient, "connect");
@@ -37,7 +38,7 @@ it("should work through all major operations", async () => {
     ares.failure("SOME_ERROR", { Error: "Data" });
   });
   try {
-    await asyncUtil.callback(fmClient.action.bind(fmClient), "SomeAction", {
+    await fmClient.action("SomeAction", {
       Action: "Args"
     });
   } catch (e) {
@@ -51,12 +52,8 @@ it("should work through all major operations", async () => {
   fmServer.once("action", (areq, ares) => {
     ares.success({ Action: "Data" });
   });
-  const actionResult = await asyncUtil.callback(
-    fmClient.action.bind(fmClient),
-    "SomeAction",
-    { Action: "Args" }
-  );
-  expect(actionResult[0]).toEqual({ Action: "Data" });
+  const actionData = await fmClient.action("SomeAction", { Action: "Args" });
+  expect(actionData).toEqual({ Action: "Data" });
 
   // Try a rejected feed open
   fmServer.once("feedOpen", (foreq, fores) => {

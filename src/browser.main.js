@@ -7,7 +7,7 @@ const dbg = debug("feedme-transport-ws:client");
 
 /**
  * Browser client transport object.
- * @typedef {Object} Client
+ * @typedef {Object} Browser
  * @extends emitter
  */
 
@@ -32,7 +32,7 @@ emitter(proto);
  * @throws {Error} "INVALID_ARGUMENT: ..."
  * @returns {Client}
  */
-export default function clientFactory(...args) {
+export default function browserFactory(...args) {
   dbg("Initializing Client object");
 
   // Check wsConstructor
@@ -249,6 +249,7 @@ proto.send = function send(msg) {
     const transportErr = new Error("FAILURE: WebSocket transmission failed.");
     transportErr.wsError = e;
     this._disconnect(transportErr);
+    return; // Stop
   }
   dbg("Message written successfully");
 };
@@ -383,9 +384,12 @@ proto._disconnect = function _disconnect(err) {
       dbg("The WebSocket connection is open");
       close();
     } else if (wsClient.readyState === wsClient.CONNECTING) {
-      // The WebSocket instance is opening - close it if it opens
+      // The WebSocket instance is opening - close it if it eventually opens
       dbg("The WebSocket connection is opening");
-      wsClient.once("open", close);
+      wsClient.onopen = () => {
+        close();
+        wsClient.onopen = null;
+      };
     }
   }
 
@@ -406,8 +410,7 @@ proto._disconnect = function _disconnect(err) {
  * The library only cares that events triggered by the library-facing API
  * (i.e. methods) are emitted asynchronously. But it is not clear whether
  * WebSocket may in some cases emit synchronously, so in order to ensure
- * a correct sequence of transport events, all are emitted asynchronously via
- * the nextTick queue.
+ * a correct sequence of transport events, all are emitted asynchronously.
  * @memberof Browser
  * @instance
  * @private

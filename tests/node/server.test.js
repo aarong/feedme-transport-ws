@@ -2,6 +2,7 @@ import WebSocket from "ws";
 import http from "http";
 import request from "request";
 import check from "check-types";
+import util from "util";
 import transportWsServer from "../../build/server";
 import asyncUtil from "./asyncutil";
 import serverConfig from "../../src/server.config";
@@ -1203,11 +1204,10 @@ describe("The transport.start() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Check that the webpage is available
-        const [, body] = await asyncUtil.callback(
-          request,
+        const { body } = await util.promisify(request)(
           `http://localhost:${port}`
         );
         expect(body).toBe("Webpage");
@@ -1220,7 +1220,7 @@ describe("The transport.start() function", () => {
         expect(transportServer.state()).toBe("started");
 
         // Clean up
-        await asyncUtil.callback(httpServer.close.bind(httpServer));
+        await util.promisify(httpServer.close.bind(httpServer))();
       });
 
       // Transport server events
@@ -1233,11 +1233,10 @@ describe("The transport.start() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Check that the webpage is available
-        const [, body] = await asyncUtil.callback(
-          request,
+        const { body } = await util.promisify(request)(
           `http://localhost:${port}`
         );
         expect(body).toBe("Webpage");
@@ -1282,7 +1281,7 @@ describe("The transport.start() function", () => {
         expect(eventOrder).toEqual(["starting", "start"]);
 
         // Clean up
-        await asyncUtil.callback(httpServer.close.bind(httpServer));
+        await util.promisify(httpServer.close.bind(httpServer))();
       });
 
       // External http server listeners
@@ -1295,7 +1294,7 @@ describe("The transport.start() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Create a transport server on the external server
         const transportServer = transportWsServer({
@@ -1313,7 +1312,7 @@ describe("The transport.start() function", () => {
         expect(httpServer.listenerCount("error")).toBe(2); // One for transport, one for ws
 
         // Clean up
-        await asyncUtil.callback(httpServer.close.bind(httpServer));
+        await util.promisify(httpServer.close.bind(httpServer))();
       });
 
       // WS client events - N/A
@@ -1348,19 +1347,18 @@ describe("The transport.start() function", () => {
 
         expect(transportServer.state()).toBe("starting");
 
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         expect(transportServer.state()).toBe("started");
 
         // Check that the webpage is available
-        const [, body] = await asyncUtil.callback(
-          request,
+        const { body } = await util.promisify(request)(
           `http://localhost:${port}`
         );
         expect(body).toBe("Webpage");
 
         // Clean up
-        await asyncUtil.callback(httpServer.close.bind(httpServer));
+        await util.promisify(httpServer.close.bind(httpServer))();
       });
 
       // Transport server events
@@ -1440,14 +1438,13 @@ describe("The transport.start() function", () => {
         expect(listener.disconnect.mock.calls.length).toBe(0);
 
         // Check that the webpage is available
-        const [, body] = await asyncUtil.callback(
-          request,
+        const { body } = await util.promisify(request)(
           `http://localhost:${port}`
         );
         expect(body).toBe("Webpage");
 
         // Clean up
-        await asyncUtil.callback(httpServer.close.bind(httpServer));
+        await util.promisify(httpServer.close.bind(httpServer))();
       });
 
       // External http server listeners
@@ -1793,7 +1790,7 @@ describe("The transport.stop() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -1826,7 +1823,7 @@ describe("The transport.stop() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -1884,7 +1881,7 @@ describe("The transport.stop() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -1918,7 +1915,7 @@ describe("The transport.stop() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -2029,7 +2026,7 @@ describe("The transport.stop() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -2355,7 +2352,7 @@ describe("The transport.send() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -2404,7 +2401,7 @@ describe("The transport.send() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -2470,7 +2467,7 @@ describe("The transport.send() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -2512,7 +2509,7 @@ describe("The transport.send() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -2568,7 +2565,7 @@ describe("The transport.send() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -2619,7 +2616,7 @@ describe("The transport.send() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -2675,7 +2672,7 @@ describe("The transport.send() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -2757,7 +2754,7 @@ describe("The transport.send() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -2806,7 +2803,7 @@ describe("The transport.send() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -2860,7 +2857,7 @@ describe("The transport.send() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -3226,7 +3223,7 @@ describe("The transport.disconnect() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -3268,7 +3265,7 @@ describe("The transport.disconnect() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -3326,7 +3323,7 @@ describe("The transport.disconnect() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -3378,7 +3375,7 @@ describe("The transport.disconnect() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -3421,7 +3418,7 @@ describe("The transport.disconnect() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -3481,7 +3478,7 @@ describe("The transport.disconnect() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -3532,7 +3529,7 @@ describe("The transport.disconnect() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -3579,7 +3576,7 @@ describe("The transport.disconnect() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -3642,7 +3639,7 @@ describe("The transport.disconnect() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -3699,7 +3696,7 @@ describe("The transport.disconnect() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -3747,7 +3744,7 @@ describe("The transport.disconnect() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -3812,7 +3809,7 @@ describe("The transport.disconnect() function", () => {
           res.writeHead(200);
           res.end("Webpage");
         });
-        await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+        await util.promisify(httpServer.listen.bind(httpServer))(port);
 
         // Start a transport server
         const transportServer = transportWsServer({
@@ -3873,7 +3870,7 @@ describe("The transport.handleUpgrade() function", () => {
         res.writeHead(200);
         res.end("Webpage");
       });
-      await asyncUtil.callback(httpServer.listen.bind(httpServer), httpPort);
+      await util.promisify(httpServer.listen.bind(httpServer))(httpPort);
 
       // Listen for upgrade arguments
       let req;
@@ -3912,7 +3909,7 @@ describe("The transport.handleUpgrade() function", () => {
         res.writeHead(200);
         res.end("Webpage");
       });
-      await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+      await util.promisify(httpServer.listen.bind(httpServer))(port);
 
       // Start a transport server
       const transportServer = transportWsServer({
@@ -3941,7 +3938,7 @@ describe("The transport.handleUpgrade() function", () => {
         new Error("INVALID_STATE: The transport is not in noServer mode.")
       );
 
-      // Clean up
+      // // Clean up
       transportServer.stop();
       await asyncUtil.once(transportServer, "stop");
       httpServer.close();
@@ -3956,7 +3953,7 @@ describe("The transport.handleUpgrade() function", () => {
         res.writeHead(200);
         res.end("Webpage");
       });
-      await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+      await util.promisify(httpServer.listen.bind(httpServer))(port);
 
       // Start a transport server
       const transportServer = transportWsServer({
@@ -4006,7 +4003,7 @@ describe("The transport.handleUpgrade() function", () => {
         res.writeHead(200);
         res.end("Webpage");
       });
-      await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+      await util.promisify(httpServer.listen.bind(httpServer))(port);
 
       // Start a transport server
       const transportServer = transportWsServer({
@@ -4052,7 +4049,7 @@ describe("The transport.handleUpgrade() function", () => {
         res.writeHead(200);
         res.end("Webpage");
       });
-      await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+      await util.promisify(httpServer.listen.bind(httpServer))(port);
 
       // Start a transport server
       const transportServer = transportWsServer({
@@ -4118,7 +4115,7 @@ describe("The transport.handleUpgrade() function", () => {
         res.writeHead(200);
         res.end("Webpage");
       });
-      await asyncUtil.callback(httpServer.listen.bind(httpServer), port);
+      await util.promisify(httpServer.listen.bind(httpServer))(port);
 
       // Start a transport server
       const transportServer = transportWsServer({

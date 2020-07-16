@@ -44,7 +44,7 @@
     "eslint-plugin-import": "^2.14.0",
     "eslint-plugin-prettier": "^3.0.1",
     "express": "^4.16.4",
-    "feedme-client": "0.0.31",
+    "feedme-client": "0.0.35",
     "feedme-server-core": "0.0.4",
     "fs-copy-file-sync": "^1.1.1",
     "ghooks": "^2.0.4",

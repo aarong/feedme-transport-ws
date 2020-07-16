@@ -1,593 +1,2916 @@
-import emitter from "component-emitter";
-
-const dbg = function dbg(msg) {
-  console.log(msg); // eslint-disable-line no-console
-};
-dbg("Starting browser tests");
+/* eslint-disable import/no-extraneous-dependencies */
+import feedmeClient from "feedme-client/bundle"; // Avoid source-map-support warning
+import asyncUtil from "./asyncutil";
 
 // Included using <script> tags in index.html
-/* global feedmeClient, feedmeTransportWsClient */
+/* global feedmeTransportWsClient */
 
 /*
 
-Browser integration functional tests. Tests the browser client against
-(1) a raw WebSocket server, (2) the transport server, and (3) a Feedme server.
+Browser functional tests. Tests the browser client against:
+  - A raw WebSocket server
+  - A transport server
+  - A Feedme server.
 
-Check:
-
+Checks:
   - Errors and return values
   - State functions - transport.state()
   - Client transport events
-  - Server events
+  - Server events (WebSocket, transport, Feedme)
 
 Don't worry about testing invalid arguments (done in unit tests) or that return
 values are empty (only state() returns a value and it's checked everywhere).
 
-The Feedme controller client connection is re-established for each tests, as
-sharing across tests was causing failures even for a small number of tests.
-  -- TRY AGAIN
+Tests fail periodicially due to connectivity issues, so they are retried several
+times before considered to have truly failed. For the same reason, a new controller
+client is established for each test.
 
-It's crucial to properly close any open WebSocket connections at the end
-of each test, otherwise many tests will fail.
-
-Sauce seems to limit total test duration to around 5-6 minutes by capping
-maxDuration. So you're limited to a maximum of around 150 tests overall,
-unless you want to build the infrastructure to break them into smaller suites.
-
-Around 1% of tests tend to fail due to connectivity issues, resulting in the
-test timing out or DISCONNECT/TIMEOUT errors. So all tests are retried several
-times on failure.
-
-          // You need masterResolve/reject so that disconnect events can
-          // fail the tests at any time - can't reject a promise once resolved
-          // Otherwise tests hang if the connection is broken --
-
-// Connect to the controller Feedme API before starting each test
-// Keeping the controller connected between tests caused problems on browsers
 */
 
-console.log("STARTING TESTS");
-console.log(feedmeTransportWsClient);
-console.log(feedmeClient);
+// Jasmine configuration
+jasmine.DEFAULT_TIMEOUT_INTERVAL = 120000; // Per test - including any retries
 
-// Allow each test to take significant time, given latency (defaults to 5000)
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000; // Per test
-
+// Test configuration
 const PORT = 3000; // Port for controller Feedme API
-const ROOT_URL = "ws://testinghost.com";
-const RETRY_LIMIT = 10; // How many times to attempt each test
+const TARGET_URL = "ws://testinghost.com"; // Target URL for all testing servers
+const BAD_URL = "ws://nothing"; // For testing failed connection attempts
+const RETRY_LIMIT = 5; // Number of times to attempt each test before failing
+const ATTEMPT_TIMEOUT = 30000; // Limit per individual test attempt
 
-// var delay = function(ms) {
-//   return function() {
-//     return new Promise(function(resolve, reject) {
-//       setTimeout(function() {
-//         resolve();
-//       }, ms);
-//     });
-//   };
-// };
-
-/*
-
-Feedme controller API wrapper for WebSocket servers.
-
-*/
-
-const wsServerProto = emitter({});
-
-const createWsServer = function createWsServer(feedmeControllerClient) {
-  dbg("Creating WebSocket server");
-
-  const server = Object.create(wsServerProto);
-
-  // Members
-  server.port = null;
-  server._feedmeControllerClient = feedmeControllerClient;
-  server._eventFeed = null;
-
-  return new Promise((resolve, reject) => {
-    // Create a WebSocket server port
-    dbg("Running action CreateWsPort");
-    feedmeControllerClient.action("CreateWsPort", {}, (err, ad) => {
-      if (err) {
-        reject(err);
-      } else {
-        dbg(`WebSocket port created on ${ad.Port}`);
-        server.port = ad.Port;
-        resolve();
-      }
-    });
-  }).then(
-    () =>
-      new Promise((resolve, reject) => {
-        // Open the server event feed and emit on revelation
-        dbg(`Opening WsEvents feed for port ${server.port}`);
-        const eventFeed = feedmeControllerClient.feed("WsEvents", {
-          Port: `${server.port}`
-        });
-        server._eventFeed = eventFeed;
-        eventFeed.once("open", () => {
-          eventFeed.removeAllListeners("close");
-          resolve(server);
-        });
-        eventFeed.once("close", err => {
-          eventFeed.removeAllListeners("open");
-          reject(err);
-        });
-        eventFeed.on("action", (an, ad) => {
-          dbg(
-            `Event revealed on WsEvents feed for port ${server.port}: ${ad.EventName}`
-          );
-          dbg(ad);
-          const emitArgs = ad.Arguments.slice(); // copy
-          // Prepend with testing server-assigned client id if present
-          // Present for client event emissions
-          if (ad.ClientId) {
-            emitArgs.unshift(ad.ClientId);
-          }
-          emitArgs.unshift(ad.EventName);
-          server.emit(...emitArgs);
-        });
-        eventFeed.desireOpen();
-      })
-  );
-};
-
-["close"].forEach(method => {
-  // Route ws server method calls to the Feedme API
-  wsServerProto[method] = (...args2) => {
-    dbg(`Received call to WebSocket server method ${method}`);
-    const _this = this;
-    const args = [];
-    for (let i = 0; i < args2.length; i += 1) {
-      args.push(args2[i]);
-    }
-    return new Promise((resolve, reject) => {
-      _this._feedmeControllerClient.action(
-        "InvokeWsMethod",
-        { Port: _this.port, Method: method.toLowerCase(), Arguments: args },
-        (err, ad) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(ad.ReturnValue);
-          }
-        }
-      );
+const createClientListener = transportClient => {
+  const evts = ["connecting", "connect", "disconnect", "message"];
+  const l = {};
+  evts.forEach(evt => {
+    l[evt] = jasmine.createSpy();
+    transportClient.on(evt, l[evt]);
+  });
+  l.spyClear = () => {
+    evts.forEach(evt => {
+      l[evt].calls.reset();
     });
   };
-});
-
-["Send", "Terminate", "Close"].forEach(method => {
-  // Route ws server method calls to the Feedme API
-  const methodName = `client${method}`;
-  wsServerProto[methodName] = (...args2) => {
-    dbg(`Received call to WebSocket server method ${method}`);
-    // First argument is client id, then actual ws client method arguments
-    const _this = this;
-    const args = [];
-    for (let i = 0; i < args2.length; i += 1) {
-      args.push(args2[i]);
-    }
-    const clientId = args.shift();
-    return new Promise((resolve, reject) => {
-      _this._feedmeControllerClient.action(
-        "InvokeWsClientMethod",
-        {
-          ClientId: clientId,
-          Port: _this.port,
-          Method: method.toLowerCase(),
-          Arguments: args
-        },
-        (err, ad) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(ad.ReturnValue);
-          }
-        }
-      );
-    });
-  };
-});
-
-wsServerProto.start = function start() {
-  // Create a WebSocket server
-  dbg("Running action CreateWsServer");
-  this._feedmeControllerClient.action(
-    "CreateWsServer",
-    { Port: this.port },
-    () => {
-      // Do nothing - will fire a listening event
-    }
-  );
+  return l;
 };
 
-wsServerProto.destroy = function destroy() {
-  // Close the event feed and destroy the server (server will stop if not stopped)
-  dbg("Destroying WebSocket server");
-  const _this = this;
-  return new Promise((resolve, reject) => {
-    _this._eventFeed.desireClosed();
-    _this._feedmeControllerClient.action(
-      "DestroyWsServer",
-      { Port: _this.port },
-      err => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      }
-    );
-  });
-};
-
-// const createWsServerListener = function createWsServerListener(ws) {
-//   const evts = [
-//     "listening",
-//     "close",
-//     "error",
-//     "connection",
-//     "clientMessage",
-//     "clientClose",
-//     "clientError"
-//   ];
-//   const l = {};
-//   evts.forEach(evt => {
-//     l[evt] = jasmine.createSpy();
-//     ws.on(evt, l[evt]);
-//   });
-//   l.mockClear = () => {
-//     evts.forEach(evt => {
-//       l[evt].calls.reset();
-//     });
-//   };
-//   return l;
-// };
-
-/*
-
-Feedme controller API wrapper for transport servers.
-
-*/
-
-const transportServerProto = emitter({});
-
-// const createTransportServer = function createTransportServer(
-//   feedmeControllerClient
-// ) {
-//   dbg("Creating transport server");
-
-//   const server = Object.create(transportServerProto);
-
-//   // Members
-//   server.port = null;
-//   server._feedmeControllerClient = feedmeControllerClient;
-//   server._eventFeed = null;
-
-//   return new Promise((resolve, reject) => {
-//     // Create a transport server
-//     dbg("Running action CreateTransportServer");
-//     feedmeControllerClient.action("CreateTransportServer", {}, (err, ad) => {
-//       if (err) {
-//         reject(err);
-//       } else {
-//         dbg(`Transport server launched on port ${ad.Port}`);
-//         server.port = ad.Port;
-//         resolve();
-//       }
-//     });
-//   }).then(
-//     () =>
-//       new Promise((resolve, reject) => {
-//         // Open the server event feed and emit on revelation
-//         dbg(`Opening TransportEvents feed for port ${server.port}`);
-//         const eventFeed = feedmeControllerClient.feed("TransportEvents", {
-//           Port: `${server.port}`
-//         });
-//         server._eventFeed = eventFeed;
-//         eventFeed.once("open", () => {
-//           eventFeed.removeAllListeners("close");
-//           resolve(server); // Return the server
-//         });
-//         eventFeed.once("close", err => {
-//           eventFeed.removeAllListeners("open");
-//           reject(err);
-//         });
-//         eventFeed.on("action", (an, ad) => {
-//           dbg(
-//             `Event revealed on TransportEvents feed for port ${server.port}: ${ad.EventName}`
-//           );
-//           dbg(ad);
-//           const emitArgs = ad.Arguments.slice(); // copy
-//           emitArgs.unshift(ad.EventName);
-//           server.emit(...emitArgs);
-//         });
-//         eventFeed.desireOpen();
-//       })
-//   );
-// };
-
-["state", "start", "stop", "send", "disconnect"].forEach(method => {
-  // Route transportServer method calls to the Feedme API
-  transportServerProto[method] = (...args2) => {
-    dbg(`Received call to transport server method ${method}`);
-    const _this = this;
-    const args = [];
-    for (let i = 0; i < args2.length; i += 1) {
-      args.push(args2[i]);
+// Wrapper that retries an asynchronous test function
+// Retries if the test throws (which occurs on failure) and if it times out
+// after ATTEMPT_TIMEOUT (which occurs when the controller or transport
+// WebSocket connection is unexpectedly lost).
+const retry = test => async () => {
+  let err;
+  let i;
+  for (i = 0; i < RETRY_LIMIT; i += 1) {
+    err = null;
+    try {
+      await asyncUtil.timeout(test, ATTEMPT_TIMEOUT); // eslint-disable-line no-await-in-loop
+    } catch (e) {
+      err = e;
     }
-    return new Promise((resolve, reject) => {
-      _this._feedmeControllerClient.action(
-        "InvokeTransportMethod",
-        { Port: _this.port, Method: method, Arguments: args },
-        (err, ad) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(ad.ReturnValue);
-          }
-        }
-      );
-    });
-  };
-});
-
-transportServerProto.destroy = function destroy() {
-  dbg("Destroying WebSocket server");
-
-  // Close the event feed and destroy the server (server will stop if not stopped)
-  const _this = this;
-  return new Promise((resolve, reject) => {
-    _this._eventFeed.desireClosed();
-    _this._feedmeControllerClient.action(
-      "DestroyTransportServer",
-      { Port: _this.port },
-      err => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve();
-        }
-      }
-    );
-  });
-};
-
-// const createTransportServerListener = function createTransportServerListener(
-//   ts
-// ) {
-//   const evts = [
-//     "starting",
-//     "start",
-//     "stopping",
-//     "stop",
-//     "connect",
-//     "message",
-//     "disconnect"
-//   ];
-//   const l = {};
-//   evts.forEach(evt => {
-//     l[evt] = jasmine.createSpy();
-//     ts.on(evt, l[evt]);
-//   });
-//   l.mockClear = () => {
-//     evts.forEach(evt => {
-//       l[evt].calls.reset();
-//     });
-//   };
-//   return l;
-// };
-
-/*
-
-Wrapper to retry failed tests (almost always a temporary conenctivity issue).
-
-Accepts a function that returns a promise and returns a function that
-returns a promise.
-
-On failure, how do you ensure proper clean-up? Maybe don't worry about it too much -- very few tests fail
-*/
-
-const retry = testPromiseGenerator => () =>
-  new Promise((resolve, reject) => {
-    let attempts = 0;
-
-    // Fucntion to run one attempt - recursive
-    const attempt = () => {
-      attempts += 1;
-      testPromiseGenerator()
-        .then(() => {
-          // Test passed
-          resolve();
-        })
-        .catch(err => {
-          // Attempt failed - retry or fail the test
-          if (attempts < RETRY_LIMIT) {
-            attempt();
-          } else {
-            reject(err); // Only rejects with the latest error
-          }
-        });
-    };
-
-    // Start attempt
-    attempt();
-  });
-
-/*
-
-Feedme controller client functions. You can't put these in beforeEach/afterEach
-because they need to be within individual test retry wrappers -- if they fail,
-they are retried.
-
-*/
-
-const connectControllerClient = () =>
-  new Promise((resolve, reject) => {
-    dbg("Connecting controller client");
-    const client = feedmeClient({
-      transport: feedmeTransportWsClient(`${ROOT_URL}:${PORT}`)
-    });
-    client.once("connect", () => {
-      client.removeAllListeners("disconnect");
-      resolve(client);
-    });
-    client.once("disconnect", err => {
-      client.removeAllListeners("connect");
-      reject(err);
-    });
-    client.connect();
-  });
-
-const disconnectControllerClient = fmClient =>
-  new Promise(resolve => {
-    dbg("Disconnecting controller client");
-    fmClient.removeAllListeners();
-    fmClient.once("disconnect", () => {
-      resolve();
-    });
-    fmClient.disconnect();
-  });
-
-/*
-
-Tests
-
-*/
-
-let testNum = -"";
-
-describe("Browser tests", () => {
-  const test = () => {
-    it(
-      "should work using the JS adapter",
-      retry(
-        () =>
-          new Promise((masterResolve, masterReject) => {
-            let feedmeControllerClient;
-            let wsServer;
-            let transportClient;
-            // let wsServerListener;
-            connectControllerClient()
-              .then(c => {
-                feedmeControllerClient = c;
-                feedmeControllerClient.on("disconnect", () => {
-                  masterReject();
-                });
-                return createWsServer(feedmeControllerClient);
-              })
-              .then(
-                s =>
-                  new Promise(resolve => {
-                    wsServer = s;
-                    wsServer.start();
-                    wsServer.once("listening", resolve);
-                    wsServer.on("close", err => {
-                      masterReject(err);
-                    });
-                  })
-              )
-              .then(
-                () =>
-                  new Promise(resolve => {
-                    // Connect a transport client
-                    transportClient = feedmeTransportWsClient(
-                      `${ROOT_URL}:${wsServer.port}`
-                    );
-                    transportClient.connect();
-                    wsServer.once("connection", () => {
-                      resolve();
-                    });
-                    transportClient.on("disconnect", err => {
-                      masterReject(err);
-                    });
-                  })
-              )
-              .then(
-                () =>
-                  new Promise((resolve, reject) => {
-                    // Make sure the client is connected
-                    if (transportClient.state() === "connected") {
-                      resolve();
-                    } else {
-                      transportClient.once("connect", () => {
-                        transportClient.removeAllListeners("disconnect");
-                        resolve();
-                      });
-                      transportClient.once("disconnect", err => {
-                        transportClient.removeAllListeners("connect");
-                        reject(err);
-                      });
-                    }
-                  })
-              )
-              .then(
-                () =>
-                  new Promise(resolve => {
-                    wsServer.on("clientMessage", () => {
-                      dbg("got client message");
-                    });
-                    transportClient.send("hi"); // Not a promise
-                    wsServer.once("clientMessage", () => {
-                      resolve();
-                    });
-                  })
-              )
-              .then(() => {
-                transportClient.removeAllListeners();
-                return new Promise(resolve => {
-                  transportClient.once("disconnect", () => {
-                    resolve();
-                  });
-                  transportClient.disconnect();
-                });
-              })
-              .then(
-                () =>
-                  new Promise((resolve, reject) => {
-                    // Destroy the server
-                    wsServer.removeAllListeners();
-                    feedmeControllerClient.action(
-                      "DestroyWsServer",
-                      { Port: wsServer.port },
-                      err => {
-                        if (err) {
-                          reject(err);
-                        } else {
-                          resolve();
-                        }
-                      }
-                    );
-                  })
-              )
-              .then(() => disconnectControllerClient(feedmeControllerClient))
-              .then(
-                () =>
-                  // Add a wait every 50 tests
-                  new Promise(resolve => {
-                    testNum += 1;
-                    if (testNum % 50 === 0) {
-                      setTimeout(resolve, 10000);
-                    } else {
-                      resolve();
-                    }
-                  })
-              )
-              .then(() => {
-                expect(1).toBe(1);
-                masterResolve();
-              })
-              .catch(err => {
-                masterReject(err);
-              });
-          })
-      )
-    );
-  };
-
-  for (let i = 0; i < 5; i += 1) {
-    describe(`Iteration ${i}`, test);
+    if (!err) {
+      return; // Success
+    }
   }
+  err.message += ` (Retry # ${i})`;
+  throw err; // All attempts failed - throw the final error
+};
+
+// Create a and connect Feedme server controller client
+const connectController = async () => {
+  const fmController = feedmeClient({
+    transport: feedmeTransportWsClient(`${TARGET_URL}:${PORT}`),
+    connectRetryMs: -1 // Do not retry connection attempts here - entire test is retried
+  });
+  fmController.connect();
+  await asyncUtil.once(fmController, "connect");
+  return fmController;
+};
+
+// Disconnect a Feedme server controller client
+const disconnectController = async fmClient => {
+  fmClient.disconnect();
+  await asyncUtil.once(fmClient, "disconnect");
+};
+
+describe("The factory function", () => {
+  // Errors and return values
+
+  it("should return an object", () => {
+    expect(feedmeTransportWsClient(TARGET_URL)).toEqual(jasmine.any(Object));
+  });
+
+  // State functions
+
+  it("should initialize disconnected", () => {
+    const transportClient = feedmeTransportWsClient(TARGET_URL);
+    expect(transportClient.state()).toBe("disconnected");
+  });
+
+  // Client events - N/A
+
+  // Server events - N/A
 });
+
+// Tests against raw WebSocket server
+
+describe("The transport.connect() function", () => {
+  describe("may fail", () => {
+    it(
+      "should throw if the transport is connecting",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Make transport client connecting
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+        transportClient.connect();
+
+        expect(transportClient.state()).toBe("connecting");
+        expect(() => {
+          transportClient.connect();
+        }).toThrow(
+          new Error("INVALID_STATE: Already connecting or connected.")
+        );
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+
+    it(
+      "should throw if the transport is connected",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Make transport client connecting
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+        transportClient.connect();
+        await asyncUtil.once(transportClient, "connect");
+
+        expect(transportClient.state()).toBe("connected");
+        expect(() => {
+          transportClient.connect();
+        }).toThrow(
+          new Error("INVALID_STATE: Already connecting or connected.")
+        );
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+  });
+
+  describe("may succeed", () => {
+    describe("WebSocket initializes successfully", () => {
+      // State functions
+
+      it(
+        "should update the state appropriately",
+        retry(async () => {
+          const fmController = await connectController();
+
+          // Establish a WS server port and open the events feed
+          const { Port: port } = await fmController.action(
+            "EstablishWsPort",
+            {}
+          );
+          const serverEventFeed = fmController.feed("WsEvents", {
+            Port: `${port}`
+          });
+          serverEventFeed.desireOpen();
+          await asyncUtil.once(serverEventFeed, "open");
+
+          // Initilize WS server an wait until listening
+          fmController.action("InitWsServer", { Port: `${port}` });
+          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          expect(eventArgs[0]).toBe("Event");
+          expect(eventArgs[1].Name).toBe("listening");
+
+          // Create transport client
+          const transportClient = feedmeTransportWsClient(
+            `${TARGET_URL}:${port}`
+          );
+
+          transportClient.connect();
+
+          expect(transportClient.state()).toBe("connecting");
+
+          // Clean up
+          await fmController.action("DestroyWsServer", { Port: port });
+          disconnectController(fmController);
+        })
+      );
+
+      // Client events
+
+      it(
+        "should asynchronously emit connecting",
+        retry(async () => {
+          const fmController = await connectController();
+
+          // Establish a WS server port and open the events feed
+          const { Port: port } = await fmController.action(
+            "EstablishWsPort",
+            {}
+          );
+          const serverEventFeed = fmController.feed("WsEvents", {
+            Port: `${port}`
+          });
+          serverEventFeed.desireOpen();
+          await asyncUtil.once(serverEventFeed, "open");
+
+          // Initilize WS server an wait until listening
+          fmController.action("InitWsServer", { Port: `${port}` });
+          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          expect(eventArgs[0]).toBe("Event");
+          expect(eventArgs[1].Name).toBe("listening");
+
+          // Create transport client
+          const transportClient = feedmeTransportWsClient(
+            `${TARGET_URL}:${port}`
+          );
+
+          const clientListener = createClientListener(transportClient);
+
+          transportClient.connect();
+
+          // Emit nothing synchronously
+          expect(clientListener.connecting.calls.count()).toBe(0);
+          expect(clientListener.connect.calls.count()).toBe(0);
+          expect(clientListener.disconnect.calls.count()).toBe(0);
+          expect(clientListener.message.calls.count()).toBe(0);
+
+          await asyncUtil.nextTick();
+
+          // Emit connecting asynchronously
+          expect(clientListener.connecting.calls.count()).toBe(1);
+          expect(clientListener.connecting.calls.argsFor(0).length).toBe(0);
+          expect(clientListener.connect.calls.count()).toBe(0);
+          expect(clientListener.disconnect.calls.count()).toBe(0);
+          expect(clientListener.message.calls.count()).toBe(0);
+
+          // Clean up
+          await fmController.action("DestroyWsServer", { Port: port });
+          disconnectController(fmController);
+        })
+      );
+
+      // Server events
+
+      it(
+        "should emit server connection",
+        retry(async () => {
+          const fmController = await connectController();
+
+          // Establish a WS server port and open the events feed
+          const { Port: port } = await fmController.action(
+            "EstablishWsPort",
+            {}
+          );
+          const serverEventFeed = fmController.feed("WsEvents", {
+            Port: `${port}`
+          });
+          serverEventFeed.desireOpen();
+          await asyncUtil.once(serverEventFeed, "open");
+
+          // Initilize WS server an wait until listening
+          fmController.action("InitWsServer", { Port: `${port}` });
+          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          expect(eventArgs[0]).toBe("Event");
+          expect(eventArgs[1].Name).toBe("listening");
+
+          // Make transport client connecting
+          const transportClient = feedmeTransportWsClient(
+            `${TARGET_URL}:${port}`
+          );
+
+          transportClient.connect();
+
+          const evtRevelation = await asyncUtil.once(serverEventFeed, "action");
+
+          expect(evtRevelation[0]).toBe("Event");
+          expect(evtRevelation[1].Name).toBe("connection");
+          expect(evtRevelation[1].Arguments).toEqual([]);
+
+          // Clean up
+          await fmController.action("DestroyWsServer", { Port: port });
+          disconnectController(fmController);
+        })
+      );
+    });
+
+    describe("WebSocket initialization fails", () => {
+      // State functions
+
+      it(
+        "should update the state appropriately",
+        retry(async () => {
+          const fmController = await connectController();
+
+          // Establish a WS server port and open the events feed
+          const { Port: port } = await fmController.action(
+            "EstablishWsPort",
+            {}
+          );
+          const serverEventFeed = fmController.feed("WsEvents", {
+            Port: `${port}`
+          });
+          serverEventFeed.desireOpen();
+          await asyncUtil.once(serverEventFeed, "open");
+
+          // Initilize WS server an wait until listening
+          fmController.action("InitWsServer", { Port: `${port}` });
+          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          expect(eventArgs[0]).toBe("Event");
+          expect(eventArgs[1].Name).toBe("listening");
+
+          // Create transport client
+          const transportClient = feedmeTransportWsClient(
+            `${TARGET_URL}:${port}`
+          );
+
+          transportClient._address = {}; // Make ws initialization fail
+          transportClient.connect();
+
+          expect(transportClient.state()).toBe("disconnected");
+
+          // Clean up
+          await fmController.action("DestroyWsServer", { Port: port });
+          disconnectController(fmController);
+        })
+      );
+
+      // Client events
+
+      it(
+        "should asynchronously emit connecting and then disconnect",
+        retry(async () => {
+          const fmController = await connectController();
+
+          // Establish a WS server port and open the events feed
+          const { Port: port } = await fmController.action(
+            "EstablishWsPort",
+            {}
+          );
+          const serverEventFeed = fmController.feed("WsEvents", {
+            Port: `${port}`
+          });
+          serverEventFeed.desireOpen();
+          await asyncUtil.once(serverEventFeed, "open");
+
+          // Initilize WS server an wait until listening
+          fmController.action("InitWsServer", { Port: `${port}` });
+          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          expect(eventArgs[0]).toBe("Event");
+          expect(eventArgs[1].Name).toBe("listening");
+
+          // Create transport client
+          const transportClient = feedmeTransportWsClient(
+            `${TARGET_URL}:${port}`
+          );
+          transportClient._address = {}; // Make ws initialization fail
+
+          const clientListener = createClientListener(transportClient);
+
+          transportClient.connect();
+
+          // Emit nothing synchronously
+          expect(clientListener.connecting.calls.count()).toBe(0);
+          expect(clientListener.connect.calls.count()).toBe(0);
+          expect(clientListener.disconnect.calls.count()).toBe(0);
+          expect(clientListener.message.calls.count()).toBe(0);
+
+          const evtOrder = [];
+          ["connecting", "disconnect"].forEach(evt => {
+            transportClient.on(evt, () => {
+              evtOrder.push(evt);
+            });
+          });
+
+          await asyncUtil.nextTick();
+
+          // Emit connecting asynchronously
+          expect(clientListener.connecting.calls.count()).toBe(1);
+          expect(clientListener.connecting.calls.argsFor(0).length).toBe(0);
+          expect(clientListener.connect.calls.count()).toBe(0);
+          expect(clientListener.disconnect.calls.count()).toBe(1);
+          expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
+          expect(clientListener.message.calls.count()).toBe(0);
+          expect(evtOrder).toEqual(["connecting", "disconnect"]);
+
+          // Clean up
+          await fmController.action("DestroyWsServer", { Port: port });
+          disconnectController(fmController);
+        })
+      );
+
+      // Server events - N/A
+    });
+  });
+});
+
+describe("The transport.disconnect() function", () => {
+  describe("may fail", () => {
+    it(
+      "should throw if the transport is disconnected",
+      retry(async () => {
+        const transportClient = feedmeTransportWsClient(TARGET_URL);
+        expect(() => {
+          transportClient.disconnect();
+        }).toThrow(new Error("INVALID_STATE: Already disconnected."));
+      })
+    );
+  });
+
+  describe("may succeed", () => {
+    describe("client was connecting - no error", () => {
+      // State functions
+
+      it(
+        "should update the state appropriately",
+        retry(async () => {
+          const fmController = await connectController();
+
+          // Establish a WS server port and open the events feed
+          const { Port: port } = await fmController.action(
+            "EstablishWsPort",
+            {}
+          );
+          const serverEventFeed = fmController.feed("WsEvents", {
+            Port: `${port}`
+          });
+          serverEventFeed.desireOpen();
+          await asyncUtil.once(serverEventFeed, "open");
+
+          // Initilize WS server an wait until listening
+          fmController.action("InitWsServer", { Port: `${port}` });
+          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          expect(eventArgs[0]).toBe("Event");
+          expect(eventArgs[1].Name).toBe("listening");
+
+          // Create transport client
+          const transportClient = feedmeTransportWsClient(
+            `${TARGET_URL}:${port}`
+          );
+
+          transportClient.connect();
+
+          expect(transportClient.state()).toBe("connecting");
+
+          transportClient.disconnect();
+
+          expect(transportClient.state()).toBe("disconnected");
+
+          // Clean up
+          await fmController.action("DestroyWsServer", { Port: port });
+          disconnectController(fmController);
+        })
+      );
+
+      // Client events
+
+      it(
+        "should asynchronously emit disconnect",
+        retry(async () => {
+          const fmController = await connectController();
+
+          // Establish a WS server port and open the events feed
+          const { Port: port } = await fmController.action(
+            "EstablishWsPort",
+            {}
+          );
+          const serverEventFeed = fmController.feed("WsEvents", {
+            Port: `${port}`
+          });
+          serverEventFeed.desireOpen();
+          await asyncUtil.once(serverEventFeed, "open");
+
+          // Initilize WS server an wait until listening
+          fmController.action("InitWsServer", { Port: `${port}` });
+          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          expect(eventArgs[0]).toBe("Event");
+          expect(eventArgs[1].Name).toBe("listening");
+
+          // Create transport client
+          const transportClient = feedmeTransportWsClient(
+            `${TARGET_URL}:${port}`
+          );
+
+          transportClient.connect();
+
+          expect(transportClient.state()).toBe("connecting");
+
+          await asyncUtil.nextTick(); // Move past connecting event
+
+          const clientListener = createClientListener(transportClient);
+
+          transportClient.disconnect();
+
+          // Emit nothing synchronously
+          expect(clientListener.connecting.calls.count()).toBe(0);
+          expect(clientListener.connect.calls.count()).toBe(0);
+          expect(clientListener.disconnect.calls.count()).toBe(0);
+          expect(clientListener.message.calls.count()).toBe(0);
+
+          await asyncUtil.nextTick();
+
+          // Emit disconnect asynchronously
+          expect(clientListener.connecting.calls.count()).toBe(0);
+          expect(clientListener.connect.calls.count()).toBeGreaterThanOrEqual(
+            0
+          ); // May have connected
+          expect(clientListener.disconnect.calls.count()).toBe(1);
+          expect(clientListener.disconnect.calls.argsFor(0).length).toBe(0);
+          expect(clientListener.message.calls.count()).toBe(0);
+
+          // Clean up
+          await fmController.action("DestroyWsServer", { Port: port });
+          disconnectController(fmController);
+        })
+      );
+
+      // Server events - N/A
+    });
+
+    describe("client was connecting - error", () => {
+      // State functions
+
+      it(
+        "should update the state appropriately",
+        retry(async () => {
+          const fmController = await connectController();
+
+          // Establish a WS server port and open the events feed
+          const { Port: port } = await fmController.action(
+            "EstablishWsPort",
+            {}
+          );
+          const serverEventFeed = fmController.feed("WsEvents", {
+            Port: `${port}`
+          });
+          serverEventFeed.desireOpen();
+          await asyncUtil.once(serverEventFeed, "open");
+
+          // Initilize WS server an wait until listening
+          fmController.action("InitWsServer", { Port: `${port}` });
+          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          expect(eventArgs[0]).toBe("Event");
+          expect(eventArgs[1].Name).toBe("listening");
+
+          // Create transport client
+          const transportClient = feedmeTransportWsClient(
+            `${TARGET_URL}:${port}`
+          );
+
+          transportClient.connect();
+
+          expect(transportClient.state()).toBe("connecting");
+
+          transportClient.disconnect(new Error("SOME_ERROR"));
+
+          expect(transportClient.state()).toBe("disconnected");
+
+          // Clean up
+          await fmController.action("DestroyWsServer", { Port: port });
+          disconnectController(fmController);
+        })
+      );
+
+      // Client events
+
+      it(
+        "should asynchronously emit disconnect",
+        retry(async () => {
+          const fmController = await connectController();
+
+          // Establish a WS server port and open the events feed
+          const { Port: port } = await fmController.action(
+            "EstablishWsPort",
+            {}
+          );
+          const serverEventFeed = fmController.feed("WsEvents", {
+            Port: `${port}`
+          });
+          serverEventFeed.desireOpen();
+          await asyncUtil.once(serverEventFeed, "open");
+
+          // Initilize WS server an wait until listening
+          fmController.action("InitWsServer", { Port: `${port}` });
+          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          expect(eventArgs[0]).toBe("Event");
+          expect(eventArgs[1].Name).toBe("listening");
+
+          // Create transport client
+          const transportClient = feedmeTransportWsClient(
+            `${TARGET_URL}:${port}`
+          );
+
+          transportClient.connect();
+
+          expect(transportClient.state()).toBe("connecting");
+
+          await asyncUtil.nextTick(); // Move past connecting event
+
+          const clientListener = createClientListener(transportClient);
+
+          const err = new Error("SOME_ERROR");
+          transportClient.disconnect(err);
+
+          // Emit nothing synchronously
+          expect(clientListener.connecting.calls.count()).toBe(0);
+          expect(clientListener.connect.calls.count()).toBe(0);
+          expect(clientListener.disconnect.calls.count()).toBe(0);
+          expect(clientListener.message.calls.count()).toBe(0);
+
+          await asyncUtil.nextTick();
+
+          // Emit disconnect asynchronously
+          expect(clientListener.connecting.calls.count()).toBe(0);
+          expect(clientListener.connect.calls.count()).toBeGreaterThanOrEqual(
+            0
+          ); // May have connected
+          expect(clientListener.disconnect.calls.count()).toBe(1);
+          expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
+          expect(clientListener.disconnect.calls.argsFor(0)[0]).toBe(err);
+          expect(clientListener.message.calls.count()).toBe(0);
+
+          // Clean up
+          await fmController.action("DestroyWsServer", { Port: port });
+          disconnectController(fmController);
+        })
+      );
+
+      // Server events - N/A
+    });
+
+    describe("client was connected - no error", () => {
+      // State functions
+
+      it(
+        "should update the state appropriately",
+        retry(async () => {
+          const fmController = await connectController();
+
+          // Establish a WS server port and open the events feed
+          const { Port: port } = await fmController.action(
+            "EstablishWsPort",
+            {}
+          );
+          const serverEventFeed = fmController.feed("WsEvents", {
+            Port: `${port}`
+          });
+          serverEventFeed.desireOpen();
+          await asyncUtil.once(serverEventFeed, "open");
+
+          // Initilize WS server an wait until listening
+          fmController.action("InitWsServer", { Port: `${port}` });
+          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          expect(eventArgs[0]).toBe("Event");
+          expect(eventArgs[1].Name).toBe("listening");
+
+          // Create transport client
+          const transportClient = feedmeTransportWsClient(
+            `${TARGET_URL}:${port}`
+          );
+
+          transportClient.connect();
+
+          await asyncUtil.once(transportClient, "connect");
+
+          expect(transportClient.state()).toBe("connected");
+
+          transportClient.disconnect();
+
+          expect(transportClient.state()).toBe("disconnected");
+
+          // Clean up
+          await fmController.action("DestroyWsServer", { Port: port });
+          disconnectController(fmController);
+        })
+      );
+
+      // Client events
+
+      it(
+        "should asynchronously emit disconnect",
+        retry(async () => {
+          const fmController = await connectController();
+
+          // Establish a WS server port and open the events feed
+          const { Port: port } = await fmController.action(
+            "EstablishWsPort",
+            {}
+          );
+          const serverEventFeed = fmController.feed("WsEvents", {
+            Port: `${port}`
+          });
+          serverEventFeed.desireOpen();
+          await asyncUtil.once(serverEventFeed, "open");
+
+          // Initilize WS server an wait until listening
+          fmController.action("InitWsServer", { Port: `${port}` });
+          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          expect(eventArgs[0]).toBe("Event");
+          expect(eventArgs[1].Name).toBe("listening");
+
+          // Create transport client
+          const transportClient = feedmeTransportWsClient(
+            `${TARGET_URL}:${port}`
+          );
+
+          transportClient.connect();
+
+          await asyncUtil.once(transportClient, "connect");
+
+          expect(transportClient.state()).toBe("connected");
+
+          await asyncUtil.nextTick(); // Move past connecting/connected events
+
+          const clientListener = createClientListener(transportClient);
+
+          transportClient.disconnect();
+
+          // Emit nothing synchronously
+          expect(clientListener.connecting.calls.count()).toBe(0);
+          expect(clientListener.connect.calls.count()).toBe(0);
+          expect(clientListener.disconnect.calls.count()).toBe(0);
+          expect(clientListener.message.calls.count()).toBe(0);
+
+          await asyncUtil.nextTick();
+
+          // Emit disconnect asynchronously
+          expect(clientListener.connecting.calls.count()).toBe(0);
+          expect(clientListener.connect.calls.count()).toBe(0);
+          expect(clientListener.disconnect.calls.count()).toBe(1);
+          expect(clientListener.disconnect.calls.argsFor(0).length).toBe(0);
+          expect(clientListener.message.calls.count()).toBe(0);
+
+          // Clean up
+          await fmController.action("DestroyWsServer", { Port: port });
+          disconnectController(fmController);
+        })
+      );
+
+      // Server events
+      it(
+        "should emit server client close",
+        retry(async () => {
+          const fmController = await connectController();
+
+          // Establish a WS server port and open the events feed
+          const { Port: port } = await fmController.action(
+            "EstablishWsPort",
+            {}
+          );
+          const serverEventFeed = fmController.feed("WsEvents", {
+            Port: `${port}`
+          });
+          serverEventFeed.desireOpen();
+          await asyncUtil.once(serverEventFeed, "open");
+
+          // Initilize WS server an wait until listening
+          fmController.action("InitWsServer", { Port: `${port}` });
+          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          expect(eventArgs[0]).toBe("Event");
+          expect(eventArgs[1].Name).toBe("listening");
+
+          // Make transport client connecting
+          const transportClient = feedmeTransportWsClient(
+            `${TARGET_URL}:${port}`
+          );
+
+          transportClient.connect();
+
+          await Promise.all([
+            asyncUtil.once(transportClient, "connect"),
+            asyncUtil.once(serverEventFeed, "action") // connection
+          ]);
+
+          transportClient.disconnect();
+
+          const evtRevelation = await asyncUtil.once(serverEventFeed, "action");
+
+          expect(evtRevelation[0]).toBe("Event");
+          expect(evtRevelation[1].Name).toBe("clientClose");
+          expect(evtRevelation[1].Arguments).toEqual([1000, ""]);
+
+          // Clean up
+          await fmController.action("DestroyWsServer", { Port: port });
+          disconnectController(fmController);
+        })
+      );
+    });
+
+    describe("client was connected - error", () => {
+      // State functions
+
+      it(
+        "should update the state appropriately",
+        retry(async () => {
+          const fmController = await connectController();
+
+          // Establish a WS server port and open the events feed
+          const { Port: port } = await fmController.action(
+            "EstablishWsPort",
+            {}
+          );
+          const serverEventFeed = fmController.feed("WsEvents", {
+            Port: `${port}`
+          });
+          serverEventFeed.desireOpen();
+          await asyncUtil.once(serverEventFeed, "open");
+
+          // Initilize WS server an wait until listening
+          fmController.action("InitWsServer", { Port: `${port}` });
+          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          expect(eventArgs[0]).toBe("Event");
+          expect(eventArgs[1].Name).toBe("listening");
+
+          // Create transport client
+          const transportClient = feedmeTransportWsClient(
+            `${TARGET_URL}:${port}`
+          );
+
+          transportClient.connect();
+
+          await asyncUtil.once(transportClient, "connect");
+
+          expect(transportClient.state()).toBe("connected");
+
+          transportClient.disconnect(new Error("SOME_ERROR"));
+
+          expect(transportClient.state()).toBe("disconnected");
+
+          // Clean up
+          await fmController.action("DestroyWsServer", { Port: port });
+          disconnectController(fmController);
+        })
+      );
+
+      // Client events
+
+      it(
+        "should asynchronously emit disconnect",
+        retry(async () => {
+          const fmController = await connectController();
+
+          // Establish a WS server port and open the events feed
+          const { Port: port } = await fmController.action(
+            "EstablishWsPort",
+            {}
+          );
+          const serverEventFeed = fmController.feed("WsEvents", {
+            Port: `${port}`
+          });
+          serverEventFeed.desireOpen();
+          await asyncUtil.once(serverEventFeed, "open");
+
+          // Initilize WS server an wait until listening
+          fmController.action("InitWsServer", { Port: `${port}` });
+          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          expect(eventArgs[0]).toBe("Event");
+          expect(eventArgs[1].Name).toBe("listening");
+
+          // Create transport client
+          const transportClient = feedmeTransportWsClient(
+            `${TARGET_URL}:${port}`
+          );
+
+          transportClient.connect();
+
+          await asyncUtil.once(transportClient, "connect");
+
+          expect(transportClient.state()).toBe("connected");
+
+          await asyncUtil.nextTick(); // Move past connecting/connected events
+
+          const clientListener = createClientListener(transportClient);
+
+          const err = new Error("SOME_ERROR");
+          transportClient.disconnect(err);
+
+          // Emit nothing synchronously
+          expect(clientListener.connecting.calls.count()).toBe(0);
+          expect(clientListener.connect.calls.count()).toBe(0);
+          expect(clientListener.disconnect.calls.count()).toBe(0);
+          expect(clientListener.message.calls.count()).toBe(0);
+
+          await asyncUtil.nextTick();
+
+          // Emit disconnect asynchronously
+          expect(clientListener.connecting.calls.count()).toBe(0);
+          expect(clientListener.connect.calls.count()).toBe(0);
+          expect(clientListener.disconnect.calls.count()).toBe(1);
+          expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
+          expect(clientListener.disconnect.calls.argsFor(0)[0]).toBe(err);
+          expect(clientListener.message.calls.count()).toBe(0);
+
+          // Clean up
+          await fmController.action("DestroyWsServer", { Port: port });
+          disconnectController(fmController);
+        })
+      );
+
+      // Server events
+      it(
+        "should emit server client close",
+        retry(async () => {
+          const fmController = await connectController();
+
+          // Establish a WS server port and open the events feed
+          const { Port: port } = await fmController.action(
+            "EstablishWsPort",
+            {}
+          );
+          const serverEventFeed = fmController.feed("WsEvents", {
+            Port: `${port}`
+          });
+          serverEventFeed.desireOpen();
+          await asyncUtil.once(serverEventFeed, "open");
+
+          // Initilize WS server an wait until listening
+          fmController.action("InitWsServer", { Port: `${port}` });
+          const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+          expect(eventArgs[0]).toBe("Event");
+          expect(eventArgs[1].Name).toBe("listening");
+
+          // Make transport client connecting
+          const transportClient = feedmeTransportWsClient(
+            `${TARGET_URL}:${port}`
+          );
+
+          transportClient.connect();
+
+          await Promise.all([
+            asyncUtil.once(transportClient, "connect"),
+            asyncUtil.once(serverEventFeed, "action") // connection
+          ]);
+
+          transportClient.disconnect(new Error("SOME_ERROR"));
+
+          const evtRevelation = await asyncUtil.once(serverEventFeed, "action");
+
+          expect(evtRevelation[0]).toBe("Event");
+          expect(evtRevelation[1].Name).toBe("clientClose");
+          expect(evtRevelation[1].Arguments).toEqual([1000, ""]);
+
+          // Clean up
+          await fmController.action("DestroyWsServer", { Port: port });
+          disconnectController(fmController);
+        })
+      );
+    });
+  });
+});
+
+describe("The transport.send() function", () => {
+  describe("may fail", () => {
+    it(
+      "should throw if the transport is disconnected",
+      retry(async () => {
+        const transportClient = feedmeTransportWsClient(TARGET_URL);
+        expect(() => {
+          transportClient.send("msg");
+        }).toThrow(new Error("INVALID_STATE: Not connected."));
+      })
+    );
+
+    it(
+      "should throw if the transport is connecting",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Make transport client connecting
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+        transportClient.connect();
+
+        expect(transportClient.state()).toBe("connecting");
+        expect(() => {
+          transportClient.send("msg");
+        }).toThrow(new Error("INVALID_STATE: Not connected."));
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+  });
+
+  describe("may succeed", () => {
+    // State functions
+
+    it(
+      "should not change the state",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Connect a transport client
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+        transportClient.connect();
+        await asyncUtil.once(transportClient, "connect");
+
+        expect(transportClient.state()).toBe("connected");
+
+        transportClient.send("msg");
+
+        expect(transportClient.state()).toBe("connected");
+
+        await asyncUtil.nextTick();
+
+        expect(transportClient.state()).toBe("connected");
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+
+    // Client events
+
+    it(
+      "should emit nothing",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Create transport client
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+
+        transportClient.connect();
+
+        await asyncUtil.once(transportClient, "connect");
+
+        expect(transportClient.state()).toBe("connected");
+
+        await asyncUtil.nextTick(); // Move past connecting/connected events
+
+        const clientListener = createClientListener(transportClient);
+
+        transportClient.send("msg");
+
+        // Emit nothing synchronously
+        expect(clientListener.connecting.calls.count()).toBe(0);
+        expect(clientListener.connect.calls.count()).toBe(0);
+        expect(clientListener.disconnect.calls.count()).toBe(0);
+        expect(clientListener.message.calls.count()).toBe(0);
+
+        await asyncUtil.nextTick();
+
+        // Emit nothing asynchronously
+        expect(clientListener.connecting.calls.count()).toBe(0);
+        expect(clientListener.connect.calls.count()).toBe(0);
+        expect(clientListener.disconnect.calls.count()).toBe(0);
+        expect(clientListener.message.calls.count()).toBe(0);
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+
+    // Server events
+
+    it(
+      "should emit server client message",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Make transport client connecting
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+
+        transportClient.connect();
+
+        await Promise.all([
+          asyncUtil.once(transportClient, "connect"),
+          asyncUtil.once(serverEventFeed, "action") // connection
+        ]);
+
+        transportClient.send("msg");
+
+        const evtRevelation = await asyncUtil.once(serverEventFeed, "action");
+
+        expect(evtRevelation[0]).toBe("Event");
+        expect(evtRevelation[1].Name).toBe("clientMessage");
+        expect(evtRevelation[1].Arguments).toEqual(["msg"]);
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+  });
+});
+
+describe("The transport._processWsOpen() function", () => {
+  // State functions
+
+  it(
+    "should change the state to connected",
+    retry(async () => {
+      const fmController = await connectController();
+
+      // Establish a WS server port and open the events feed
+      const { Port: port } = await fmController.action("EstablishWsPort", {});
+      const serverEventFeed = fmController.feed("WsEvents", {
+        Port: `${port}`
+      });
+      serverEventFeed.desireOpen();
+      await asyncUtil.once(serverEventFeed, "open");
+
+      // Initilize WS server an wait until listening
+      fmController.action("InitWsServer", { Port: `${port}` });
+      const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+      expect(eventArgs[0]).toBe("Event");
+      expect(eventArgs[1].Name).toBe("listening");
+
+      // Connect a transport client
+      const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
+      transportClient.connect();
+
+      expect(transportClient.state()).toBe("connecting");
+
+      await asyncUtil.once(transportClient, "connect");
+
+      expect(transportClient.state()).toBe("connected");
+
+      await asyncUtil.nextTick();
+
+      expect(transportClient.state()).toBe("connected");
+
+      // Clean up
+      await fmController.action("DestroyWsServer", { Port: port });
+      disconnectController(fmController);
+    })
+  );
+
+  // Client events
+
+  it(
+    "should asynchronously emit connect",
+    retry(async () => {
+      const fmController = await connectController();
+
+      // Establish a WS server port and open the events feed
+      const { Port: port } = await fmController.action("EstablishWsPort", {});
+      const serverEventFeed = fmController.feed("WsEvents", {
+        Port: `${port}`
+      });
+      serverEventFeed.desireOpen();
+      await asyncUtil.once(serverEventFeed, "open");
+
+      // Initilize WS server an wait until listening
+      fmController.action("InitWsServer", { Port: `${port}` });
+      const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+      expect(eventArgs[0]).toBe("Event");
+      expect(eventArgs[1].Name).toBe("listening");
+
+      // Create transport client
+      const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
+
+      transportClient.connect();
+
+      expect(transportClient.state()).toBe("connecting");
+
+      await asyncUtil.nextTick(); // Move past connecting event
+
+      const clientListener = createClientListener(transportClient);
+
+      await asyncUtil.once(transportClient, "connect");
+
+      // Emit connect asynchronously
+      expect(clientListener.connecting.calls.count()).toBe(0);
+      expect(clientListener.connect.calls.count()).toBe(1);
+      expect(clientListener.connect.calls.argsFor(0).length).toBe(0);
+      expect(clientListener.disconnect.calls.count()).toBe(0);
+      expect(clientListener.message.calls.count()).toBe(0);
+
+      // Clean up
+      await fmController.action("DestroyWsServer", { Port: port });
+      disconnectController(fmController);
+    })
+  );
+
+  // Server events - N/A
+});
+
+describe("The transport._processWsMessage() function", () => {
+  describe("for a non-string message", () => {
+    // State functions
+
+    it(
+      "should change the state to disconnected",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Connect a transport client
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+        transportClient.connect();
+
+        // Await connection on both sides and get server client id
+        const results = await Promise.all([
+          asyncUtil.once(serverEventFeed, "action"),
+          asyncUtil.once(transportClient, "connect")
+        ]);
+        const serverClientId = results[0][1].ClientId;
+
+        expect(transportClient.state()).toBe("connected");
+
+        // Send a message from the server
+        fmController.action("InvokeWsClientMethod", {
+          Port: `${port}`,
+          Method: "send",
+          ClientId: serverClientId,
+          Arguments: ["binary"] // server changes "binary" to actual binary
+        });
+
+        await asyncUtil.once(transportClient, "disconnect");
+
+        expect(transportClient.state()).toBe("disconnected");
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+
+    // Client events
+
+    it(
+      "should asynchronously emit disconnect",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Connect a transport client
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+        transportClient.connect();
+
+        // Await connection on both sides and get server client id
+        const results = await Promise.all([
+          asyncUtil.once(serverEventFeed, "action"),
+          asyncUtil.once(transportClient, "connect")
+        ]);
+        const serverClientId = results[0][1].ClientId;
+
+        const clientListener = createClientListener(transportClient);
+
+        // Send a message from the server
+        fmController.action("InvokeWsClientMethod", {
+          Port: `${port}`,
+          Method: "send",
+          ClientId: serverClientId,
+          Arguments: ["binary"] // server changes "binary" to actual binary
+        });
+        await asyncUtil.once(transportClient, "disconnect");
+
+        // Emit disconnect asynchronously
+        expect(clientListener.connecting.calls.count()).toBe(0);
+        expect(clientListener.connect.calls.count()).toBe(0);
+        expect(clientListener.disconnect.calls.count()).toBe(1);
+        expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
+        expect(clientListener.disconnect.calls.argsFor(0)[0]).toEqual(
+          jasmine.any(Error)
+        );
+        expect(clientListener.disconnect.calls.argsFor(0)[0].message).toEqual(
+          "FAILURE: Received non-string message on WebSocket connection."
+        );
+        expect(clientListener.message.calls.count()).toBe(0);
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+
+    // Server events
+
+    it(
+      "should emit server client close",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Connect a transport client
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+        transportClient.connect();
+
+        // Await connection on both sides and get server client id
+        const results = await Promise.all([
+          asyncUtil.once(serverEventFeed, "action"),
+          asyncUtil.once(transportClient, "connect")
+        ]);
+        const serverClientId = results[0][1].ClientId;
+
+        // Send a message from the server
+        fmController.action("InvokeWsClientMethod", {
+          Port: `${port}`,
+          Method: "send",
+          ClientId: serverClientId,
+          Arguments: ["binary"] // server changes "binary" to actual binary
+        });
+
+        const evt = await asyncUtil.once(serverEventFeed, "action");
+        expect(evt[0]).toBe("Event");
+        expect(evt[1]).toEqual(jasmine.any(Object));
+        expect(evt[1].Name).toBe("clientClose");
+        expect(evt[1].Arguments).toEqual([1000, ""]);
+        expect(evt[1].ClientId).toBe(serverClientId);
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+  });
+
+  describe("for a string message", () => {
+    // State functions
+
+    it(
+      "should not change the state",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Connect a transport client
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+        transportClient.connect();
+
+        // Await connection on both sides and get server client id
+        const results = await Promise.all([
+          asyncUtil.once(serverEventFeed, "action"),
+          asyncUtil.once(transportClient, "connect")
+        ]);
+        const serverClientId = results[0][1].ClientId;
+
+        expect(transportClient.state()).toBe("connected");
+
+        // Send a message from the server
+        fmController.action("InvokeWsClientMethod", {
+          Port: `${port}`,
+          Method: "send",
+          ClientId: serverClientId,
+          Arguments: ["msg"]
+        });
+
+        await asyncUtil.once(transportClient, "message");
+
+        expect(transportClient.state()).toBe("connected");
+
+        await asyncUtil.nextTick();
+
+        expect(transportClient.state()).toBe("connected");
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+
+    // Client events
+
+    it(
+      "should asynchronously emit message",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Connect a transport client
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+        transportClient.connect();
+
+        // Await connection on both sides and get server client id
+        const results = await Promise.all([
+          asyncUtil.once(serverEventFeed, "action"),
+          asyncUtil.once(transportClient, "connect")
+        ]);
+        const serverClientId = results[0][1].ClientId;
+
+        const clientListener = createClientListener(transportClient);
+
+        // Send a message from the server
+        fmController.action("InvokeWsClientMethod", {
+          Port: `${port}`,
+          Method: "send",
+          ClientId: serverClientId,
+          Arguments: ["msg"]
+        });
+        await asyncUtil.once(transportClient, "message");
+
+        // Emit message asynchronously
+        expect(clientListener.connecting.calls.count()).toBe(0);
+        expect(clientListener.connect.calls.count()).toBe(0);
+        expect(clientListener.disconnect.calls.count()).toBe(0);
+        expect(clientListener.message.calls.count()).toBe(1);
+        expect(clientListener.message.calls.argsFor(0).length).toBe(1);
+        expect(clientListener.message.calls.argsFor(0)[0]).toBe("msg");
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+
+    // Server events - N/A
+  });
+});
+
+describe("The transport._processWsClose() function", () => {
+  describe("If the transport state is connecting", () => {
+    // State functions
+
+    it(
+      "should change the state to disconnected",
+      retry(async () => {
+        // Start connecting a transport client
+        const transportClient = feedmeTransportWsClient(BAD_URL);
+        transportClient.connect();
+
+        expect(transportClient.state()).toBe("connecting");
+
+        await asyncUtil.once(transportClient, "disconnect");
+
+        expect(transportClient.state()).toBe("disconnected");
+      })
+    );
+
+    // Client events
+
+    it(
+      "should emit disconnect",
+      retry(async () => {
+        // Start connecting a transport client
+        const transportClient = feedmeTransportWsClient(BAD_URL);
+        transportClient.connect();
+
+        await asyncUtil.nextTick(); // Move past connecting event
+
+        const clientListener = createClientListener(transportClient);
+
+        await asyncUtil.once(transportClient, "disconnect");
+
+        expect(clientListener.connecting.calls.count()).toBe(0);
+        expect(clientListener.connect.calls.count()).toBe(0);
+        expect(clientListener.disconnect.calls.count()).toBe(1);
+        expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
+        expect(clientListener.disconnect.calls.argsFor(0)[0]).toEqual(
+          jasmine.any(Error)
+        );
+        expect(clientListener.disconnect.calls.argsFor(0)[0].message).toBe(
+          "FAILURE: The WebSocket could not be opened."
+        );
+        expect(clientListener.message.calls.count()).toBe(0);
+      })
+    );
+
+    // Server events - N/A
+  });
+
+  describe("If the transport state is connected - server does wsServer.close()", () => {
+    // State functions
+
+    it(
+      "should change the state to disconnected",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Connect a transport client
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+        transportClient.connect();
+        await asyncUtil.once(transportClient, "connect");
+
+        expect(transportClient.state()).toBe("connected");
+
+        // Stop the server
+        fmController.action("InvokeWsMethod", {
+          Port: `${port}`,
+          Method: "close",
+          Arguments: []
+        });
+
+        await asyncUtil.once(transportClient, "disconnect");
+
+        expect(transportClient.state()).toBe("disconnected");
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+
+    // Client events
+
+    it(
+      "should asynchronously emit disconnect",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Connect a transport client
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+        transportClient.connect();
+        await asyncUtil.once(transportClient, "connect");
+
+        const clientListener = createClientListener(transportClient);
+
+        expect(transportClient.state()).toBe("connected");
+
+        // Stop the server
+        fmController.action("InvokeWsMethod", {
+          Port: `${port}`,
+          Method: "close",
+          Arguments: []
+        });
+
+        await asyncUtil.once(transportClient, "disconnect");
+
+        // Emit disconnect asynchronously
+        expect(clientListener.connecting.calls.count()).toBe(0);
+        expect(clientListener.connect.calls.count()).toBe(0);
+        expect(clientListener.disconnect.calls.count()).toBe(1);
+        expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
+        expect(clientListener.disconnect.calls.argsFor(0)[0]).toEqual(
+          jasmine.any(Error)
+        );
+        expect(clientListener.disconnect.calls.argsFor(0)[0].message).toBe(
+          "FAILURE: The WebSocket closed unexpectedly."
+        );
+        expect(clientListener.message.calls.count()).toBe(0);
+
+        expect(transportClient.state()).toBe("disconnected");
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+
+    // Server events - N/A
+  });
+
+  describe("If the transport state is connected - server does wsClient.close()", () => {
+    // State functions
+
+    it(
+      "should change the state to disconnected",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Connect a transport client
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+        transportClient.connect();
+
+        // Await connection on both sides and get server client id
+        const results = await Promise.all([
+          asyncUtil.once(serverEventFeed, "action"),
+          asyncUtil.once(transportClient, "connect")
+        ]);
+        const serverClientId = results[0][1].ClientId;
+
+        expect(transportClient.state()).toBe("connected");
+
+        // Disconnect the client
+        fmController.action("InvokeWsClientMethod", {
+          Port: `${port}`,
+          Method: "close",
+          Arguments: [],
+          ClientId: serverClientId
+        });
+
+        await asyncUtil.once(transportClient, "disconnect");
+
+        expect(transportClient.state()).toBe("disconnected");
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+
+    // Client events
+
+    it(
+      "should asynchronously emit disconnect",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Connect a transport client
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+        transportClient.connect();
+
+        // Await connection on both sides and get server client id
+        const results = await Promise.all([
+          asyncUtil.once(serverEventFeed, "action"),
+          asyncUtil.once(transportClient, "connect")
+        ]);
+        const serverClientId = results[0][1].ClientId;
+
+        const clientListener = createClientListener(transportClient);
+
+        expect(transportClient.state()).toBe("connected");
+
+        // Disconnect the client
+        fmController.action("InvokeWsClientMethod", {
+          Port: `${port}`,
+          Method: "close",
+          Arguments: [],
+          ClientId: serverClientId
+        });
+
+        await asyncUtil.once(transportClient, "disconnect");
+
+        // Emit disconnect asynchronously
+        expect(clientListener.connecting.calls.count()).toBe(0);
+        expect(clientListener.connect.calls.count()).toBe(0);
+        expect(clientListener.disconnect.calls.count()).toBe(1);
+        expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
+        expect(clientListener.disconnect.calls.argsFor(0)[0]).toEqual(
+          jasmine.any(Error)
+        );
+        expect(clientListener.disconnect.calls.argsFor(0)[0].message).toBe(
+          "FAILURE: The WebSocket closed unexpectedly."
+        );
+        expect(clientListener.message.calls.count()).toBe(0);
+
+        expect(transportClient.state()).toBe("disconnected");
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+
+    // Server events - N/A
+  });
+
+  describe("If the transport state is connected - server does wsClient.terminate()", () => {
+    // State functions
+
+    it(
+      "should change the state to disconnected",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Connect a transport client
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+        transportClient.connect();
+
+        // Await connection on both sides and get server client id
+        const results = await Promise.all([
+          asyncUtil.once(serverEventFeed, "action"),
+          asyncUtil.once(transportClient, "connect")
+        ]);
+        const serverClientId = results[0][1].ClientId;
+
+        expect(transportClient.state()).toBe("connected");
+
+        // Disconnect the client
+        fmController.action("InvokeWsClientMethod", {
+          Port: `${port}`,
+          Method: "terminate",
+          Arguments: [],
+          ClientId: serverClientId
+        });
+
+        await asyncUtil.once(transportClient, "disconnect");
+
+        expect(transportClient.state()).toBe("disconnected");
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+
+    // Client events
+
+    it(
+      "should asynchronously emit disconnect",
+      retry(async () => {
+        const fmController = await connectController();
+
+        // Establish a WS server port and open the events feed
+        const { Port: port } = await fmController.action("EstablishWsPort", {});
+        const serverEventFeed = fmController.feed("WsEvents", {
+          Port: `${port}`
+        });
+        serverEventFeed.desireOpen();
+        await asyncUtil.once(serverEventFeed, "open");
+
+        // Initilize WS server an wait until listening
+        fmController.action("InitWsServer", { Port: `${port}` });
+        const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+        expect(eventArgs[0]).toBe("Event");
+        expect(eventArgs[1].Name).toBe("listening");
+
+        // Connect a transport client
+        const transportClient = feedmeTransportWsClient(
+          `${TARGET_URL}:${port}`
+        );
+        transportClient.connect();
+
+        // Await connection on both sides and get server client id
+        const results = await Promise.all([
+          asyncUtil.once(serverEventFeed, "action"),
+          asyncUtil.once(transportClient, "connect")
+        ]);
+        const serverClientId = results[0][1].ClientId;
+
+        const clientListener = createClientListener(transportClient);
+
+        expect(transportClient.state()).toBe("connected");
+
+        // Disconnect the client
+        fmController.action("InvokeWsClientMethod", {
+          Port: `${port}`,
+          Method: "terminate",
+          Arguments: [],
+          ClientId: serverClientId
+        });
+
+        await asyncUtil.once(transportClient, "disconnect");
+
+        // Emit disconnect asynchronously
+        expect(clientListener.connecting.calls.count()).toBe(0);
+        expect(clientListener.connect.calls.count()).toBe(0);
+        expect(clientListener.disconnect.calls.count()).toBe(1);
+        expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
+        expect(clientListener.disconnect.calls.argsFor(0)[0]).toEqual(
+          jasmine.any(Error)
+        );
+        expect(clientListener.disconnect.calls.argsFor(0)[0].message).toBe(
+          "FAILURE: The WebSocket closed unexpectedly."
+        );
+        expect(clientListener.message.calls.count()).toBe(0);
+
+        expect(transportClient.state()).toBe("disconnected");
+
+        // Clean up
+        await fmController.action("DestroyWsServer", { Port: port });
+        disconnectController(fmController);
+      })
+    );
+
+    // Server events - N/A
+  });
+});
+
+describe("The transport._processWsError() function", () => {
+  // Debug printing only - nothing to test
+});
+
+describe("The transport should operate correctly through multiple connection cycles", () => {
+  // State functions
+
+  it(
+    "should update the state appropriately through the cycle",
+    retry(async () => {
+      const fmController = await connectController();
+
+      // Establish a WS server port and open the events feed
+      const { Port: port } = await fmController.action("EstablishWsPort", {});
+      const serverEventFeed = fmController.feed("WsEvents", {
+        Port: `${port}`
+      });
+      serverEventFeed.desireOpen();
+      await asyncUtil.once(serverEventFeed, "open");
+
+      // Initilize WS server an wait until listening
+      fmController.action("InitWsServer", { Port: `${port}` });
+      const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+      expect(eventArgs[0]).toBe("Event");
+      expect(eventArgs[1].Name).toBe("listening");
+
+      // Connect a transport client
+      const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
+
+      expect(transportClient.state()).toBe("disconnected");
+
+      transportClient.connect();
+
+      expect(transportClient.state()).toBe("connecting");
+
+      await asyncUtil.once(transportClient, "connect");
+
+      expect(transportClient.state()).toBe("connected");
+
+      transportClient.disconnect();
+
+      expect(transportClient.state()).toBe("disconnected");
+
+      transportClient.connect();
+
+      expect(transportClient.state()).toBe("connecting");
+
+      await asyncUtil.once(transportClient, "connect");
+
+      expect(transportClient.state()).toBe("connected");
+
+      transportClient.disconnect();
+
+      expect(transportClient.state()).toBe("disconnected");
+
+      // Clean up
+      await fmController.action("DestroyWsServer", { Port: port });
+      disconnectController(fmController);
+    })
+  );
+
+  // Transport client events
+
+  it(
+    "should emit events appropriately through the cycle",
+    retry(async () => {
+      const fmController = await connectController();
+
+      // Establish a WS server port and open the events feed
+      const { Port: port } = await fmController.action("EstablishWsPort", {});
+      const serverEventFeed = fmController.feed("WsEvents", {
+        Port: `${port}`
+      });
+      serverEventFeed.desireOpen();
+      await asyncUtil.once(serverEventFeed, "open");
+
+      // Initilize WS server an wait until listening
+      fmController.action("InitWsServer", { Port: `${port}` });
+      const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+      expect(eventArgs[0]).toBe("Event");
+      expect(eventArgs[1].Name).toBe("listening");
+
+      // Connect a transport client
+      const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
+
+      const clientListener = createClientListener(transportClient);
+
+      transportClient.connect();
+
+      // Emit nothing synchronously
+      expect(clientListener.connecting.calls.count()).toBe(0);
+      expect(clientListener.connect.calls.count()).toBe(0);
+      expect(clientListener.disconnect.calls.count()).toBe(0);
+      expect(clientListener.message.calls.count()).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      // Emit connecting asynchronously
+      expect(clientListener.connecting.calls.count()).toBe(1);
+      expect(clientListener.connecting.calls.argsFor(0).length).toBe(0);
+      expect(clientListener.connect.calls.count()).toBe(0);
+      expect(clientListener.disconnect.calls.count()).toBe(0);
+      expect(clientListener.message.calls.count()).toBe(0);
+      clientListener.spyClear();
+
+      await asyncUtil.once(transportClient, "connect");
+
+      // Emit connect
+      expect(clientListener.connecting.calls.count()).toBe(0);
+      expect(clientListener.connect.calls.count()).toBe(1);
+      expect(clientListener.connect.calls.argsFor(0).length).toBe(0);
+      expect(clientListener.disconnect.calls.count()).toBe(0);
+      expect(clientListener.message.calls.count()).toBe(0);
+      clientListener.spyClear();
+
+      transportClient.disconnect();
+
+      // Emit nothing synchronously
+      expect(clientListener.connecting.calls.count()).toBe(0);
+      expect(clientListener.connect.calls.count()).toBe(0);
+      expect(clientListener.disconnect.calls.count()).toBe(0);
+      expect(clientListener.message.calls.count()).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      // Emit disconnect asynchronously
+      expect(clientListener.connecting.calls.count()).toBe(0);
+      expect(clientListener.connect.calls.count()).toBe(0);
+      expect(clientListener.disconnect.calls.count()).toBe(1);
+      expect(clientListener.disconnect.calls.argsFor(0).length).toBe(0);
+      expect(clientListener.message.calls.count()).toBe(0);
+      clientListener.spyClear();
+
+      transportClient.connect();
+
+      // Emit nothing synchronously
+      expect(clientListener.connecting.calls.count()).toBe(0);
+      expect(clientListener.connect.calls.count()).toBe(0);
+      expect(clientListener.disconnect.calls.count()).toBe(0);
+      expect(clientListener.message.calls.count()).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      // Emit connecting asynchronously
+      expect(clientListener.connecting.calls.count()).toBe(1);
+      expect(clientListener.connecting.calls.argsFor(0).length).toBe(0);
+      expect(clientListener.connect.calls.count()).toBe(0);
+      expect(clientListener.disconnect.calls.count()).toBe(0);
+      expect(clientListener.message.calls.count()).toBe(0);
+      clientListener.spyClear();
+
+      await asyncUtil.once(transportClient, "connect");
+
+      // Emit connect
+      expect(clientListener.connecting.calls.count()).toBe(0);
+      expect(clientListener.connect.calls.count()).toBe(1);
+      expect(clientListener.connect.calls.argsFor(0).length).toBe(0);
+      expect(clientListener.disconnect.calls.count()).toBe(0);
+      expect(clientListener.message.calls.count()).toBe(0);
+      clientListener.spyClear();
+
+      transportClient.disconnect();
+
+      // Emit nothing synchronously
+      expect(clientListener.connecting.calls.count()).toBe(0);
+      expect(clientListener.connect.calls.count()).toBe(0);
+      expect(clientListener.disconnect.calls.count()).toBe(0);
+      expect(clientListener.message.calls.count()).toBe(0);
+
+      await asyncUtil.nextTick();
+
+      // Emit disconnect asynchronously
+      expect(clientListener.connecting.calls.count()).toBe(0);
+      expect(clientListener.connect.calls.count()).toBe(0);
+      expect(clientListener.disconnect.calls.count()).toBe(1);
+      expect(clientListener.disconnect.calls.argsFor(0).length).toBe(0);
+      expect(clientListener.message.calls.count()).toBe(0);
+      clientListener.spyClear();
+
+      // Clean up
+      await fmController.action("DestroyWsServer", { Port: port });
+      disconnectController(fmController);
+    })
+  );
+
+  // Server events
+
+  it(
+    "should emit server events appropriately through the cycle",
+    retry(async () => {
+      const fmController = await connectController();
+
+      // Establish a WS server port and open the events feed
+      const { Port: port } = await fmController.action("EstablishWsPort", {});
+      const serverEventFeed = fmController.feed("WsEvents", {
+        Port: `${port}`
+      });
+      serverEventFeed.desireOpen();
+      await asyncUtil.once(serverEventFeed, "open");
+
+      // Initilize WS server an wait until listening
+      fmController.action("InitWsServer", { Port: `${port}` });
+      const eventArgs = await asyncUtil.once(serverEventFeed, "action");
+      expect(eventArgs[0]).toBe("Event");
+      expect(eventArgs[1].Name).toBe("listening");
+
+      // Connect a transport client
+      const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
+
+      transportClient.connect();
+
+      // Server should emit connecting event
+      let results = await Promise.all([
+        asyncUtil.once(serverEventFeed, "action"),
+        asyncUtil.once(transportClient, "connect")
+      ]);
+      let evt = results[0];
+      expect(evt[0]).toBe("Event");
+      expect(evt[1].Name).toBe("connection");
+      expect(evt[1].Arguments).toEqual([]);
+
+      transportClient.disconnect();
+
+      // Server should emit disconnect event
+      results = await Promise.all([
+        asyncUtil.once(serverEventFeed, "action"),
+        asyncUtil.once(transportClient, "disconnect")
+      ]);
+      [evt] = results;
+      expect(evt[0]).toBe("Event");
+      expect(evt[1].Name).toBe("clientClose");
+      expect(evt[1].Arguments).toEqual([1000, ""]);
+
+      transportClient.connect();
+
+      // Server should emit connecting event
+      results = await Promise.all([
+        asyncUtil.once(serverEventFeed, "action"),
+        asyncUtil.once(transportClient, "connect")
+      ]);
+      [evt] = results;
+      expect(evt[0]).toBe("Event");
+      expect(evt[1].Name).toBe("connection");
+      expect(evt[1].Arguments).toEqual([]);
+
+      transportClient.disconnect();
+
+      // Server should emit disconnect event
+      results = await Promise.all([
+        asyncUtil.once(serverEventFeed, "action"),
+        asyncUtil.once(transportClient, "disconnect")
+      ]);
+      [evt] = results;
+      expect(evt[0]).toBe("Event");
+      expect(evt[1].Name).toBe("clientClose");
+      expect(evt[1].Arguments).toEqual([1000, ""]);
+
+      // Clean up
+      await fmController.action("DestroyWsServer", { Port: port });
+      disconnectController(fmController);
+    })
+  );
+});
+
+// Tests against a transport server
+// Test only that the invokations on the library-facing side of the client API
+// generate the correct events on the server, and vice versa
+
+describe("The transport.connect() function", () => {
+  it(
+    "should emit connect on the server",
+    retry(async () => {
+      const fmController = await connectController();
+
+      // Initialize a transport server and open the events feed
+      const { Port: port } = await fmController.action(
+        "InitTransportServer",
+        {}
+      );
+      const serverEventFeed = fmController.feed("TransportEvents", {
+        Port: `${port}`
+      });
+      serverEventFeed.desireOpen();
+      await asyncUtil.once(serverEventFeed, "open");
+
+      // Start the transport server and wait until started
+      fmController.action("InvokeTransportMethod", {
+        Port: port,
+        Method: "start",
+        Arguments: []
+      });
+      await new Promise(resolve => {
+        serverEventFeed.on("action", (an, ad) => {
+          if (an === "Event" && ad.Name === "start") {
+            serverEventFeed.removeAllListeners("action");
+            resolve();
+          }
+        });
+      });
+
+      // Connect a transport client and check the server event
+      const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
+      transportClient.connect();
+      const evt = await asyncUtil.once(serverEventFeed, "action");
+      expect(evt[0]).toBe("Event");
+      expect(evt[1].Name).toBe("connect");
+      expect(evt[1].Arguments.length).toBe(1);
+      expect(evt[1].Arguments[0]).toEqual(jasmine.any(String));
+
+      // Clean up
+      await fmController.action("DestroyTransportServer", { Port: port });
+      disconnectController(fmController);
+    })
+  );
+});
+
+describe("The transport.disconnect() function", () => {
+  it(
+    "should emit disconnect on the server",
+    retry(async () => {
+      const fmController = await connectController();
+
+      // Initialize a transport server and open the events feed
+      const { Port: port } = await fmController.action(
+        "InitTransportServer",
+        {}
+      );
+      const serverEventFeed = fmController.feed("TransportEvents", {
+        Port: `${port}`
+      });
+      serverEventFeed.desireOpen();
+      await asyncUtil.once(serverEventFeed, "open");
+
+      // Start the transport server and wait until started
+      fmController.action("InvokeTransportMethod", {
+        Port: port,
+        Method: "start",
+        Arguments: []
+      });
+      await new Promise(resolve => {
+        serverEventFeed.on("action", (an, ad) => {
+          if (an === "Event" && ad.Name === "start") {
+            serverEventFeed.removeAllListeners("action");
+            resolve();
+          }
+        });
+      });
+
+      // Connect a transport client and get server client id
+      const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
+      transportClient.connect();
+      const evts = await Promise.all([
+        asyncUtil.once(transportClient, "connect"),
+        asyncUtil.once(serverEventFeed, "action") // connection
+      ]);
+      const serverClientId = evts[1][1].Arguments[0];
+
+      // Disconnect the client and check the server event
+      transportClient.disconnect();
+      const evt = await asyncUtil.once(serverEventFeed, "action");
+      expect(evt[0]).toBe("Event");
+      expect(evt[1].Name).toBe("disconnect");
+      expect(evt[1].Arguments.length).toBe(2); // Client ID and Error object
+      expect(evt[1].Arguments[0]).toBe(serverClientId);
+
+      // Clean up
+      await fmController.action("DestroyTransportServer", { Port: port });
+      disconnectController(fmController);
+    })
+  );
+});
+
+describe("The transport.send() function", () => {
+  it(
+    "should emit message on the server",
+    retry(async () => {
+      const fmController = await connectController();
+
+      // Initialize a transport server and open the events feed
+      const { Port: port } = await fmController.action(
+        "InitTransportServer",
+        {}
+      );
+      const serverEventFeed = fmController.feed("TransportEvents", {
+        Port: `${port}`
+      });
+      serverEventFeed.desireOpen();
+      await asyncUtil.once(serverEventFeed, "open");
+
+      // Start the transport server and wait until started
+      fmController.action("InvokeTransportMethod", {
+        Port: port,
+        Method: "start",
+        Arguments: []
+      });
+      await new Promise(resolve => {
+        serverEventFeed.on("action", (an, ad) => {
+          if (an === "Event" && ad.Name === "start") {
+            serverEventFeed.removeAllListeners("action");
+            resolve();
+          }
+        });
+      });
+
+      // Connect a transport client and get server client id
+      const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
+      transportClient.connect();
+      const evts = await Promise.all([
+        asyncUtil.once(transportClient, "connect"),
+        asyncUtil.once(serverEventFeed, "action") // connection
+      ]);
+      const serverClientId = evts[1][1].Arguments[0];
+
+      // Send the server a message and check the server event
+      transportClient.send("msg");
+      const evt = await asyncUtil.once(serverEventFeed, "action");
+      expect(evt[0]).toBe("Event");
+      expect(evt[1].Name).toBe("message");
+      expect(evt[1].Arguments.length).toBe(2);
+      expect(evt[1].Arguments[0]).toBe(serverClientId);
+      expect(evt[1].Arguments[1]).toBe("msg");
+
+      // Clean up
+      await fmController.action("DestroyTransportServer", { Port: port });
+      disconnectController(fmController);
+    })
+  );
+});
+
+describe("The server.stop() function", () => {
+  it(
+    "should emit disconnect on the client",
+    retry(async () => {
+      const fmController = await connectController();
+
+      // Initialize a transport server and open the events feed
+      const { Port: port } = await fmController.action(
+        "InitTransportServer",
+        {}
+      );
+      const serverEventFeed = fmController.feed("TransportEvents", {
+        Port: `${port}`
+      });
+      serverEventFeed.desireOpen();
+      await asyncUtil.once(serverEventFeed, "open");
+
+      // Start the transport server and wait until started
+      fmController.action("InvokeTransportMethod", {
+        Port: port,
+        Method: "start",
+        Arguments: []
+      });
+      await new Promise(resolve => {
+        serverEventFeed.on("action", (an, ad) => {
+          if (an === "Event" && ad.Name === "start") {
+            serverEventFeed.removeAllListeners("action");
+            resolve();
+          }
+        });
+      });
+
+      // Connect a transport client
+      const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
+      transportClient.connect();
+      await asyncUtil.once(transportClient, "connect");
+
+      const clientListener = createClientListener(transportClient);
+
+      // Stop the server
+      fmController.action("InvokeTransportMethod", {
+        Port: port,
+        Method: "stop",
+        Arguments: []
+      });
+
+      // Check the client event
+      await asyncUtil.once(transportClient, "disconnect");
+      expect(clientListener.connecting.calls.count()).toBe(0);
+      expect(clientListener.connect.calls.count()).toBe(0);
+      expect(clientListener.disconnect.calls.count()).toBe(1);
+      expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
+      expect(clientListener.disconnect.calls.argsFor(0)[0]).toEqual(
+        jasmine.any(Error)
+      );
+      expect(clientListener.disconnect.calls.argsFor(0)[0].message).toBe(
+        "FAILURE: The WebSocket closed unexpectedly."
+      );
+      expect(clientListener.message.calls.count()).toBe(0);
+
+      // Clean up
+      await fmController.action("DestroyTransportServer", { Port: port });
+      disconnectController(fmController);
+    })
+  );
+});
+
+describe("The server.send() function", () => {
+  it(
+    "should emit message on the client",
+    retry(async () => {
+      const fmController = await connectController();
+
+      // Initialize a transport server and open the events feed
+      const { Port: port } = await fmController.action(
+        "InitTransportServer",
+        {}
+      );
+      const serverEventFeed = fmController.feed("TransportEvents", {
+        Port: `${port}`
+      });
+      serverEventFeed.desireOpen();
+      await asyncUtil.once(serverEventFeed, "open");
+
+      // Start the transport server and wait until started
+      fmController.action("InvokeTransportMethod", {
+        Port: port,
+        Method: "start",
+        Arguments: []
+      });
+      await new Promise(resolve => {
+        serverEventFeed.on("action", (an, ad) => {
+          if (an === "Event" && ad.Name === "start") {
+            serverEventFeed.removeAllListeners("action");
+            resolve();
+          }
+        });
+      });
+
+      // Connect a transport client
+      const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
+      transportClient.connect();
+      const results = await Promise.all([
+        asyncUtil.once(serverEventFeed, "action"),
+        asyncUtil.once(transportClient, "connect")
+      ]);
+      const serverClientId = results[0][1].Arguments[0];
+
+      const clientListener = createClientListener(transportClient);
+
+      // Send a message
+      fmController.action("InvokeTransportMethod", {
+        Port: port,
+        Method: "send",
+        Arguments: [serverClientId, "msg"]
+      });
+
+      // Check the client event
+      await asyncUtil.once(transportClient, "message");
+      expect(clientListener.connecting.calls.count()).toBe(0);
+      expect(clientListener.connect.calls.count()).toBe(0);
+      expect(clientListener.disconnect.calls.count()).toBe(0);
+      expect(clientListener.message.calls.count()).toBe(1);
+      expect(clientListener.message.calls.argsFor(0).length).toBe(1);
+      expect(clientListener.message.calls.argsFor(0)[0]).toBe("msg");
+
+      // Clean up
+      await fmController.action("DestroyTransportServer", { Port: port });
+      disconnectController(fmController);
+    })
+  );
+});
+
+describe("The server.disconnect() function", () => {
+  it(
+    "should emit disconnect on the client",
+    retry(async () => {
+      const fmController = await connectController();
+
+      // Initialize a transport server and open the events feed
+      const { Port: port } = await fmController.action(
+        "InitTransportServer",
+        {}
+      );
+      const serverEventFeed = fmController.feed("TransportEvents", {
+        Port: `${port}`
+      });
+      serverEventFeed.desireOpen();
+      await asyncUtil.once(serverEventFeed, "open");
+
+      // Start the transport server and wait until started
+      fmController.action("InvokeTransportMethod", {
+        Port: port,
+        Method: "start",
+        Arguments: []
+      });
+      await new Promise(resolve => {
+        serverEventFeed.on("action", (an, ad) => {
+          if (an === "Event" && ad.Name === "start") {
+            serverEventFeed.removeAllListeners("action");
+            resolve();
+          }
+        });
+      });
+
+      // Connect a transport client
+      const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
+      transportClient.connect();
+      const results = await Promise.all([
+        asyncUtil.once(serverEventFeed, "action"),
+        asyncUtil.once(transportClient, "connect")
+      ]);
+      const serverClientId = results[0][1].Arguments[0];
+
+      const clientListener = createClientListener(transportClient);
+
+      // Disconnect the client
+      fmController.action("InvokeTransportMethod", {
+        Port: port,
+        Method: "disconnect",
+        Arguments: [serverClientId]
+      });
+
+      // Check the client event
+      await asyncUtil.once(transportClient, "disconnect");
+      expect(clientListener.connecting.calls.count()).toBe(0);
+      expect(clientListener.connect.calls.count()).toBe(0);
+      expect(clientListener.disconnect.calls.count()).toBe(1);
+      expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
+      expect(clientListener.disconnect.calls.argsFor(0)[0]).toEqual(
+        jasmine.any(Error)
+      );
+      expect(clientListener.disconnect.calls.argsFor(0)[0].message).toBe(
+        "FAILURE: The WebSocket closed unexpectedly."
+      );
+      expect(clientListener.message.calls.count()).toBe(0);
+
+      // Clean up
+      await fmController.action("DestroyTransportServer", { Port: port });
+      disconnectController(fmController);
+    })
+  );
+});
+
+describe("The transport should be able to exchange long messages", () => {
+  it(
+    "server to client",
+    retry(async () => {
+      const fmController = await connectController();
+
+      // Initialize a transport server and open the events feed
+      const { Port: port } = await fmController.action(
+        "InitTransportServer",
+        {}
+      );
+      const serverEventFeed = fmController.feed("TransportEvents", {
+        Port: `${port}`
+      });
+      serverEventFeed.desireOpen();
+      await asyncUtil.once(serverEventFeed, "open");
+
+      // Start the transport server and wait until started
+      fmController.action("InvokeTransportMethod", {
+        Port: port,
+        Method: "start",
+        Arguments: []
+      });
+      await new Promise(resolve => {
+        serverEventFeed.on("action", (an, ad) => {
+          if (an === "Event" && ad.Name === "start") {
+            serverEventFeed.removeAllListeners("action");
+            resolve();
+          }
+        });
+      });
+
+      // Connect a transport client
+      const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
+      transportClient.connect();
+      const results = await Promise.all([
+        asyncUtil.once(serverEventFeed, "action"),
+        asyncUtil.once(transportClient, "connect")
+      ]);
+      const serverClientId = results[0][1].Arguments[0];
+
+      const clientListener = createClientListener(transportClient);
+
+      const msg = "z".repeat(1e6); // 1mb (not too long to avoid timeouts on Sauce)
+
+      // Send a long message server -> client
+      fmController.action("InvokeTransportMethod", {
+        Port: port,
+        Method: "send",
+        Arguments: [serverClientId, msg]
+      });
+
+      // Check the client event
+      await asyncUtil.once(transportClient, "message");
+      expect(clientListener.connecting.calls.count()).toBe(0);
+      expect(clientListener.connect.calls.count()).toBe(0);
+      expect(clientListener.disconnect.calls.count()).toBe(0);
+      expect(clientListener.message.calls.count()).toBe(1);
+      expect(clientListener.message.calls.argsFor(0).length).toBe(1);
+      expect(clientListener.message.calls.argsFor(0)[0]).toBe(msg);
+
+      // Clean up
+      await fmController.action("DestroyTransportServer", { Port: port });
+      disconnectController(fmController);
+    })
+  );
+
+  it(
+    "client to server",
+    retry(async () => {
+      const fmController = await connectController();
+
+      // Initialize a transport server and open the events feed
+      const { Port: port } = await fmController.action(
+        "InitTransportServer",
+        {}
+      );
+      const serverEventFeed = fmController.feed("TransportEvents", {
+        Port: `${port}`
+      });
+      serverEventFeed.desireOpen();
+      await asyncUtil.once(serverEventFeed, "open");
+
+      // Start the transport server and wait until started
+      fmController.action("InvokeTransportMethod", {
+        Port: port,
+        Method: "start",
+        Arguments: []
+      });
+      await new Promise(resolve => {
+        serverEventFeed.on("action", (an, ad) => {
+          if (an === "Event" && ad.Name === "start") {
+            serverEventFeed.removeAllListeners("action");
+            resolve();
+          }
+        });
+      });
+
+      // Connect a transport client
+      const transportClient = feedmeTransportWsClient(`${TARGET_URL}:${port}`);
+      transportClient.connect();
+      const results = await Promise.all([
+        asyncUtil.once(serverEventFeed, "action"),
+        asyncUtil.once(transportClient, "connect")
+      ]);
+      const serverClientId = results[0][1].Arguments[0];
+
+      const msg = "z".repeat(1e6); // 1mb (not too long to avoid timeouts on Sauce)
+
+      // Send a long message client -> server
+      transportClient.send(msg);
+
+      // Check the server event
+      const evt = await asyncUtil.once(serverEventFeed, "action");
+      expect(evt[0]).toBe("Event");
+      expect(evt[1].Name).toBe("message");
+      expect(evt[1].Arguments.length).toBe(2);
+      expect(evt[1].Arguments[0]).toBe(serverClientId);
+      expect(evt[1].Arguments[1]).toBe(msg);
+
+      // Clean up
+      await fmController.action("DestroyTransportServer", { Port: port });
+      disconnectController(fmController);
+    })
+  );
+});
+
+// Library-to-library tests
+
+it(
+  "should work through all major operations",
+  retry(async () => {
+    const fmController = await connectController();
+
+    // Initialize a Feedme server and open the events feed
+    const { Port: port } = await fmController.action("InitFeedmeServer", {});
+    const serverEventFeed = fmController.feed("FeedmeEvents", {
+      Port: `${port}`
+    });
+    serverEventFeed.desireOpen();
+    await asyncUtil.once(serverEventFeed, "open");
+
+    // Start the Feedme server and wait until started
+    fmController.action("InvokeFeedmeMethod", {
+      Port: port,
+      Method: "start",
+      Arguments: []
+    });
+    await new Promise(resolve => {
+      serverEventFeed.on("action", (an, ad) => {
+        if (an === "Event" && ad.Name === "start") {
+          serverEventFeed.removeAllListeners("action");
+          resolve();
+        }
+      });
+    });
+
+    // Connect a Feedme client
+    const fmClient = feedmeClient({
+      transport: feedmeTransportWsClient(`${TARGET_URL}:${port}`)
+    });
+    fmClient.connect();
+    await asyncUtil.once(fmClient, "connect");
+
+    // Try a rejected action
+    try {
+      await fmClient.action("failing_action", {
+        Action: "Args"
+      });
+    } catch (e) {
+      expect(e).toEqual(jasmine.any(Error));
+      expect(e.message).toBe("REJECTED: Server rejected the action request.");
+      expect(e.serverErrorCode).toBe("SOME_ERROR");
+      expect(e.serverErrorData).toEqual({ Error: "Data" });
+    }
+
+    // Try a successful action
+    const actionData = await fmClient.action("successful_action", {
+      Action: "Args"
+    });
+    expect(actionData).toEqual({ Action: "Data" });
+
+    // Try a rejected feed open
+    const feed1 = fmClient.feed("failing_feed", { Feed: "Args" });
+    feed1.desireOpen();
+    const evt1 = await asyncUtil.once(feed1, "close");
+    expect(evt1[0]).toEqual(jasmine.any(Error));
+    expect(evt1[0].message).toBe(
+      "REJECTED: Server rejected the feed open request."
+    );
+    expect(evt1[0].serverErrorCode).toBe("SOME_ERROR");
+    expect(evt1[0].serverErrorData).toEqual({ Error: "Data" });
+    feed1.desireClosed();
+
+    // Try a successful feed open
+    const feed2 = fmClient.feed("successful_feed", { Feed: "Args" });
+    feed2.desireOpen();
+    await asyncUtil.once(feed2, "open");
+    expect(feed2.data()).toEqual({ Feed: "Data" });
+
+    // Try a feed closure
+    feed2.desireClosed();
+    // await asyncUtil.once(feed2, "close"); // close is emitted synchronously (changing))
+
+    // Try an action revelation
+    feed2.desireOpen();
+    await asyncUtil.once(feed2, "open");
+    fmController.action("InvokeFeedmeMethod", {
+      Port: port,
+      Method: "actionRevelation",
+      Arguments: [
+        {
+          actionName: "SomeAction",
+          actionData: { Action: "Data" },
+          feedName: "successful_feed",
+          feedArgs: { Feed: "Args" },
+          feedDeltas: [{ Operation: "Append", Path: ["Feed"], Value: "New" }]
+        }
+      ]
+    });
+    const evt2 = await asyncUtil.once(feed2, "action");
+    expect(evt2[0]).toBe("SomeAction");
+    expect(evt2[1]).toEqual({ Action: "Data" });
+    expect(evt2[2]).toEqual({ Feed: "DataNew" });
+    expect(evt2[3]).toEqual({ Feed: "Data" });
+
+    // Try a feed termination
+    fmController.action("InvokeFeedmeMethod", {
+      Port: port,
+      Method: "feedTermination",
+      Arguments: [
+        {
+          feedName: "successful_feed",
+          feedArgs: { Feed: "Args" },
+          errorCode: "SOME_ERROR",
+          errorData: { Error: "Data" }
+        }
+      ]
+    });
+    const evt3 = await asyncUtil.once(feed2, "close");
+    expect(evt3[0]).toEqual(jasmine.any(Error));
+    expect(evt3[0].message).toBe("TERMINATED: The server terminated the feed.");
+    expect(evt3[0].serverErrorCode).toBe("SOME_ERROR");
+    expect(evt3[0].serverErrorData).toEqual({ Error: "Data" });
+
+    // Try a server disconnect
+    fmController.action("InvokeFeedmeMethod", {
+      Port: port,
+      Method: "disconnect",
+      Arguments: [fmClient.id()]
+    });
+    const evt4 = await asyncUtil.once(fmClient, "disconnect");
+    expect(evt4[0]).toEqual(jasmine.any(Error));
+    expect(evt4[0].message).toBe("FAILURE: The WebSocket closed unexpectedly.");
+
+    // Try a client disconnect
+    // fmClient.connect();
+    // await asyncUtil.once(fmClient, "connect");
+    // fmClient.disconnect();
+    // await asyncUtil.once(fmClient, "disconnect");
+
+    // // Try a server stoppage (also cleans up)
+    // fmClient.connect();
+    // await asyncUtil.once(fmClient, "connect");
+    // fmServer.stop();
+    // fmClient.once("disconnect", err => {
+    //   expect(err).toBeInstanceOf(Error);
+    //   expect(err.message).toBe("FAILURE: The WebSocket closed unexpectedly.");
+    // });
+    // await asyncUtil.once(fmClient, "disconnect");
+
+    // Clean up
+    // await fmController.action("DestroyFeedmeServer", { Port: port });
+    // disconnectController(fmController);
+  })
+);
