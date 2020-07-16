@@ -584,7 +584,7 @@ describe("The transport client configuration options", () => {
       expect(transportClient.state()).toBe("connected");
 
       // Run through the ping/pong cycle a bunch of times
-      await delay(20 * (heartbeatIntervalMs + LATENCY));
+      await delay(10 * (heartbeatIntervalMs + LATENCY));
 
       expect(transportClient.state()).toBe("connected");
 
@@ -613,7 +613,7 @@ describe("The transport client configuration options", () => {
       const listener = createClientListener(transportClient);
 
       // Run through the ping/pong cycle a bunch of times
-      await delay(20 * (heartbeatIntervalMs + LATENCY));
+      await delay(10 * (heartbeatIntervalMs + LATENCY));
 
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.connecting.mock.calls.length).toBe(0);
@@ -650,7 +650,7 @@ describe("The transport client configuration options", () => {
       const cListener = createWsServerClientListener(wsServerClient);
 
       // Run through the ping/pong cycle a bunch of times
-      await delay(20 * (heartbeatIntervalMs + LATENCY));
+      await delay(10 * (heartbeatIntervalMs + LATENCY));
 
       expect(sListener.close.mock.calls.length).toBe(0);
       expect(sListener.connection.mock.calls.length).toBe(0);
