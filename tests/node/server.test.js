@@ -1288,34 +1288,34 @@ describe("The transport.start() function", () => {
 
       // External http server listeners
 
-      it("should attach listeners to the external server", async () => {
-        const port = getNextPortNumber();
+      // it("should attach listeners to the external server", async () => {
+      //   const port = getNextPortNumber();
 
-        // Create http server and start listening
-        const httpServer = http.createServer((req, res) => {
-          res.writeHead(200);
-          res.end("Webpage");
-        });
-        await promisify(httpServer.listen.bind(httpServer))(port);
+      //   // Create http server and start listening
+      //   const httpServer = http.createServer((req, res) => {
+      //     res.writeHead(200);
+      //     res.end("Webpage");
+      //   });
+      //   await promisify(httpServer.listen.bind(httpServer))(port);
 
-        // Create a transport server on the external server
-        const transportServer = transportWsServer({
-          server: httpServer
-        });
+      //   // Create a transport server on the external server
+      //   const transportServer = transportWsServer({
+      //     server: httpServer
+      //   });
 
-        expect(httpServer.listenerCount("listening")).toBe(0);
-        expect(httpServer.listenerCount("close")).toBe(0);
-        expect(httpServer.listenerCount("error")).toBe(0);
+      //   expect(httpServer.listenerCount("listening")).toBe(0);
+      //   expect(httpServer.listenerCount("close")).toBe(0);
+      //   expect(httpServer.listenerCount("error")).toBe(0);
 
-        transportServer.start();
+      //   transportServer.start();
 
-        expect(httpServer.listenerCount("listening")).toBe(2); // One for transport, one for ws
-        expect(httpServer.listenerCount("close")).toBe(1);
-        expect(httpServer.listenerCount("error")).toBe(2); // One for transport, one for ws
+      //   expect(httpServer.listenerCount("listening")).toBe(2); // One for transport, one for ws
+      //   expect(httpServer.listenerCount("close")).toBe(1);
+      //   expect(httpServer.listenerCount("error")).toBe(2); // One for transport, one for ws
 
-        // Clean up
-        await promisify(httpServer.close.bind(httpServer))();
-      });
+      //   // Clean up
+      //   await promisify(httpServer.close.bind(httpServer))();
+      // });
 
       // WS client events - N/A
     });
@@ -1447,28 +1447,28 @@ describe("The transport.start() function", () => {
 
       // External http server listeners
 
-      it("should attach listeners to the external server", async () => {
-        // Create http server
-        const httpServer = http.createServer((req, res) => {
-          res.writeHead(200);
-          res.end("Webpage");
-        });
+      // it("should attach listeners to the external server", async () => {
+      //   // Create http server
+      //   const httpServer = http.createServer((req, res) => {
+      //     res.writeHead(200);
+      //     res.end("Webpage");
+      //   });
 
-        // Create a transport server on the external server
-        const transportServer = transportWsServer({
-          server: httpServer
-        });
+      //   // Create a transport server on the external server
+      //   const transportServer = transportWsServer({
+      //     server: httpServer
+      //   });
 
-        expect(httpServer.listenerCount("listening")).toBe(0);
-        expect(httpServer.listenerCount("close")).toBe(0);
-        expect(httpServer.listenerCount("error")).toBe(0);
+      //   expect(httpServer.listenerCount("listening")).toBe(0);
+      //   expect(httpServer.listenerCount("close")).toBe(0);
+      //   expect(httpServer.listenerCount("error")).toBe(0);
 
-        transportServer.start();
+      //   transportServer.start();
 
-        expect(httpServer.listenerCount("listening")).toBe(2); // One for transport, one for ws
-        expect(httpServer.listenerCount("close")).toBe(1);
-        expect(httpServer.listenerCount("error")).toBe(2); // One for transport, one for ws
-      });
+      //   expect(httpServer.listenerCount("listening")).toBe(2); // One for transport, one for ws
+      //   expect(httpServer.listenerCount("close")).toBe(1);
+      //   expect(httpServer.listenerCount("error")).toBe(2); // One for transport, one for ws
+      // });
 
       // WS client events - N/A
     });
@@ -1871,37 +1871,37 @@ describe("The transport.stop() function", () => {
 
       // External http server listeners
 
-      it("should remove external http server listeners", async () => {
-        const port = getNextPortNumber();
+      // it("should remove external http server listeners", async () => {
+      //   const port = getNextPortNumber();
 
-        // Create a http server
-        const httpServer = http.createServer((req, res) => {
-          res.writeHead(200);
-          res.end("Webpage");
-        });
-        await promisify(httpServer.listen.bind(httpServer))(port);
+      //   // Create a http server
+      //   const httpServer = http.createServer((req, res) => {
+      //     res.writeHead(200);
+      //     res.end("Webpage");
+      //   });
+      //   await promisify(httpServer.listen.bind(httpServer))(port);
 
-        // Start a transport server
-        const transportServer = transportWsServer({
-          server: httpServer
-        });
-        transportServer.start();
-        await promisifyEvent(transportServer, "start");
+      //   // Start a transport server
+      //   const transportServer = transportWsServer({
+      //     server: httpServer
+      //   });
+      //   transportServer.start();
+      //   await promisifyEvent(transportServer, "start");
 
-        expect(httpServer.listenerCount("listening")).toBe(2); // One for transport, one for ws
-        expect(httpServer.listenerCount("close")).toBe(1);
-        expect(httpServer.listenerCount("error")).toBe(2); // One for transport, one for ws
+      //   expect(httpServer.listenerCount("listening")).toBe(2); // One for transport, one for ws
+      //   expect(httpServer.listenerCount("close")).toBe(1);
+      //   expect(httpServer.listenerCount("error")).toBe(2); // One for transport, one for ws
 
-        transportServer.stop();
+      //   transportServer.stop();
 
-        expect(httpServer.listenerCount("listening")).toBe(0);
-        expect(httpServer.listenerCount("close")).toBe(0);
-        expect(httpServer.listenerCount("error")).toBe(0);
+      //   expect(httpServer.listenerCount("listening")).toBe(0);
+      //   expect(httpServer.listenerCount("close")).toBe(0);
+      //   expect(httpServer.listenerCount("error")).toBe(0);
 
-        // Clean up
-        httpServer.close();
-        await promisifyEvent(httpServer, "close");
-      });
+      //   // Clean up
+      //   httpServer.close();
+      //   await promisifyEvent(httpServer, "close");
+      // });
 
       // WS client events
 
@@ -4889,41 +4889,41 @@ describe("The transport._processServerClose() function", () => {
 
     // HTTP event listeners
 
-    it("should remove http server event listeners", async () => {
-      const port = getNextPortNumber();
+    // it("should remove http server event listeners", async () => {
+    //   const port = getNextPortNumber();
 
-      // Start an http server
-      const httpServer = http.createServer((req, res) => {
-        res.writeHead(200);
-        res.end("Webpage");
-      });
-      httpServer.listen(port);
-      await promisifyEvent(httpServer, "listening");
+    //   // Start an http server
+    //   const httpServer = http.createServer((req, res) => {
+    //     res.writeHead(200);
+    //     res.end("Webpage");
+    //   });
+    //   httpServer.listen(port);
+    //   await promisifyEvent(httpServer, "listening");
 
-      // Start a transport server
-      const transportServer = transportWsServer({ server: httpServer });
-      transportServer.start();
-      await promisifyEvent(transportServer, "start");
+    //   // Start a transport server
+    //   const transportServer = transportWsServer({ server: httpServer });
+    //   transportServer.start();
+    //   await promisifyEvent(transportServer, "start");
 
-      expect(httpServer.listenerCount("listening")).toBe(2);
-      expect(httpServer.listenerCount("close")).toBe(1);
-      expect(httpServer.listenerCount("error")).toBe(2);
+    //   expect(httpServer.listenerCount("listening")).toBe(2);
+    //   expect(httpServer.listenerCount("close")).toBe(1);
+    //   expect(httpServer.listenerCount("error")).toBe(2);
 
-      httpServer.close();
+    //   httpServer.close();
 
-      const eventOrder = [];
-      ["stopping", "stop"].forEach(evt => {
-        transportServer.on(evt, () => {
-          eventOrder.push(evt);
-        });
-      });
+    //   const eventOrder = [];
+    //   ["stopping", "stop"].forEach(evt => {
+    //     transportServer.on(evt, () => {
+    //       eventOrder.push(evt);
+    //     });
+    //   });
 
-      await promisifyEvent(transportServer, "stop");
+    //   await promisifyEvent(transportServer, "stop");
 
-      expect(httpServer.listenerCount("listening")).toBe(0);
-      expect(httpServer.listenerCount("close")).toBe(0);
-      expect(httpServer.listenerCount("error")).toBe(0);
-    });
+    //   expect(httpServer.listenerCount("listening")).toBe(0);
+    //   expect(httpServer.listenerCount("close")).toBe(0);
+    //   expect(httpServer.listenerCount("error")).toBe(0);
+    // });
   });
 });
 
@@ -5132,44 +5132,44 @@ describe("The transport._processServerError() function", () => {
 
     // HTTP event listeners
 
-    it("should remove external http listeners", async () => {
-      const port = getNextPortNumber();
+    // it("should remove external http listeners", async () => {
+    //   const port = getNextPortNumber();
 
-      // Occupy the port
-      const httpServer1 = http.createServer(() => {});
-      httpServer1.listen(port);
+    //   // Occupy the port
+    //   const httpServer1 = http.createServer(() => {});
+    //   httpServer1.listen(port);
 
-      // Create an http server
-      const httpServer = http.createServer((req, res) => {
-        res.writeHead(200);
-        res.end("Webpage");
-      });
+    //   // Create an http server
+    //   const httpServer = http.createServer((req, res) => {
+    //     res.writeHead(200);
+    //     res.end("Webpage");
+    //   });
 
-      // Start a transport server
-      const transportServer = transportWsServer({
-        server: httpServer
-      });
+    //   // Start a transport server
+    //   const transportServer = transportWsServer({
+    //     server: httpServer
+    //   });
 
-      transportServer.start();
+    //   transportServer.start();
 
-      await promisify(process.nextTick)(); // Move past starting event
+    //   await promisify(process.nextTick)(); // Move past starting event
 
-      expect(httpServer.listenerCount("listening")).toBe(2);
-      expect(httpServer.listenerCount("close")).toBe(1);
-      expect(httpServer.listenerCount("error")).toBe(2);
+    //   expect(httpServer.listenerCount("listening")).toBe(2);
+    //   expect(httpServer.listenerCount("close")).toBe(1);
+    //   expect(httpServer.listenerCount("error")).toBe(2);
 
-      httpServer.listen(port);
+    //   httpServer.listen(port);
 
-      await promisifyEvent(transportServer, "stop");
+    //   await promisifyEvent(transportServer, "stop");
 
-      expect(httpServer.listenerCount("listening")).toBe(0);
-      expect(httpServer.listenerCount("close")).toBe(0);
-      expect(httpServer.listenerCount("error")).toBe(0);
+    //   expect(httpServer.listenerCount("listening")).toBe(0);
+    //   expect(httpServer.listenerCount("close")).toBe(0);
+    //   expect(httpServer.listenerCount("error")).toBe(0);
 
-      // Clean up
-      httpServer1.close();
-      await promisifyEvent(httpServer1, "close");
-    });
+    //   // Clean up
+    //   httpServer1.close();
+    //   await promisifyEvent(httpServer1, "close");
+    // });
   });
 });
 

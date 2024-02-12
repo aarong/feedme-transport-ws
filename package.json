@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "docs": "documentation build src/client.node.js src/client.browser.js src/server.js -f html -o docs --access public --access private --access undefined --sort-order alpha",
-    "build": "npm run test-src && gulp build && npm run test-build-node",
+    "build": "npm run test-src && babel-node build.js && npm run test-build-node",
     "lint-src": "eslint src/**",
     "lint-build-tests": "eslint \"tests/browsers/*.js\" && eslint \"tests/node/*.js\"",
     "test": "npm run test-src",
@@ -36,7 +36,6 @@
     "babel-plugin-add-module-exports": "^1.0.0",
     "core-js": "^3.6.5",
     "coveralls": "^3.0.3",
-    "del": "^4.0.0",
     "delay": "^4.3.0",
     "documentation": "^9.1.1",
     "eslint": "^5.12.0",
@@ -49,10 +48,7 @@
     "feedme-server-core": "0.0.4",
     "fs-copy-file-sync": "^1.1.1",
     "ghooks": "^2.0.4",
-    "gulp": "^4.0.0",
-    "gulp-babel": "^8.0.0",
-    "gulp-cli": "^2.0.1",
-    "gulp-sourcemaps": "^2.6.5",
+    "glob": "^10.3.10",
     "hostile": "^1.3.2",
     "jest": "^23.6.0",
     "jest-cli": "^23.6.0",
@@ -64,8 +60,7 @@
     "promisify-function": "^1.3.2",
     "request": "^2.88.2",
     "sauce-connect-launcher": "^1.2.4",
-    "webpack": "^4.43.0",
-    "webpack-stream": "^5.2.1"
+    "webpack": "^5.90.1"
   },
   "repository": {
     "type": "git",

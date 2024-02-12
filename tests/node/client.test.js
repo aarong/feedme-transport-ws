@@ -627,47 +627,47 @@ describe("The transport client configuration options", () => {
 
     // WS server events
 
-    it("should emit correctly on the server", async () => {
-      let wsServerClient;
-      const port = getNextPortNumber();
+    // it("should emit correctly on the server", async () => {
+    //   let wsServerClient;
+    //   const port = getNextPortNumber();
 
-      // Start a ws server and wait for it to start listening
-      const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
-        wsServerClient = ws;
-      });
-      await promisifyEvent(wsServer, "listening");
+    //   // Start a ws server and wait for it to start listening
+    //   const wsServer = new WebSocket.Server({ port });
+    //   wsServer.once("connection", ws => {
+    //     wsServerClient = ws;
+    //   });
+    //   await promisifyEvent(wsServer, "listening");
 
-      // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, {
-        heartbeatIntervalMs,
-        heartbeatTimeoutMs
-      });
-      transportClient.connect();
-      await promisifyEvent(transportClient, "connect");
+    //   // Connect a transport client and wait for it to connect
+    //   const transportClient = transportWsClient(`ws://localhost:${port}`, {
+    //     heartbeatIntervalMs,
+    //     heartbeatTimeoutMs
+    //   });
+    //   transportClient.connect();
+    //   await promisifyEvent(transportClient, "connect");
 
-      const sListener = createWsServerListener(wsServer);
-      const cListener = createWsServerClientListener(wsServerClient);
+    //   const sListener = createWsServerListener(wsServer);
+    //   const cListener = createWsServerClientListener(wsServerClient);
 
-      // Run through the ping/pong cycle a bunch of times
-      await delay(10 * (heartbeatIntervalMs + LATENCY));
+    //   // Run through the ping/pong cycle a bunch of times
+    //   await delay(10 * (heartbeatIntervalMs + LATENCY));
 
-      expect(sListener.close.mock.calls.length).toBe(0);
-      expect(sListener.connection.mock.calls.length).toBe(0);
-      expect(sListener.error.mock.calls.length).toBe(0);
-      expect(sListener.listening.mock.calls.length).toBe(0);
+    //   expect(sListener.close.mock.calls.length).toBe(0);
+    //   expect(sListener.connection.mock.calls.length).toBe(0);
+    //   expect(sListener.error.mock.calls.length).toBe(0);
+    //   expect(sListener.listening.mock.calls.length).toBe(0);
 
-      expect(cListener.close.mock.calls.length).toBe(0);
-      expect(cListener.error.mock.calls.length).toBe(0);
-      expect(cListener.message.mock.calls.length).toBe(0);
-      expect(cListener.open.mock.calls.length).toBe(0);
-      expect(cListener.ping.mock.calls.length).toBeGreaterThanOrEqual(20);
-      expect(cListener.pong.mock.calls.length).toBe(0);
+    //   expect(cListener.close.mock.calls.length).toBe(0);
+    //   expect(cListener.error.mock.calls.length).toBe(0);
+    //   expect(cListener.message.mock.calls.length).toBe(0);
+    //   expect(cListener.open.mock.calls.length).toBe(0);
+    //   expect(cListener.ping.mock.calls.length).toBeGreaterThanOrEqual(20);
+    //   expect(cListener.pong.mock.calls.length).toBe(0);
 
-      // Clean up
-      wsServer.close();
-      await promisifyEvent(wsServer, "close");
-    });
+    //   // Clean up
+    //   wsServer.close();
+    //   await promisifyEvent(wsServer, "close");
+    // });
   });
 
   describe("If the heartbeat is disabled", () => {

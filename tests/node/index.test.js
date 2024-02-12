@@ -1,4 +1,4 @@
-import feedmeTransportWs from "../../build";
+import feedmeTransportWs from "../../build/index"; // Don't confuse with root build script
 
 describe("The common entry point for all three modules", () => {
   it("should work", () => {
