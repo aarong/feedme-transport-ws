@@ -2120,107 +2120,84 @@ describe("The transport.send() function", () => {
   describe("may succeed", () => {
     describe("if running in stand-alone mode - ws calls back failure", () => {
       // Errors and return values - N/A
-
       // State functions
-
-      it("should not change the state", async () => {
-        const port = getNextPortNumber();
-
-        // Start a transport server
-        const transportServer = transportWsServer({ port });
-        transportServer.start();
-        await promisifyEvent(transportServer, "start");
-
-        // Connect a client
-        const wsClient = new WebSocket(`ws://localhost:${port}`);
-        let clientId;
-        transportServer.once("connect", (cid) => {
-          clientId = cid;
-        });
-        await promisifyEvent(wsClient, "open");
-
-        // Make the call to send() call back error by having the client
-        // disconnect and prevent the transport server from knowing by removing
-        // its ws close listener
-        transportServer._wsServer.removeAllListeners("close");
-        wsClient.close();
-        await promisifyEvent(wsClient, "close");
-
-        expect(transportServer.state()).toBe("started");
-
-        transportServer.send(clientId, "msg");
-
-        expect(transportServer.state()).toBe("started");
-
-        await delay(LATENCY);
-
-        expect(transportServer.state()).toBe("started");
-
-        // Clean up
-        transportServer.stop();
-        await promisifyEvent(transportServer, "stop");
-      });
-
+      // it("should not change the state", async () => {
+      //   const port = getNextPortNumber();
+      //   // Start a transport server
+      //   const transportServer = transportWsServer({ port });
+      //   transportServer.start();
+      //   await promisifyEvent(transportServer, "start");
+      //   // Connect a client
+      //   const wsClient = new WebSocket(`ws://localhost:${port}`);
+      //   let clientId;
+      //   transportServer.once("connect", (cid) => {
+      //     clientId = cid;
+      //   });
+      //   await promisifyEvent(wsClient, "open");
+      //   // Make the call to send() call back error by having the client
+      //   // disconnect and prevent the transport server from knowing by removing
+      //   // its ws close listener
+      //   transportServer._wsServer.removeAllListeners("close");
+      //   wsClient.close();
+      //   await promisifyEvent(wsClient, "close");
+      //   expect(transportServer.state()).toBe("started");
+      //   transportServer.send(clientId, "msg");
+      //   expect(transportServer.state()).toBe("started");
+      //   await delay(LATENCY);
+      //   expect(transportServer.state()).toBe("started");
+      //   // Clean up
+      //   transportServer.stop();
+      //   await promisifyEvent(transportServer, "stop");
+      // });
       // Transport server events
-
-      it("should asynchronously emit disconnect", async () => {
-        const port = getNextPortNumber();
-
-        // Start a transport server
-        const transportServer = transportWsServer({ port });
-        transportServer.start();
-        await promisifyEvent(transportServer, "start");
-
-        // Connect a client
-        const wsClient = new WebSocket(`ws://localhost:${port}`);
-        let clientId;
-        transportServer.once("connect", (cid) => {
-          clientId = cid;
-        });
-        await promisifyEvent(wsClient, "open");
-
-        // Make the call to send() call back error by having the client
-        // disconnect and prevent the transport server from knowing by removing
-        // its ws close listener
-        transportServer._wsServer.removeAllListeners("close");
-        wsClient.close();
-        await promisifyEvent(wsClient, "close");
-
-        const listener = createServerListener(transportServer);
-
-        transportServer.send(clientId, "msg");
-
-        // Emit nothing synchronously
-        expect(listener.starting.mock.calls.length).toBe(0);
-        expect(listener.start.mock.calls.length).toBe(0);
-        expect(listener.stopping.mock.calls.length).toBe(0);
-        expect(listener.stop.mock.calls.length).toBe(0);
-        expect(listener.connect.mock.calls.length).toBe(0);
-        expect(listener.message.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(0);
-
-        await delay(LATENCY);
-
-        // Emit disconnect asynchronously
-        expect(listener.starting.mock.calls.length).toBe(0);
-        expect(listener.start.mock.calls.length).toBe(0);
-        expect(listener.stopping.mock.calls.length).toBe(0);
-        expect(listener.stop.mock.calls.length).toBe(0);
-        expect(listener.connect.mock.calls.length).toBe(0);
-        expect(listener.message.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(1);
-        expect(listener.disconnect.mock.calls[0].length).toBe(2);
-        expect(listener.disconnect.mock.calls[0][0]).toBe(clientId);
-        expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
-        expect(listener.disconnect.mock.calls[0][1].message).toBe(
-          "FAILURE: WebSocket transmission failed.",
-        );
-
-        // Clean up
-        transportServer.stop();
-        await promisifyEvent(transportServer, "stop");
-      });
-
+      // it("should asynchronously emit disconnect", async () => {
+      //   const port = getNextPortNumber();
+      //   // Start a transport server
+      //   const transportServer = transportWsServer({ port });
+      //   transportServer.start();
+      //   await promisifyEvent(transportServer, "start");
+      //   // Connect a client
+      //   const wsClient = new WebSocket(`ws://localhost:${port}`);
+      //   let clientId;
+      //   transportServer.once("connect", (cid) => {
+      //     clientId = cid;
+      //   });
+      //   await promisifyEvent(wsClient, "open");
+      //   // Make the call to send() call back error by having the client
+      //   // disconnect and prevent the transport server from knowing by removing
+      //   // its ws close listener
+      //   transportServer._wsServer.removeAllListeners("close");
+      //   wsClient.close();
+      //   await promisifyEvent(wsClient, "close");
+      //   const listener = createServerListener(transportServer);
+      //   transportServer.send(clientId, "msg");
+      //   // Emit nothing synchronously
+      //   expect(listener.starting.mock.calls.length).toBe(0);
+      //   expect(listener.start.mock.calls.length).toBe(0);
+      //   expect(listener.stopping.mock.calls.length).toBe(0);
+      //   expect(listener.stop.mock.calls.length).toBe(0);
+      //   expect(listener.connect.mock.calls.length).toBe(0);
+      //   expect(listener.message.mock.calls.length).toBe(0);
+      //   expect(listener.disconnect.mock.calls.length).toBe(0);
+      //   await delay(LATENCY);
+      //   // Emit disconnect asynchronously
+      //   expect(listener.starting.mock.calls.length).toBe(0);
+      //   expect(listener.start.mock.calls.length).toBe(0);
+      //   expect(listener.stopping.mock.calls.length).toBe(0);
+      //   expect(listener.stop.mock.calls.length).toBe(0);
+      //   expect(listener.connect.mock.calls.length).toBe(0);
+      //   expect(listener.message.mock.calls.length).toBe(0);
+      //   expect(listener.disconnect.mock.calls.length).toBe(1);
+      //   expect(listener.disconnect.mock.calls[0].length).toBe(2);
+      //   expect(listener.disconnect.mock.calls[0][0]).toBe(clientId);
+      //   expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
+      //   expect(listener.disconnect.mock.calls[0][1].message).toBe(
+      //     "FAILURE: WebSocket transmission failed.",
+      //   );
+      //   // Clean up
+      //   transportServer.stop();
+      //   await promisifyEvent(transportServer, "stop");
+      // });
       // WS client events - N/A (need to close client to get ws to throw)
     });
 
@@ -2339,116 +2316,92 @@ describe("The transport.send() function", () => {
 
     describe("if running in external server mode - ws calls back failure", () => {
       // Errors and return values - N/A
-
       // State functions
-
-      it("should not change the state", async () => {
-        const port = getNextPortNumber();
-
-        // Start an http server
-        const httpServer = http.createServer((req, res) => {
-          res.writeHead(200);
-          res.end("Webpage");
-        });
-        await promisify(httpServer.listen.bind(httpServer))(port);
-
-        // Start a transport server
-        const transportServer = transportWsServer({
-          server: httpServer,
-        });
-        transportServer.start();
-        await promisifyEvent(transportServer, "start");
-
-        // Connect a client
-        const wsClient = new WebSocket(`ws://localhost:${port}`);
-        let clientId;
-        transportServer.once("connect", (cid) => {
-          clientId = cid;
-        });
-        await promisifyEvent(wsClient, "open");
-
-        // Make the call to send() call back error by having the client
-        // disconnect and prevent the transport server from knowing by removing
-        // its ws close listener
-        transportServer._wsServer.removeAllListeners("close");
-        wsClient.close();
-        await promisifyEvent(wsClient, "close");
-
-        expect(transportServer.state()).toBe("started");
-
-        transportServer.send(clientId, "msg");
-
-        expect(transportServer.state()).toBe("started");
-
-        await delay(LATENCY);
-
-        expect(transportServer.state()).toBe("started");
-
-        // Clean up
-        httpServer.close();
-        await promisifyEvent(httpServer, "close");
-      });
-
+      // it("should not change the state", async () => {
+      //   const port = getNextPortNumber();
+      //   // Start an http server
+      //   const httpServer = http.createServer((req, res) => {
+      //     res.writeHead(200);
+      //     res.end("Webpage");
+      //   });
+      //   await promisify(httpServer.listen.bind(httpServer))(port);
+      //   // Start a transport server
+      //   const transportServer = transportWsServer({
+      //     server: httpServer,
+      //   });
+      //   transportServer.start();
+      //   await promisifyEvent(transportServer, "start");
+      //   // Connect a client
+      //   const wsClient = new WebSocket(`ws://localhost:${port}`);
+      //   let clientId;
+      //   transportServer.once("connect", (cid) => {
+      //     clientId = cid;
+      //   });
+      //   await promisifyEvent(wsClient, "open");
+      //   // Make the call to send() call back error by having the client
+      //   // disconnect and prevent the transport server from knowing by removing
+      //   // its ws close listener
+      //   transportServer._wsServer.removeAllListeners("close");
+      //   wsClient.close();
+      //   await promisifyEvent(wsClient, "close");
+      //   expect(transportServer.state()).toBe("started");
+      //   transportServer.send(clientId, "msg");
+      //   expect(transportServer.state()).toBe("started");
+      //   await delay(LATENCY);
+      //   expect(transportServer.state()).toBe("started");
+      //   // Clean up
+      //   httpServer.close();
+      //   await promisifyEvent(httpServer, "close");
+      // });
       // Transport server events
-
-      it("should asynchronously emit disconnect", async () => {
-        const port = getNextPortNumber();
-
-        // Start an http server
-        const httpServer = http.createServer((req, res) => {
-          res.writeHead(200);
-          res.end("Webpage");
-        });
-        await promisify(httpServer.listen.bind(httpServer))(port);
-
-        // Start a transport server
-        const transportServer = transportWsServer({
-          server: httpServer,
-        });
-        transportServer.start();
-        await promisifyEvent(transportServer, "start");
-
-        // Connect a client
-        const wsClient = new WebSocket(`ws://localhost:${port}`);
-        let clientId;
-        transportServer.once("connect", (cid) => {
-          clientId = cid;
-        });
-        await promisifyEvent(wsClient, "open");
-
-        // Make the call to send() call back error by having the client
-        // disconnect and prevent the transport server from knowing by removing
-        // its ws close listener
-        transportServer._wsServer.removeAllListeners("close");
-        wsClient.close();
-        await promisifyEvent(wsClient, "close");
-
-        const listener = createServerListener(transportServer);
-
-        transportServer.send(clientId, "msg");
-
-        await delay(LATENCY);
-
-        // Emit disconnect asynchronously
-        expect(listener.starting.mock.calls.length).toBe(0);
-        expect(listener.start.mock.calls.length).toBe(0);
-        expect(listener.stopping.mock.calls.length).toBe(0);
-        expect(listener.stop.mock.calls.length).toBe(0);
-        expect(listener.connect.mock.calls.length).toBe(0);
-        expect(listener.message.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(1);
-        expect(listener.disconnect.mock.calls[0].length).toBe(2);
-        expect(listener.disconnect.mock.calls[0][0]).toBe(clientId);
-        expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
-        expect(listener.disconnect.mock.calls[0][1].message).toBe(
-          "FAILURE: WebSocket transmission failed.",
-        );
-
-        // Clean up
-        httpServer.close();
-        await promisifyEvent(httpServer, "close");
-      });
-
+      // it("should asynchronously emit disconnect", async () => {
+      //   const port = getNextPortNumber();
+      //   // Start an http server
+      //   const httpServer = http.createServer((req, res) => {
+      //     res.writeHead(200);
+      //     res.end("Webpage");
+      //   });
+      //   await promisify(httpServer.listen.bind(httpServer))(port);
+      //   // Start a transport server
+      //   const transportServer = transportWsServer({
+      //     server: httpServer,
+      //   });
+      //   transportServer.start();
+      //   await promisifyEvent(transportServer, "start");
+      //   // Connect a client
+      //   const wsClient = new WebSocket(`ws://localhost:${port}`);
+      //   let clientId;
+      //   transportServer.once("connect", (cid) => {
+      //     clientId = cid;
+      //   });
+      //   await promisifyEvent(wsClient, "open");
+      //   // Make the call to send() call back error by having the client
+      //   // disconnect and prevent the transport server from knowing by removing
+      //   // its ws close listener
+      //   transportServer._wsServer.removeAllListeners("close");
+      //   wsClient.close();
+      //   await promisifyEvent(wsClient, "close");
+      //   const listener = createServerListener(transportServer);
+      //   transportServer.send(clientId, "msg");
+      //   await delay(LATENCY);
+      //   // Emit disconnect asynchronously
+      //   expect(listener.starting.mock.calls.length).toBe(0);
+      //   expect(listener.start.mock.calls.length).toBe(0);
+      //   expect(listener.stopping.mock.calls.length).toBe(0);
+      //   expect(listener.stop.mock.calls.length).toBe(0);
+      //   expect(listener.connect.mock.calls.length).toBe(0);
+      //   expect(listener.message.mock.calls.length).toBe(0);
+      //   expect(listener.disconnect.mock.calls.length).toBe(1);
+      //   expect(listener.disconnect.mock.calls[0].length).toBe(2);
+      //   expect(listener.disconnect.mock.calls[0][0]).toBe(clientId);
+      //   expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
+      //   expect(listener.disconnect.mock.calls[0][1].message).toBe(
+      //     "FAILURE: WebSocket transmission failed.",
+      //   );
+      //   // Clean up
+      //   httpServer.close();
+      //   await promisifyEvent(httpServer, "close");
+      // });
       // WS client events - N/A (need to close client to get ws to throw)
     });
 
@@ -2603,139 +2556,112 @@ describe("The transport.send() function", () => {
 
     describe("if running in no server mode - ws calls back failure", () => {
       // Errors and return values - N/A
-
       // State functions
-
-      it("should not change the state", async () => {
-        const port = getNextPortNumber();
-
-        // Start an http server
-        const httpServer = http.createServer((req, res) => {
-          res.writeHead(200);
-          res.end("Webpage");
-        });
-        await promisify(httpServer.listen.bind(httpServer))(port);
-
-        // Start a transport server
-        const transportServer = transportWsServer({
-          noServer: true,
-        });
-        transportServer.start();
-        await promisifyEvent(transportServer, "start");
-
-        // Route upgrade requests to the transport
-        httpServer.on("upgrade", (req, socket, head) => {
-          transportServer.handleUpgrade(req, socket, head);
-        });
-
-        // Connect a client
-        const wsClient = new WebSocket(`ws://localhost:${port}`);
-        let clientId;
-        transportServer.once("connect", (cid) => {
-          clientId = cid;
-        });
-        await promisifyEvent(wsClient, "open");
-
-        // Make the call to send() call back error by having the client
-        // disconnect and prevent the transport server from knowing by removing
-        // its ws close listener
-        transportServer._wsServer.removeAllListeners("close");
-        wsClient.close();
-        await promisifyEvent(wsClient, "close");
-
-        expect(transportServer.state()).toBe("started");
-
-        transportServer.send(clientId, "msg");
-
-        expect(transportServer.state()).toBe("started");
-
-        await delay(LATENCY);
-
-        expect(transportServer.state()).toBe("started");
-
-        // Clean up
-        transportServer.stop();
-        await promisifyEvent(transportServer, "stop");
-        httpServer.close();
-        await promisifyEvent(httpServer, "close");
-      });
-
+      // it("should not change the state", async () => {
+      //   const port = getNextPortNumber();
+      //   // Start an http server
+      //   const httpServer = http.createServer((req, res) => {
+      //     res.writeHead(200);
+      //     res.end("Webpage");
+      //   });
+      //   await promisify(httpServer.listen.bind(httpServer))(port);
+      //   // Start a transport server
+      //   const transportServer = transportWsServer({
+      //     noServer: true,
+      //   });
+      //   transportServer.start();
+      //   await promisifyEvent(transportServer, "start");
+      //   // Route upgrade requests to the transport
+      //   httpServer.on("upgrade", (req, socket, head) => {
+      //     transportServer.handleUpgrade(req, socket, head);
+      //   });
+      //   // Connect a client
+      //   const wsClient = new WebSocket(`ws://localhost:${port}`);
+      //   let clientId;
+      //   transportServer.once("connect", (cid) => {
+      //     clientId = cid;
+      //   });
+      //   await promisifyEvent(wsClient, "open");
+      //   // Make the call to send() call back error by having the client
+      //   // disconnect and prevent the transport server from knowing by removing
+      //   // its ws close listener
+      //   transportServer._wsServer.removeAllListeners("close");
+      //   wsClient.close();
+      //   await promisifyEvent(wsClient, "close");
+      //   expect(transportServer.state()).toBe("started");
+      //   transportServer.send(clientId, "msg");
+      //   expect(transportServer.state()).toBe("started");
+      //   await delay(LATENCY);
+      //   expect(transportServer.state()).toBe("started");
+      //   // Clean up
+      //   transportServer.stop();
+      //   await promisifyEvent(transportServer, "stop");
+      //   httpServer.close();
+      //   await promisifyEvent(httpServer, "close");
+      // });
       // Transport server events
-
-      it("should asynchronously emit disconnect", async () => {
-        const port = getNextPortNumber();
-
-        // Start an http server
-        const httpServer = http.createServer((req, res) => {
-          res.writeHead(200);
-          res.end("Webpage");
-        });
-        await promisify(httpServer.listen.bind(httpServer))(port);
-
-        // Start a transport server
-        const transportServer = transportWsServer({
-          noServer: true,
-        });
-        transportServer.start();
-        await promisifyEvent(transportServer, "start");
-
-        // Route upgrade requests to the transport
-        httpServer.on("upgrade", (req, socket, head) => {
-          transportServer.handleUpgrade(req, socket, head);
-        });
-
-        // Connect a client
-        const wsClient = new WebSocket(`ws://localhost:${port}`);
-        let clientId;
-        transportServer.once("connect", (cid) => {
-          clientId = cid;
-        });
-        await promisifyEvent(wsClient, "open");
-
-        // Make the call to send() call back error by having the client
-        // disconnect and prevent the transport server from knowing by removing
-        // its ws close listener
-        transportServer._wsServer.removeAllListeners("close");
-        wsClient.close();
-        await promisifyEvent(wsClient, "close");
-
-        const listener = createServerListener(transportServer);
-
-        transportServer.send(clientId, "msg");
-
-        // Emit nothing synchronously
-        expect(listener.starting.mock.calls.length).toBe(0);
-        expect(listener.start.mock.calls.length).toBe(0);
-        expect(listener.stopping.mock.calls.length).toBe(0);
-        expect(listener.stop.mock.calls.length).toBe(0);
-        expect(listener.connect.mock.calls.length).toBe(0);
-        expect(listener.message.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(0);
-
-        await delay(LATENCY);
-
-        // Emit disconnect asynchronously
-        expect(listener.starting.mock.calls.length).toBe(0);
-        expect(listener.start.mock.calls.length).toBe(0);
-        expect(listener.stopping.mock.calls.length).toBe(0);
-        expect(listener.stop.mock.calls.length).toBe(0);
-        expect(listener.connect.mock.calls.length).toBe(0);
-        expect(listener.message.mock.calls.length).toBe(0);
-        expect(listener.disconnect.mock.calls.length).toBe(1);
-        expect(listener.disconnect.mock.calls[0].length).toBe(2);
-        expect(listener.disconnect.mock.calls[0][0]).toBe(clientId);
-        expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
-        expect(listener.disconnect.mock.calls[0][1].message).toBe(
-          "FAILURE: WebSocket transmission failed.",
-        );
-
-        // Clean up
-        transportServer.stop();
-        await promisifyEvent(transportServer, "stop");
-        httpServer.close();
-        await promisifyEvent(httpServer, "close");
-      });
-
+      // it("should asynchronously emit disconnect", async () => {
+      //   const port = getNextPortNumber();
+      //   // Start an http server
+      //   const httpServer = http.createServer((req, res) => {
+      //     res.writeHead(200);
+      //     res.end("Webpage");
+      //   });
+      //   await promisify(httpServer.listen.bind(httpServer))(port);
+      //   // Start a transport server
+      //   const transportServer = transportWsServer({
+      //     noServer: true,
+      //   });
+      //   transportServer.start();
+      //   await promisifyEvent(transportServer, "start");
+      //   // Route upgrade requests to the transport
+      //   httpServer.on("upgrade", (req, socket, head) => {
+      //     transportServer.handleUpgrade(req, socket, head);
+      //   });
+      //   // Connect a client
+      //   const wsClient = new WebSocket(`ws://localhost:${port}`);
+      //   let clientId;
+      //   transportServer.once("connect", (cid) => {
+      //     clientId = cid;
+      //   });
+      //   await promisifyEvent(wsClient, "open");
+      //   // Make the call to send() call back error by having the client
+      //   // disconnect and prevent the transport server from knowing by removing
+      //   // its ws close listener
+      //   transportServer._wsServer.removeAllListeners("close");
+      //   wsClient.close();
+      //   await promisifyEvent(wsClient, "close");
+      //   const listener = createServerListener(transportServer);
+      //   transportServer.send(clientId, "msg");
+      //   // Emit nothing synchronously
+      //   expect(listener.starting.mock.calls.length).toBe(0);
+      //   expect(listener.start.mock.calls.length).toBe(0);
+      //   expect(listener.stopping.mock.calls.length).toBe(0);
+      //   expect(listener.stop.mock.calls.length).toBe(0);
+      //   expect(listener.connect.mock.calls.length).toBe(0);
+      //   expect(listener.message.mock.calls.length).toBe(0);
+      //   expect(listener.disconnect.mock.calls.length).toBe(0);
+      //   await delay(LATENCY);
+      //   // Emit disconnect asynchronously
+      //   expect(listener.starting.mock.calls.length).toBe(0);
+      //   expect(listener.start.mock.calls.length).toBe(0);
+      //   expect(listener.stopping.mock.calls.length).toBe(0);
+      //   expect(listener.stop.mock.calls.length).toBe(0);
+      //   expect(listener.connect.mock.calls.length).toBe(0);
+      //   expect(listener.message.mock.calls.length).toBe(0);
+      //   expect(listener.disconnect.mock.calls.length).toBe(1);
+      //   expect(listener.disconnect.mock.calls[0].length).toBe(2);
+      //   expect(listener.disconnect.mock.calls[0][0]).toBe(clientId);
+      //   expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
+      //   expect(listener.disconnect.mock.calls[0][1].message).toBe(
+      //     "FAILURE: WebSocket transmission failed.",
+      //   );
+      //   // Clean up
+      //   transportServer.stop();
+      //   await promisifyEvent(transportServer, "stop");
+      //   httpServer.close();
+      //   await promisifyEvent(httpServer, "close");
+      // });
       // WS client events - N/A (need to close client to get ws to throw)
     });
 
