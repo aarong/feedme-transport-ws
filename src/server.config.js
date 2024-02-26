@@ -5,7 +5,7 @@
 export default {
   defaults: {
     heartbeatIntervalMs: 5000,
-    heartbeatTimeoutMs: 4500
+    heartbeatTimeoutMs: 4500,
   },
 
   // Wait this long for a non-listening external server to start after call
@@ -13,5 +13,5 @@ export default {
   httpListeningMs: 2000,
 
   // Once started, check that an external server is listening this frequently
-  httpPollingMs: 500
+  httpPollingMs: 500,
 };

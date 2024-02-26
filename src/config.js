@@ -3,5 +3,5 @@
  * @type {Object}
  */
 export default {
-  wsSubprotocol: "feedme"
+  wsSubprotocol: "feedme",
 };

@@ -8,5 +8,5 @@ import server from "./server";
 export default {
   client,
   browser,
-  server
+  server,
 };

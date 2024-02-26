@@ -39,15 +39,15 @@ const BAD_URL = "ws://nothing"; // For testing failed connection attempts
 const RETRY_LIMIT = 5; // Number of times to attempt each test before failing
 const ATTEMPT_TIMEOUT = 30000; // Limit per individual test attempt
 
-const createClientListener = transportClient => {
+const createClientListener = (transportClient) => {
   const evts = ["connecting", "connect", "disconnect", "message"];
   const l = {};
-  evts.forEach(evt => {
+  evts.forEach((evt) => {
     l[evt] = jasmine.createSpy();
     transportClient.on(evt, l[evt]);
   });
   l.spyClear = () => {
-    evts.forEach(evt => {
+    evts.forEach((evt) => {
       l[evt].calls.reset();
     });
   };
@@ -58,7 +58,7 @@ const createClientListener = transportClient => {
 // Retries if the test throws (which occurs on failure) and if it times out
 // after ATTEMPT_TIMEOUT (which occurs when the controller or transport
 // WebSocket connection is unexpectedly lost).
-const retry = test => async () => {
+const retry = (test) => async () => {
   let err;
   let i;
   for (i = 0; i < RETRY_LIMIT; i += 1) {
@@ -80,7 +80,7 @@ const retry = test => async () => {
 const connectController = async () => {
   const fmController = feedmeClient({
     transport: feedmeTransportWsClient(`${TARGET_URL}:${PORT}`),
-    connectRetryMs: -1 // Do not retry connection attempts here - entire test is retried
+    connectRetryMs: -1, // Do not retry connection attempts here - entire test is retried
   });
   fmController.connect();
   await promisifyEvent(fmController, "connect");
@@ -88,7 +88,7 @@ const connectController = async () => {
 };
 
 // Disconnect a Feedme server controller client
-const disconnectController = async fmClient => {
+const disconnectController = async (fmClient) => {
   fmClient.disconnect();
   await promisifyEvent(fmClient, "disconnect");
 };
@@ -124,7 +124,7 @@ describe("The transport.connect() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -137,7 +137,7 @@ describe("The transport.connect() function", () => {
 
         // Make transport client connecting
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
         transportClient.connect();
 
@@ -145,13 +145,13 @@ describe("The transport.connect() function", () => {
         expect(() => {
           transportClient.connect();
         }).toThrow(
-          new Error("INVALID_STATE: Already connecting or connected.")
+          new Error("INVALID_STATE: Already connecting or connected."),
         );
 
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
 
     it(
@@ -162,7 +162,7 @@ describe("The transport.connect() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -175,7 +175,7 @@ describe("The transport.connect() function", () => {
 
         // Make transport client connecting
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
         transportClient.connect();
         await promisifyEvent(transportClient, "connect");
@@ -184,13 +184,13 @@ describe("The transport.connect() function", () => {
         expect(() => {
           transportClient.connect();
         }).toThrow(
-          new Error("INVALID_STATE: Already connecting or connected.")
+          new Error("INVALID_STATE: Already connecting or connected."),
         );
 
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
   });
 
@@ -206,10 +206,10 @@ describe("The transport.connect() function", () => {
           // Establish a WS server port and open the events feed
           const { Port: port } = await fmController.action(
             "EstablishWsPort",
-            {}
+            {},
           );
           const serverEventFeed = fmController.feed("WsEvents", {
-            Port: `${port}`
+            Port: `${port}`,
           });
           serverEventFeed.desireOpen();
           await promisifyEvent(serverEventFeed, "open");
@@ -222,7 +222,7 @@ describe("The transport.connect() function", () => {
 
           // Create transport client
           const transportClient = feedmeTransportWsClient(
-            `${TARGET_URL}:${port}`
+            `${TARGET_URL}:${port}`,
           );
 
           transportClient.connect();
@@ -232,7 +232,7 @@ describe("The transport.connect() function", () => {
           // Clean up
           await fmController.action("DestroyWsServer", { Port: port });
           disconnectController(fmController);
-        })
+        }),
       );
 
       // Client events
@@ -245,10 +245,10 @@ describe("The transport.connect() function", () => {
           // Establish a WS server port and open the events feed
           const { Port: port } = await fmController.action(
             "EstablishWsPort",
-            {}
+            {},
           );
           const serverEventFeed = fmController.feed("WsEvents", {
-            Port: `${port}`
+            Port: `${port}`,
           });
           serverEventFeed.desireOpen();
           await promisifyEvent(serverEventFeed, "open");
@@ -261,7 +261,7 @@ describe("The transport.connect() function", () => {
 
           // Create transport client
           const transportClient = feedmeTransportWsClient(
-            `${TARGET_URL}:${port}`
+            `${TARGET_URL}:${port}`,
           );
 
           const clientListener = createClientListener(transportClient);
@@ -286,7 +286,7 @@ describe("The transport.connect() function", () => {
           // Clean up
           await fmController.action("DestroyWsServer", { Port: port });
           disconnectController(fmController);
-        })
+        }),
       );
 
       // Server events
@@ -299,10 +299,10 @@ describe("The transport.connect() function", () => {
           // Establish a WS server port and open the events feed
           const { Port: port } = await fmController.action(
             "EstablishWsPort",
-            {}
+            {},
           );
           const serverEventFeed = fmController.feed("WsEvents", {
-            Port: `${port}`
+            Port: `${port}`,
           });
           serverEventFeed.desireOpen();
           await promisifyEvent(serverEventFeed, "open");
@@ -315,7 +315,7 @@ describe("The transport.connect() function", () => {
 
           // Make transport client connecting
           const transportClient = feedmeTransportWsClient(
-            `${TARGET_URL}:${port}`
+            `${TARGET_URL}:${port}`,
           );
 
           transportClient.connect();
@@ -329,7 +329,7 @@ describe("The transport.connect() function", () => {
           // Clean up
           await fmController.action("DestroyWsServer", { Port: port });
           disconnectController(fmController);
-        })
+        }),
       );
     });
 
@@ -344,10 +344,10 @@ describe("The transport.connect() function", () => {
           // Establish a WS server port and open the events feed
           const { Port: port } = await fmController.action(
             "EstablishWsPort",
-            {}
+            {},
           );
           const serverEventFeed = fmController.feed("WsEvents", {
-            Port: `${port}`
+            Port: `${port}`,
           });
           serverEventFeed.desireOpen();
           await promisifyEvent(serverEventFeed, "open");
@@ -360,7 +360,7 @@ describe("The transport.connect() function", () => {
 
           // Create transport client
           const transportClient = feedmeTransportWsClient(
-            `${TARGET_URL}:${port}`
+            `${TARGET_URL}:${port}`,
           );
 
           transportClient._address = {}; // Make ws initialization fail
@@ -371,7 +371,7 @@ describe("The transport.connect() function", () => {
           // Clean up
           await fmController.action("DestroyWsServer", { Port: port });
           disconnectController(fmController);
-        })
+        }),
       );
 
       // Client events
@@ -384,10 +384,10 @@ describe("The transport.connect() function", () => {
           // Establish a WS server port and open the events feed
           const { Port: port } = await fmController.action(
             "EstablishWsPort",
-            {}
+            {},
           );
           const serverEventFeed = fmController.feed("WsEvents", {
-            Port: `${port}`
+            Port: `${port}`,
           });
           serverEventFeed.desireOpen();
           await promisifyEvent(serverEventFeed, "open");
@@ -400,7 +400,7 @@ describe("The transport.connect() function", () => {
 
           // Create transport client
           const transportClient = feedmeTransportWsClient(
-            `${TARGET_URL}:${port}`
+            `${TARGET_URL}:${port}`,
           );
           transportClient._address = {}; // Make ws initialization fail
 
@@ -415,7 +415,7 @@ describe("The transport.connect() function", () => {
           expect(clientListener.message.calls.count()).toBe(0);
 
           const evtOrder = [];
-          ["connecting", "disconnect"].forEach(evt => {
+          ["connecting", "disconnect"].forEach((evt) => {
             transportClient.on(evt, () => {
               evtOrder.push(evt);
             });
@@ -435,7 +435,7 @@ describe("The transport.connect() function", () => {
           // Clean up
           await fmController.action("DestroyWsServer", { Port: port });
           disconnectController(fmController);
-        })
+        }),
       );
 
       // Server events - N/A
@@ -452,7 +452,7 @@ describe("The transport.disconnect() function", () => {
         expect(() => {
           transportClient.disconnect();
         }).toThrow(new Error("INVALID_STATE: Already disconnected."));
-      })
+      }),
     );
   });
 
@@ -468,10 +468,10 @@ describe("The transport.disconnect() function", () => {
           // Establish a WS server port and open the events feed
           const { Port: port } = await fmController.action(
             "EstablishWsPort",
-            {}
+            {},
           );
           const serverEventFeed = fmController.feed("WsEvents", {
-            Port: `${port}`
+            Port: `${port}`,
           });
           serverEventFeed.desireOpen();
           await promisifyEvent(serverEventFeed, "open");
@@ -484,7 +484,7 @@ describe("The transport.disconnect() function", () => {
 
           // Create transport client
           const transportClient = feedmeTransportWsClient(
-            `${TARGET_URL}:${port}`
+            `${TARGET_URL}:${port}`,
           );
 
           transportClient.connect();
@@ -498,7 +498,7 @@ describe("The transport.disconnect() function", () => {
           // Clean up
           await fmController.action("DestroyWsServer", { Port: port });
           disconnectController(fmController);
-        })
+        }),
       );
 
       // Client events
@@ -511,10 +511,10 @@ describe("The transport.disconnect() function", () => {
           // Establish a WS server port and open the events feed
           const { Port: port } = await fmController.action(
             "EstablishWsPort",
-            {}
+            {},
           );
           const serverEventFeed = fmController.feed("WsEvents", {
-            Port: `${port}`
+            Port: `${port}`,
           });
           serverEventFeed.desireOpen();
           await promisifyEvent(serverEventFeed, "open");
@@ -527,7 +527,7 @@ describe("The transport.disconnect() function", () => {
 
           // Create transport client
           const transportClient = feedmeTransportWsClient(
-            `${TARGET_URL}:${port}`
+            `${TARGET_URL}:${port}`,
           );
 
           transportClient.connect();
@@ -551,7 +551,7 @@ describe("The transport.disconnect() function", () => {
           // Emit disconnect asynchronously
           expect(clientListener.connecting.calls.count()).toBe(0);
           expect(clientListener.connect.calls.count()).toBeGreaterThanOrEqual(
-            0
+            0,
           ); // May have connected
           expect(clientListener.disconnect.calls.count()).toBe(1);
           expect(clientListener.disconnect.calls.argsFor(0).length).toBe(0);
@@ -560,7 +560,7 @@ describe("The transport.disconnect() function", () => {
           // Clean up
           await fmController.action("DestroyWsServer", { Port: port });
           disconnectController(fmController);
-        })
+        }),
       );
 
       // Server events - N/A
@@ -577,10 +577,10 @@ describe("The transport.disconnect() function", () => {
           // Establish a WS server port and open the events feed
           const { Port: port } = await fmController.action(
             "EstablishWsPort",
-            {}
+            {},
           );
           const serverEventFeed = fmController.feed("WsEvents", {
-            Port: `${port}`
+            Port: `${port}`,
           });
           serverEventFeed.desireOpen();
           await promisifyEvent(serverEventFeed, "open");
@@ -593,7 +593,7 @@ describe("The transport.disconnect() function", () => {
 
           // Create transport client
           const transportClient = feedmeTransportWsClient(
-            `${TARGET_URL}:${port}`
+            `${TARGET_URL}:${port}`,
           );
 
           transportClient.connect();
@@ -607,7 +607,7 @@ describe("The transport.disconnect() function", () => {
           // Clean up
           await fmController.action("DestroyWsServer", { Port: port });
           disconnectController(fmController);
-        })
+        }),
       );
 
       // Client events
@@ -620,10 +620,10 @@ describe("The transport.disconnect() function", () => {
           // Establish a WS server port and open the events feed
           const { Port: port } = await fmController.action(
             "EstablishWsPort",
-            {}
+            {},
           );
           const serverEventFeed = fmController.feed("WsEvents", {
-            Port: `${port}`
+            Port: `${port}`,
           });
           serverEventFeed.desireOpen();
           await promisifyEvent(serverEventFeed, "open");
@@ -636,7 +636,7 @@ describe("The transport.disconnect() function", () => {
 
           // Create transport client
           const transportClient = feedmeTransportWsClient(
-            `${TARGET_URL}:${port}`
+            `${TARGET_URL}:${port}`,
           );
 
           transportClient.connect();
@@ -661,7 +661,7 @@ describe("The transport.disconnect() function", () => {
           // Emit disconnect asynchronously
           expect(clientListener.connecting.calls.count()).toBe(0);
           expect(clientListener.connect.calls.count()).toBeGreaterThanOrEqual(
-            0
+            0,
           ); // May have connected
           expect(clientListener.disconnect.calls.count()).toBe(1);
           expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
@@ -671,7 +671,7 @@ describe("The transport.disconnect() function", () => {
           // Clean up
           await fmController.action("DestroyWsServer", { Port: port });
           disconnectController(fmController);
-        })
+        }),
       );
 
       // Server events - N/A
@@ -688,10 +688,10 @@ describe("The transport.disconnect() function", () => {
           // Establish a WS server port and open the events feed
           const { Port: port } = await fmController.action(
             "EstablishWsPort",
-            {}
+            {},
           );
           const serverEventFeed = fmController.feed("WsEvents", {
-            Port: `${port}`
+            Port: `${port}`,
           });
           serverEventFeed.desireOpen();
           await promisifyEvent(serverEventFeed, "open");
@@ -704,7 +704,7 @@ describe("The transport.disconnect() function", () => {
 
           // Create transport client
           const transportClient = feedmeTransportWsClient(
-            `${TARGET_URL}:${port}`
+            `${TARGET_URL}:${port}`,
           );
 
           transportClient.connect();
@@ -720,7 +720,7 @@ describe("The transport.disconnect() function", () => {
           // Clean up
           await fmController.action("DestroyWsServer", { Port: port });
           disconnectController(fmController);
-        })
+        }),
       );
 
       // Client events
@@ -733,10 +733,10 @@ describe("The transport.disconnect() function", () => {
           // Establish a WS server port and open the events feed
           const { Port: port } = await fmController.action(
             "EstablishWsPort",
-            {}
+            {},
           );
           const serverEventFeed = fmController.feed("WsEvents", {
-            Port: `${port}`
+            Port: `${port}`,
           });
           serverEventFeed.desireOpen();
           await promisifyEvent(serverEventFeed, "open");
@@ -749,7 +749,7 @@ describe("The transport.disconnect() function", () => {
 
           // Create transport client
           const transportClient = feedmeTransportWsClient(
-            `${TARGET_URL}:${port}`
+            `${TARGET_URL}:${port}`,
           );
 
           transportClient.connect();
@@ -782,7 +782,7 @@ describe("The transport.disconnect() function", () => {
           // Clean up
           await fmController.action("DestroyWsServer", { Port: port });
           disconnectController(fmController);
-        })
+        }),
       );
 
       // Server events
@@ -794,10 +794,10 @@ describe("The transport.disconnect() function", () => {
           // Establish a WS server port and open the events feed
           const { Port: port } = await fmController.action(
             "EstablishWsPort",
-            {}
+            {},
           );
           const serverEventFeed = fmController.feed("WsEvents", {
-            Port: `${port}`
+            Port: `${port}`,
           });
           serverEventFeed.desireOpen();
           await promisifyEvent(serverEventFeed, "open");
@@ -810,14 +810,14 @@ describe("The transport.disconnect() function", () => {
 
           // Make transport client connecting
           const transportClient = feedmeTransportWsClient(
-            `${TARGET_URL}:${port}`
+            `${TARGET_URL}:${port}`,
           );
 
           transportClient.connect();
 
           await Promise.all([
             promisifyEvent(transportClient, "connect"),
-            promisifyEvent(serverEventFeed, "action") // connection
+            promisifyEvent(serverEventFeed, "action"), // connection
           ]);
 
           transportClient.disconnect();
@@ -831,7 +831,7 @@ describe("The transport.disconnect() function", () => {
           // Clean up
           await fmController.action("DestroyWsServer", { Port: port });
           disconnectController(fmController);
-        })
+        }),
       );
     });
 
@@ -846,10 +846,10 @@ describe("The transport.disconnect() function", () => {
           // Establish a WS server port and open the events feed
           const { Port: port } = await fmController.action(
             "EstablishWsPort",
-            {}
+            {},
           );
           const serverEventFeed = fmController.feed("WsEvents", {
-            Port: `${port}`
+            Port: `${port}`,
           });
           serverEventFeed.desireOpen();
           await promisifyEvent(serverEventFeed, "open");
@@ -862,7 +862,7 @@ describe("The transport.disconnect() function", () => {
 
           // Create transport client
           const transportClient = feedmeTransportWsClient(
-            `${TARGET_URL}:${port}`
+            `${TARGET_URL}:${port}`,
           );
 
           transportClient.connect();
@@ -878,7 +878,7 @@ describe("The transport.disconnect() function", () => {
           // Clean up
           await fmController.action("DestroyWsServer", { Port: port });
           disconnectController(fmController);
-        })
+        }),
       );
 
       // Client events
@@ -891,10 +891,10 @@ describe("The transport.disconnect() function", () => {
           // Establish a WS server port and open the events feed
           const { Port: port } = await fmController.action(
             "EstablishWsPort",
-            {}
+            {},
           );
           const serverEventFeed = fmController.feed("WsEvents", {
-            Port: `${port}`
+            Port: `${port}`,
           });
           serverEventFeed.desireOpen();
           await promisifyEvent(serverEventFeed, "open");
@@ -907,7 +907,7 @@ describe("The transport.disconnect() function", () => {
 
           // Create transport client
           const transportClient = feedmeTransportWsClient(
-            `${TARGET_URL}:${port}`
+            `${TARGET_URL}:${port}`,
           );
 
           transportClient.connect();
@@ -942,7 +942,7 @@ describe("The transport.disconnect() function", () => {
           // Clean up
           await fmController.action("DestroyWsServer", { Port: port });
           disconnectController(fmController);
-        })
+        }),
       );
 
       // Server events
@@ -954,10 +954,10 @@ describe("The transport.disconnect() function", () => {
           // Establish a WS server port and open the events feed
           const { Port: port } = await fmController.action(
             "EstablishWsPort",
-            {}
+            {},
           );
           const serverEventFeed = fmController.feed("WsEvents", {
-            Port: `${port}`
+            Port: `${port}`,
           });
           serverEventFeed.desireOpen();
           await promisifyEvent(serverEventFeed, "open");
@@ -970,14 +970,14 @@ describe("The transport.disconnect() function", () => {
 
           // Make transport client connecting
           const transportClient = feedmeTransportWsClient(
-            `${TARGET_URL}:${port}`
+            `${TARGET_URL}:${port}`,
           );
 
           transportClient.connect();
 
           await Promise.all([
             promisifyEvent(transportClient, "connect"),
-            promisifyEvent(serverEventFeed, "action") // connection
+            promisifyEvent(serverEventFeed, "action"), // connection
           ]);
 
           transportClient.disconnect(new Error("SOME_ERROR"));
@@ -991,7 +991,7 @@ describe("The transport.disconnect() function", () => {
           // Clean up
           await fmController.action("DestroyWsServer", { Port: port });
           disconnectController(fmController);
-        })
+        }),
       );
     });
   });
@@ -1006,7 +1006,7 @@ describe("The transport.send() function", () => {
         expect(() => {
           transportClient.send("msg");
         }).toThrow(new Error("INVALID_STATE: Not connected."));
-      })
+      }),
     );
 
     it(
@@ -1017,7 +1017,7 @@ describe("The transport.send() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -1030,7 +1030,7 @@ describe("The transport.send() function", () => {
 
         // Make transport client connecting
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
         transportClient.connect();
 
@@ -1042,7 +1042,7 @@ describe("The transport.send() function", () => {
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
   });
 
@@ -1057,7 +1057,7 @@ describe("The transport.send() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -1070,7 +1070,7 @@ describe("The transport.send() function", () => {
 
         // Connect a transport client
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
         transportClient.connect();
         await promisifyEvent(transportClient, "connect");
@@ -1088,7 +1088,7 @@ describe("The transport.send() function", () => {
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
 
     // Client events
@@ -1101,7 +1101,7 @@ describe("The transport.send() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -1114,7 +1114,7 @@ describe("The transport.send() function", () => {
 
         // Create transport client
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
 
         transportClient.connect();
@@ -1146,7 +1146,7 @@ describe("The transport.send() function", () => {
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
 
     // Server events
@@ -1159,7 +1159,7 @@ describe("The transport.send() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -1172,14 +1172,14 @@ describe("The transport.send() function", () => {
 
         // Make transport client connecting
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
 
         transportClient.connect();
 
         await Promise.all([
           promisifyEvent(transportClient, "connect"),
-          promisifyEvent(serverEventFeed, "action") // connection
+          promisifyEvent(serverEventFeed, "action"), // connection
         ]);
 
         transportClient.send("msg");
@@ -1193,7 +1193,7 @@ describe("The transport.send() function", () => {
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
   });
 });
@@ -1209,7 +1209,7 @@ describe("The transport._processWsOpen() function", () => {
       // Establish a WS server port and open the events feed
       const { Port: port } = await fmController.action("EstablishWsPort", {});
       const serverEventFeed = fmController.feed("WsEvents", {
-        Port: `${port}`
+        Port: `${port}`,
       });
       serverEventFeed.desireOpen();
       await promisifyEvent(serverEventFeed, "open");
@@ -1237,7 +1237,7 @@ describe("The transport._processWsOpen() function", () => {
       // Clean up
       await fmController.action("DestroyWsServer", { Port: port });
       disconnectController(fmController);
-    })
+    }),
   );
 
   // Client events
@@ -1250,7 +1250,7 @@ describe("The transport._processWsOpen() function", () => {
       // Establish a WS server port and open the events feed
       const { Port: port } = await fmController.action("EstablishWsPort", {});
       const serverEventFeed = fmController.feed("WsEvents", {
-        Port: `${port}`
+        Port: `${port}`,
       });
       serverEventFeed.desireOpen();
       await promisifyEvent(serverEventFeed, "open");
@@ -1284,7 +1284,7 @@ describe("The transport._processWsOpen() function", () => {
       // Clean up
       await fmController.action("DestroyWsServer", { Port: port });
       disconnectController(fmController);
-    })
+    }),
   );
 
   // Server events - N/A
@@ -1302,7 +1302,7 @@ describe("The transport._processWsMessage() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -1315,14 +1315,14 @@ describe("The transport._processWsMessage() function", () => {
 
         // Connect a transport client
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
         transportClient.connect();
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
           promisifyEvent(serverEventFeed, "action"),
-          promisifyEvent(transportClient, "connect")
+          promisifyEvent(transportClient, "connect"),
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1333,7 +1333,7 @@ describe("The transport._processWsMessage() function", () => {
           Port: `${port}`,
           Method: "send",
           ClientId: serverClientId,
-          Arguments: ["binary"] // server changes "binary" to actual binary
+          Arguments: ["binary"], // server changes "binary" to actual binary
         });
 
         await promisifyEvent(transportClient, "disconnect");
@@ -1343,7 +1343,7 @@ describe("The transport._processWsMessage() function", () => {
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
 
     // Client events
@@ -1356,7 +1356,7 @@ describe("The transport._processWsMessage() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -1369,14 +1369,14 @@ describe("The transport._processWsMessage() function", () => {
 
         // Connect a transport client
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
         transportClient.connect();
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
           promisifyEvent(serverEventFeed, "action"),
-          promisifyEvent(transportClient, "connect")
+          promisifyEvent(transportClient, "connect"),
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1387,7 +1387,7 @@ describe("The transport._processWsMessage() function", () => {
           Port: `${port}`,
           Method: "send",
           ClientId: serverClientId,
-          Arguments: ["binary"] // server changes "binary" to actual binary
+          Arguments: ["binary"], // server changes "binary" to actual binary
         });
         await promisifyEvent(transportClient, "disconnect");
 
@@ -1397,17 +1397,17 @@ describe("The transport._processWsMessage() function", () => {
         expect(clientListener.disconnect.calls.count()).toBe(1);
         expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
         expect(clientListener.disconnect.calls.argsFor(0)[0]).toEqual(
-          jasmine.any(Error)
+          jasmine.any(Error),
         );
         expect(clientListener.disconnect.calls.argsFor(0)[0].message).toEqual(
-          "FAILURE: Received non-string message on WebSocket connection."
+          "FAILURE: Received non-string message on WebSocket connection.",
         );
         expect(clientListener.message.calls.count()).toBe(0);
 
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
 
     // Server events
@@ -1420,7 +1420,7 @@ describe("The transport._processWsMessage() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -1433,14 +1433,14 @@ describe("The transport._processWsMessage() function", () => {
 
         // Connect a transport client
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
         transportClient.connect();
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
           promisifyEvent(serverEventFeed, "action"),
-          promisifyEvent(transportClient, "connect")
+          promisifyEvent(transportClient, "connect"),
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1449,7 +1449,7 @@ describe("The transport._processWsMessage() function", () => {
           Port: `${port}`,
           Method: "send",
           ClientId: serverClientId,
-          Arguments: ["binary"] // server changes "binary" to actual binary
+          Arguments: ["binary"], // server changes "binary" to actual binary
         });
 
         const evt = await promisifyEvent(serverEventFeed, "action");
@@ -1462,7 +1462,7 @@ describe("The transport._processWsMessage() function", () => {
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
   });
 
@@ -1477,7 +1477,7 @@ describe("The transport._processWsMessage() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -1490,14 +1490,14 @@ describe("The transport._processWsMessage() function", () => {
 
         // Connect a transport client
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
         transportClient.connect();
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
           promisifyEvent(serverEventFeed, "action"),
-          promisifyEvent(transportClient, "connect")
+          promisifyEvent(transportClient, "connect"),
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1508,7 +1508,7 @@ describe("The transport._processWsMessage() function", () => {
           Port: `${port}`,
           Method: "send",
           ClientId: serverClientId,
-          Arguments: ["msg"]
+          Arguments: ["msg"],
         });
 
         await promisifyEvent(transportClient, "message");
@@ -1522,7 +1522,7 @@ describe("The transport._processWsMessage() function", () => {
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
 
     // Client events
@@ -1535,7 +1535,7 @@ describe("The transport._processWsMessage() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -1548,14 +1548,14 @@ describe("The transport._processWsMessage() function", () => {
 
         // Connect a transport client
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
         transportClient.connect();
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
           promisifyEvent(serverEventFeed, "action"),
-          promisifyEvent(transportClient, "connect")
+          promisifyEvent(transportClient, "connect"),
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1566,7 +1566,7 @@ describe("The transport._processWsMessage() function", () => {
           Port: `${port}`,
           Method: "send",
           ClientId: serverClientId,
-          Arguments: ["msg"]
+          Arguments: ["msg"],
         });
         await promisifyEvent(transportClient, "message");
 
@@ -1581,7 +1581,7 @@ describe("The transport._processWsMessage() function", () => {
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
 
     // Server events - N/A
@@ -1604,7 +1604,7 @@ describe("The transport._processWsClose() function", () => {
         await promisifyEvent(transportClient, "disconnect");
 
         expect(transportClient.state()).toBe("disconnected");
-      })
+      }),
     );
 
     // Client events
@@ -1627,13 +1627,13 @@ describe("The transport._processWsClose() function", () => {
         expect(clientListener.disconnect.calls.count()).toBe(1);
         expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
         expect(clientListener.disconnect.calls.argsFor(0)[0]).toEqual(
-          jasmine.any(Error)
+          jasmine.any(Error),
         );
         expect(clientListener.disconnect.calls.argsFor(0)[0].message).toBe(
-          "FAILURE: The WebSocket could not be opened."
+          "FAILURE: The WebSocket could not be opened.",
         );
         expect(clientListener.message.calls.count()).toBe(0);
-      })
+      }),
     );
 
     // Server events - N/A
@@ -1650,7 +1650,7 @@ describe("The transport._processWsClose() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -1663,7 +1663,7 @@ describe("The transport._processWsClose() function", () => {
 
         // Connect a transport client
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
         transportClient.connect();
         await promisifyEvent(transportClient, "connect");
@@ -1674,7 +1674,7 @@ describe("The transport._processWsClose() function", () => {
         fmController.action("InvokeWsMethod", {
           Port: `${port}`,
           Method: "close",
-          Arguments: []
+          Arguments: [],
         });
 
         await promisifyEvent(transportClient, "disconnect");
@@ -1684,7 +1684,7 @@ describe("The transport._processWsClose() function", () => {
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
 
     // Client events
@@ -1697,7 +1697,7 @@ describe("The transport._processWsClose() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -1710,7 +1710,7 @@ describe("The transport._processWsClose() function", () => {
 
         // Connect a transport client
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
         transportClient.connect();
         await promisifyEvent(transportClient, "connect");
@@ -1723,7 +1723,7 @@ describe("The transport._processWsClose() function", () => {
         fmController.action("InvokeWsMethod", {
           Port: `${port}`,
           Method: "close",
-          Arguments: []
+          Arguments: [],
         });
 
         await promisifyEvent(transportClient, "disconnect");
@@ -1734,10 +1734,10 @@ describe("The transport._processWsClose() function", () => {
         expect(clientListener.disconnect.calls.count()).toBe(1);
         expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
         expect(clientListener.disconnect.calls.argsFor(0)[0]).toEqual(
-          jasmine.any(Error)
+          jasmine.any(Error),
         );
         expect(clientListener.disconnect.calls.argsFor(0)[0].message).toBe(
-          "FAILURE: The WebSocket closed unexpectedly."
+          "FAILURE: The WebSocket closed unexpectedly.",
         );
         expect(clientListener.message.calls.count()).toBe(0);
 
@@ -1746,7 +1746,7 @@ describe("The transport._processWsClose() function", () => {
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
 
     // Server events - N/A
@@ -1763,7 +1763,7 @@ describe("The transport._processWsClose() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -1776,14 +1776,14 @@ describe("The transport._processWsClose() function", () => {
 
         // Connect a transport client
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
         transportClient.connect();
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
           promisifyEvent(serverEventFeed, "action"),
-          promisifyEvent(transportClient, "connect")
+          promisifyEvent(transportClient, "connect"),
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1794,7 +1794,7 @@ describe("The transport._processWsClose() function", () => {
           Port: `${port}`,
           Method: "close",
           Arguments: [],
-          ClientId: serverClientId
+          ClientId: serverClientId,
         });
 
         await promisifyEvent(transportClient, "disconnect");
@@ -1804,7 +1804,7 @@ describe("The transport._processWsClose() function", () => {
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
 
     // Client events
@@ -1817,7 +1817,7 @@ describe("The transport._processWsClose() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -1830,14 +1830,14 @@ describe("The transport._processWsClose() function", () => {
 
         // Connect a transport client
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
         transportClient.connect();
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
           promisifyEvent(serverEventFeed, "action"),
-          promisifyEvent(transportClient, "connect")
+          promisifyEvent(transportClient, "connect"),
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1850,7 +1850,7 @@ describe("The transport._processWsClose() function", () => {
           Port: `${port}`,
           Method: "close",
           Arguments: [],
-          ClientId: serverClientId
+          ClientId: serverClientId,
         });
 
         await promisifyEvent(transportClient, "disconnect");
@@ -1861,10 +1861,10 @@ describe("The transport._processWsClose() function", () => {
         expect(clientListener.disconnect.calls.count()).toBe(1);
         expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
         expect(clientListener.disconnect.calls.argsFor(0)[0]).toEqual(
-          jasmine.any(Error)
+          jasmine.any(Error),
         );
         expect(clientListener.disconnect.calls.argsFor(0)[0].message).toBe(
-          "FAILURE: The WebSocket closed unexpectedly."
+          "FAILURE: The WebSocket closed unexpectedly.",
         );
         expect(clientListener.message.calls.count()).toBe(0);
 
@@ -1873,7 +1873,7 @@ describe("The transport._processWsClose() function", () => {
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
 
     // Server events - N/A
@@ -1890,7 +1890,7 @@ describe("The transport._processWsClose() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -1903,14 +1903,14 @@ describe("The transport._processWsClose() function", () => {
 
         // Connect a transport client
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
         transportClient.connect();
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
           promisifyEvent(serverEventFeed, "action"),
-          promisifyEvent(transportClient, "connect")
+          promisifyEvent(transportClient, "connect"),
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1921,7 +1921,7 @@ describe("The transport._processWsClose() function", () => {
           Port: `${port}`,
           Method: "terminate",
           Arguments: [],
-          ClientId: serverClientId
+          ClientId: serverClientId,
         });
 
         await promisifyEvent(transportClient, "disconnect");
@@ -1931,7 +1931,7 @@ describe("The transport._processWsClose() function", () => {
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
 
     // Client events
@@ -1944,7 +1944,7 @@ describe("The transport._processWsClose() function", () => {
         // Establish a WS server port and open the events feed
         const { Port: port } = await fmController.action("EstablishWsPort", {});
         const serverEventFeed = fmController.feed("WsEvents", {
-          Port: `${port}`
+          Port: `${port}`,
         });
         serverEventFeed.desireOpen();
         await promisifyEvent(serverEventFeed, "open");
@@ -1957,14 +1957,14 @@ describe("The transport._processWsClose() function", () => {
 
         // Connect a transport client
         const transportClient = feedmeTransportWsClient(
-          `${TARGET_URL}:${port}`
+          `${TARGET_URL}:${port}`,
         );
         transportClient.connect();
 
         // Await connection on both sides and get server client id
         const results = await Promise.all([
           promisifyEvent(serverEventFeed, "action"),
-          promisifyEvent(transportClient, "connect")
+          promisifyEvent(transportClient, "connect"),
         ]);
         const serverClientId = results[0][1].ClientId;
 
@@ -1977,7 +1977,7 @@ describe("The transport._processWsClose() function", () => {
           Port: `${port}`,
           Method: "terminate",
           Arguments: [],
-          ClientId: serverClientId
+          ClientId: serverClientId,
         });
 
         await promisifyEvent(transportClient, "disconnect");
@@ -1988,10 +1988,10 @@ describe("The transport._processWsClose() function", () => {
         expect(clientListener.disconnect.calls.count()).toBe(1);
         expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
         expect(clientListener.disconnect.calls.argsFor(0)[0]).toEqual(
-          jasmine.any(Error)
+          jasmine.any(Error),
         );
         expect(clientListener.disconnect.calls.argsFor(0)[0].message).toBe(
-          "FAILURE: The WebSocket closed unexpectedly."
+          "FAILURE: The WebSocket closed unexpectedly.",
         );
         expect(clientListener.message.calls.count()).toBe(0);
 
@@ -2000,7 +2000,7 @@ describe("The transport._processWsClose() function", () => {
         // Clean up
         await fmController.action("DestroyWsServer", { Port: port });
         disconnectController(fmController);
-      })
+      }),
     );
 
     // Server events - N/A
@@ -2022,7 +2022,7 @@ describe("The transport should operate correctly through multiple connection cyc
       // Establish a WS server port and open the events feed
       const { Port: port } = await fmController.action("EstablishWsPort", {});
       const serverEventFeed = fmController.feed("WsEvents", {
-        Port: `${port}`
+        Port: `${port}`,
       });
       serverEventFeed.desireOpen();
       await promisifyEvent(serverEventFeed, "open");
@@ -2065,7 +2065,7 @@ describe("The transport should operate correctly through multiple connection cyc
       // Clean up
       await fmController.action("DestroyWsServer", { Port: port });
       disconnectController(fmController);
-    })
+    }),
   );
 
   // Transport client events
@@ -2078,7 +2078,7 @@ describe("The transport should operate correctly through multiple connection cyc
       // Establish a WS server port and open the events feed
       const { Port: port } = await fmController.action("EstablishWsPort", {});
       const serverEventFeed = fmController.feed("WsEvents", {
-        Port: `${port}`
+        Port: `${port}`,
       });
       serverEventFeed.desireOpen();
       await promisifyEvent(serverEventFeed, "open");
@@ -2189,7 +2189,7 @@ describe("The transport should operate correctly through multiple connection cyc
       // Clean up
       await fmController.action("DestroyWsServer", { Port: port });
       disconnectController(fmController);
-    })
+    }),
   );
 
   // Server events
@@ -2202,7 +2202,7 @@ describe("The transport should operate correctly through multiple connection cyc
       // Establish a WS server port and open the events feed
       const { Port: port } = await fmController.action("EstablishWsPort", {});
       const serverEventFeed = fmController.feed("WsEvents", {
-        Port: `${port}`
+        Port: `${port}`,
       });
       serverEventFeed.desireOpen();
       await promisifyEvent(serverEventFeed, "open");
@@ -2221,7 +2221,7 @@ describe("The transport should operate correctly through multiple connection cyc
       // Server should emit connecting event
       let results = await Promise.all([
         promisifyEvent(serverEventFeed, "action"),
-        promisifyEvent(transportClient, "connect")
+        promisifyEvent(transportClient, "connect"),
       ]);
       let evt = results[0];
       expect(evt[0]).toBe("Event");
@@ -2233,7 +2233,7 @@ describe("The transport should operate correctly through multiple connection cyc
       // Server should emit disconnect event
       results = await Promise.all([
         promisifyEvent(serverEventFeed, "action"),
-        promisifyEvent(transportClient, "disconnect")
+        promisifyEvent(transportClient, "disconnect"),
       ]);
       [evt] = results;
       expect(evt[0]).toBe("Event");
@@ -2245,7 +2245,7 @@ describe("The transport should operate correctly through multiple connection cyc
       // Server should emit connecting event
       results = await Promise.all([
         promisifyEvent(serverEventFeed, "action"),
-        promisifyEvent(transportClient, "connect")
+        promisifyEvent(transportClient, "connect"),
       ]);
       [evt] = results;
       expect(evt[0]).toBe("Event");
@@ -2257,7 +2257,7 @@ describe("The transport should operate correctly through multiple connection cyc
       // Server should emit disconnect event
       results = await Promise.all([
         promisifyEvent(serverEventFeed, "action"),
-        promisifyEvent(transportClient, "disconnect")
+        promisifyEvent(transportClient, "disconnect"),
       ]);
       [evt] = results;
       expect(evt[0]).toBe("Event");
@@ -2267,7 +2267,7 @@ describe("The transport should operate correctly through multiple connection cyc
       // Clean up
       await fmController.action("DestroyWsServer", { Port: port });
       disconnectController(fmController);
-    })
+    }),
   );
 });
 
@@ -2284,10 +2284,10 @@ describe("The transport.connect() function", () => {
       // Initialize a transport server and open the events feed
       const { Port: port } = await fmController.action(
         "InitTransportServer",
-        {}
+        {},
       );
       const serverEventFeed = fmController.feed("TransportEvents", {
-        Port: `${port}`
+        Port: `${port}`,
       });
       serverEventFeed.desireOpen();
       await promisifyEvent(serverEventFeed, "open");
@@ -2296,9 +2296,9 @@ describe("The transport.connect() function", () => {
       fmController.action("InvokeTransportMethod", {
         Port: port,
         Method: "start",
-        Arguments: []
+        Arguments: [],
       });
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         serverEventFeed.on("action", (an, ad) => {
           if (an === "Event" && ad.Name === "start") {
             serverEventFeed.removeAllListeners("action");
@@ -2319,7 +2319,7 @@ describe("The transport.connect() function", () => {
       // Clean up
       await fmController.action("DestroyTransportServer", { Port: port });
       disconnectController(fmController);
-    })
+    }),
   );
 });
 
@@ -2332,10 +2332,10 @@ describe("The transport.disconnect() function", () => {
       // Initialize a transport server and open the events feed
       const { Port: port } = await fmController.action(
         "InitTransportServer",
-        {}
+        {},
       );
       const serverEventFeed = fmController.feed("TransportEvents", {
-        Port: `${port}`
+        Port: `${port}`,
       });
       serverEventFeed.desireOpen();
       await promisifyEvent(serverEventFeed, "open");
@@ -2344,9 +2344,9 @@ describe("The transport.disconnect() function", () => {
       fmController.action("InvokeTransportMethod", {
         Port: port,
         Method: "start",
-        Arguments: []
+        Arguments: [],
       });
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         serverEventFeed.on("action", (an, ad) => {
           if (an === "Event" && ad.Name === "start") {
             serverEventFeed.removeAllListeners("action");
@@ -2360,7 +2360,7 @@ describe("The transport.disconnect() function", () => {
       transportClient.connect();
       const evts = await Promise.all([
         promisifyEvent(transportClient, "connect"),
-        promisifyEvent(serverEventFeed, "action") // connection
+        promisifyEvent(serverEventFeed, "action"), // connection
       ]);
       const serverClientId = evts[1][1].Arguments[0];
 
@@ -2375,7 +2375,7 @@ describe("The transport.disconnect() function", () => {
       // Clean up
       await fmController.action("DestroyTransportServer", { Port: port });
       disconnectController(fmController);
-    })
+    }),
   );
 });
 
@@ -2388,10 +2388,10 @@ describe("The transport.send() function", () => {
       // Initialize a transport server and open the events feed
       const { Port: port } = await fmController.action(
         "InitTransportServer",
-        {}
+        {},
       );
       const serverEventFeed = fmController.feed("TransportEvents", {
-        Port: `${port}`
+        Port: `${port}`,
       });
       serverEventFeed.desireOpen();
       await promisifyEvent(serverEventFeed, "open");
@@ -2400,9 +2400,9 @@ describe("The transport.send() function", () => {
       fmController.action("InvokeTransportMethod", {
         Port: port,
         Method: "start",
-        Arguments: []
+        Arguments: [],
       });
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         serverEventFeed.on("action", (an, ad) => {
           if (an === "Event" && ad.Name === "start") {
             serverEventFeed.removeAllListeners("action");
@@ -2416,7 +2416,7 @@ describe("The transport.send() function", () => {
       transportClient.connect();
       const evts = await Promise.all([
         promisifyEvent(transportClient, "connect"),
-        promisifyEvent(serverEventFeed, "action") // connection
+        promisifyEvent(serverEventFeed, "action"), // connection
       ]);
       const serverClientId = evts[1][1].Arguments[0];
 
@@ -2432,7 +2432,7 @@ describe("The transport.send() function", () => {
       // Clean up
       await fmController.action("DestroyTransportServer", { Port: port });
       disconnectController(fmController);
-    })
+    }),
   );
 });
 
@@ -2445,10 +2445,10 @@ describe("The server.stop() function", () => {
       // Initialize a transport server and open the events feed
       const { Port: port } = await fmController.action(
         "InitTransportServer",
-        {}
+        {},
       );
       const serverEventFeed = fmController.feed("TransportEvents", {
-        Port: `${port}`
+        Port: `${port}`,
       });
       serverEventFeed.desireOpen();
       await promisifyEvent(serverEventFeed, "open");
@@ -2457,9 +2457,9 @@ describe("The server.stop() function", () => {
       fmController.action("InvokeTransportMethod", {
         Port: port,
         Method: "start",
-        Arguments: []
+        Arguments: [],
       });
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         serverEventFeed.on("action", (an, ad) => {
           if (an === "Event" && ad.Name === "start") {
             serverEventFeed.removeAllListeners("action");
@@ -2479,7 +2479,7 @@ describe("The server.stop() function", () => {
       fmController.action("InvokeTransportMethod", {
         Port: port,
         Method: "stop",
-        Arguments: []
+        Arguments: [],
       });
 
       // Check the client event
@@ -2489,17 +2489,17 @@ describe("The server.stop() function", () => {
       expect(clientListener.disconnect.calls.count()).toBe(1);
       expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
       expect(clientListener.disconnect.calls.argsFor(0)[0]).toEqual(
-        jasmine.any(Error)
+        jasmine.any(Error),
       );
       expect(clientListener.disconnect.calls.argsFor(0)[0].message).toBe(
-        "FAILURE: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly.",
       );
       expect(clientListener.message.calls.count()).toBe(0);
 
       // Clean up
       await fmController.action("DestroyTransportServer", { Port: port });
       disconnectController(fmController);
-    })
+    }),
   );
 });
 
@@ -2512,10 +2512,10 @@ describe("The server.send() function", () => {
       // Initialize a transport server and open the events feed
       const { Port: port } = await fmController.action(
         "InitTransportServer",
-        {}
+        {},
       );
       const serverEventFeed = fmController.feed("TransportEvents", {
-        Port: `${port}`
+        Port: `${port}`,
       });
       serverEventFeed.desireOpen();
       await promisifyEvent(serverEventFeed, "open");
@@ -2524,9 +2524,9 @@ describe("The server.send() function", () => {
       fmController.action("InvokeTransportMethod", {
         Port: port,
         Method: "start",
-        Arguments: []
+        Arguments: [],
       });
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         serverEventFeed.on("action", (an, ad) => {
           if (an === "Event" && ad.Name === "start") {
             serverEventFeed.removeAllListeners("action");
@@ -2540,7 +2540,7 @@ describe("The server.send() function", () => {
       transportClient.connect();
       const results = await Promise.all([
         promisifyEvent(serverEventFeed, "action"),
-        promisifyEvent(transportClient, "connect")
+        promisifyEvent(transportClient, "connect"),
       ]);
       const serverClientId = results[0][1].Arguments[0];
 
@@ -2550,7 +2550,7 @@ describe("The server.send() function", () => {
       fmController.action("InvokeTransportMethod", {
         Port: port,
         Method: "send",
-        Arguments: [serverClientId, "msg"]
+        Arguments: [serverClientId, "msg"],
       });
 
       // Check the client event
@@ -2565,7 +2565,7 @@ describe("The server.send() function", () => {
       // Clean up
       await fmController.action("DestroyTransportServer", { Port: port });
       disconnectController(fmController);
-    })
+    }),
   );
 });
 
@@ -2578,10 +2578,10 @@ describe("The server.disconnect() function", () => {
       // Initialize a transport server and open the events feed
       const { Port: port } = await fmController.action(
         "InitTransportServer",
-        {}
+        {},
       );
       const serverEventFeed = fmController.feed("TransportEvents", {
-        Port: `${port}`
+        Port: `${port}`,
       });
       serverEventFeed.desireOpen();
       await promisifyEvent(serverEventFeed, "open");
@@ -2590,9 +2590,9 @@ describe("The server.disconnect() function", () => {
       fmController.action("InvokeTransportMethod", {
         Port: port,
         Method: "start",
-        Arguments: []
+        Arguments: [],
       });
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         serverEventFeed.on("action", (an, ad) => {
           if (an === "Event" && ad.Name === "start") {
             serverEventFeed.removeAllListeners("action");
@@ -2606,7 +2606,7 @@ describe("The server.disconnect() function", () => {
       transportClient.connect();
       const results = await Promise.all([
         promisifyEvent(serverEventFeed, "action"),
-        promisifyEvent(transportClient, "connect")
+        promisifyEvent(transportClient, "connect"),
       ]);
       const serverClientId = results[0][1].Arguments[0];
 
@@ -2616,7 +2616,7 @@ describe("The server.disconnect() function", () => {
       fmController.action("InvokeTransportMethod", {
         Port: port,
         Method: "disconnect",
-        Arguments: [serverClientId]
+        Arguments: [serverClientId],
       });
 
       // Check the client event
@@ -2626,17 +2626,17 @@ describe("The server.disconnect() function", () => {
       expect(clientListener.disconnect.calls.count()).toBe(1);
       expect(clientListener.disconnect.calls.argsFor(0).length).toBe(1);
       expect(clientListener.disconnect.calls.argsFor(0)[0]).toEqual(
-        jasmine.any(Error)
+        jasmine.any(Error),
       );
       expect(clientListener.disconnect.calls.argsFor(0)[0].message).toBe(
-        "FAILURE: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly.",
       );
       expect(clientListener.message.calls.count()).toBe(0);
 
       // Clean up
       await fmController.action("DestroyTransportServer", { Port: port });
       disconnectController(fmController);
-    })
+    }),
   );
 });
 
@@ -2649,10 +2649,10 @@ describe("The transport should be able to exchange long messages", () => {
       // Initialize a transport server and open the events feed
       const { Port: port } = await fmController.action(
         "InitTransportServer",
-        {}
+        {},
       );
       const serverEventFeed = fmController.feed("TransportEvents", {
-        Port: `${port}`
+        Port: `${port}`,
       });
       serverEventFeed.desireOpen();
       await promisifyEvent(serverEventFeed, "open");
@@ -2661,9 +2661,9 @@ describe("The transport should be able to exchange long messages", () => {
       fmController.action("InvokeTransportMethod", {
         Port: port,
         Method: "start",
-        Arguments: []
+        Arguments: [],
       });
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         serverEventFeed.on("action", (an, ad) => {
           if (an === "Event" && ad.Name === "start") {
             serverEventFeed.removeAllListeners("action");
@@ -2677,7 +2677,7 @@ describe("The transport should be able to exchange long messages", () => {
       transportClient.connect();
       const results = await Promise.all([
         promisifyEvent(serverEventFeed, "action"),
-        promisifyEvent(transportClient, "connect")
+        promisifyEvent(transportClient, "connect"),
       ]);
       const serverClientId = results[0][1].Arguments[0];
 
@@ -2689,7 +2689,7 @@ describe("The transport should be able to exchange long messages", () => {
       fmController.action("InvokeTransportMethod", {
         Port: port,
         Method: "send",
-        Arguments: [serverClientId, msg]
+        Arguments: [serverClientId, msg],
       });
 
       // Check the client event
@@ -2704,7 +2704,7 @@ describe("The transport should be able to exchange long messages", () => {
       // Clean up
       await fmController.action("DestroyTransportServer", { Port: port });
       disconnectController(fmController);
-    })
+    }),
   );
 
   it(
@@ -2715,10 +2715,10 @@ describe("The transport should be able to exchange long messages", () => {
       // Initialize a transport server and open the events feed
       const { Port: port } = await fmController.action(
         "InitTransportServer",
-        {}
+        {},
       );
       const serverEventFeed = fmController.feed("TransportEvents", {
-        Port: `${port}`
+        Port: `${port}`,
       });
       serverEventFeed.desireOpen();
       await promisifyEvent(serverEventFeed, "open");
@@ -2727,9 +2727,9 @@ describe("The transport should be able to exchange long messages", () => {
       fmController.action("InvokeTransportMethod", {
         Port: port,
         Method: "start",
-        Arguments: []
+        Arguments: [],
       });
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         serverEventFeed.on("action", (an, ad) => {
           if (an === "Event" && ad.Name === "start") {
             serverEventFeed.removeAllListeners("action");
@@ -2743,7 +2743,7 @@ describe("The transport should be able to exchange long messages", () => {
       transportClient.connect();
       const results = await Promise.all([
         promisifyEvent(serverEventFeed, "action"),
-        promisifyEvent(transportClient, "connect")
+        promisifyEvent(transportClient, "connect"),
       ]);
       const serverClientId = results[0][1].Arguments[0];
 
@@ -2763,7 +2763,7 @@ describe("The transport should be able to exchange long messages", () => {
       // Clean up
       await fmController.action("DestroyTransportServer", { Port: port });
       disconnectController(fmController);
-    })
+    }),
   );
 });
 
@@ -2777,7 +2777,7 @@ it(
     // Initialize a Feedme server and open the events feed
     const { Port: port } = await fmController.action("InitFeedmeServer", {});
     const serverEventFeed = fmController.feed("FeedmeEvents", {
-      Port: `${port}`
+      Port: `${port}`,
     });
     serverEventFeed.desireOpen();
     await promisifyEvent(serverEventFeed, "open");
@@ -2786,9 +2786,9 @@ it(
     fmController.action("InvokeFeedmeMethod", {
       Port: port,
       Method: "start",
-      Arguments: []
+      Arguments: [],
     });
-    await new Promise(resolve => {
+    await new Promise((resolve) => {
       serverEventFeed.on("action", (an, ad) => {
         if (an === "Event" && ad.Name === "start") {
           serverEventFeed.removeAllListeners("action");
@@ -2799,7 +2799,7 @@ it(
 
     // Connect a Feedme client
     const fmClient = feedmeClient({
-      transport: feedmeTransportWsClient(`${TARGET_URL}:${port}`)
+      transport: feedmeTransportWsClient(`${TARGET_URL}:${port}`),
     });
     fmClient.connect();
     await promisifyEvent(fmClient, "connect");
@@ -2807,7 +2807,7 @@ it(
     // Try a rejected action
     try {
       await fmClient.action("failing_action", {
-        Action: "Args"
+        Action: "Args",
       });
     } catch (e) {
       expect(e).toEqual(jasmine.any(Error));
@@ -2818,7 +2818,7 @@ it(
 
     // Try a successful action
     const actionData = await fmClient.action("successful_action", {
-      Action: "Args"
+      Action: "Args",
     });
     expect(actionData).toEqual({ Action: "Data" });
 
@@ -2828,7 +2828,7 @@ it(
     const evt1 = await promisifyEvent(feed1, "close");
     expect(evt1).toEqual(jasmine.any(Error));
     expect(evt1.message).toBe(
-      "REJECTED: Server rejected the feed open request."
+      "REJECTED: Server rejected the feed open request.",
     );
     expect(evt1.serverErrorCode).toBe("SOME_ERROR");
     expect(evt1.serverErrorData).toEqual({ Error: "Data" });
@@ -2856,9 +2856,9 @@ it(
           actionData: { Action: "Data" },
           feedName: "successful_feed",
           feedArgs: { Feed: "Args" },
-          feedDeltas: [{ Operation: "Append", Path: ["Feed"], Value: "New" }]
-        }
-      ]
+          feedDeltas: [{ Operation: "Append", Path: ["Feed"], Value: "New" }],
+        },
+      ],
     });
     const evt2 = await promisifyEvent(feed2, "action");
     expect(evt2[0]).toBe("SomeAction");
@@ -2875,9 +2875,9 @@ it(
           feedName: "successful_feed",
           feedArgs: { Feed: "Args" },
           errorCode: "SOME_ERROR",
-          errorData: { Error: "Data" }
-        }
-      ]
+          errorData: { Error: "Data" },
+        },
+      ],
     });
     const evt3 = await promisifyEvent(feed2, "close");
     expect(evt3).toEqual(jasmine.any(Error));
@@ -2889,7 +2889,7 @@ it(
     fmController.action("InvokeFeedmeMethod", {
       Port: port,
       Method: "disconnect",
-      Arguments: [fmClient.id()]
+      Arguments: [fmClient.id()],
     });
     const evt4 = await promisifyEvent(fmClient, "disconnect");
     expect(evt4).toEqual(jasmine.any(Error));
@@ -2914,5 +2914,5 @@ it(
     // Clean up
     // await fmController.action("DestroyFeedmeServer", { Port: port });
     // disconnectController(fmController);
-  })
+  }),
 );

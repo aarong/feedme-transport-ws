@@ -57,13 +57,13 @@ off tests midway through execution even when the global timeout has not been hit
     if (
       _.includes(
         ["sauce-automatic", "sauce-automatic-hanging", "sauce-live", "local"],
-        process.argv[2].toLowerCase()
+        process.argv[2].toLowerCase(),
       )
     ) {
       mode = process.argv[2].toLowerCase();
     } else {
       throw new Error(
-        "INVALID_ARGUMENT: Mode must be local, sauce-live, sauce-automatic (default), or sauce-automatic-hanging."
+        "INVALID_ARGUMENT: Mode must be local, sauce-live, sauce-automatic (default), or sauce-automatic-hanging.",
       );
     }
   }
@@ -74,7 +74,7 @@ off tests midway through execution even when the global timeout has not been hit
     (!process.env.SAUCE_USERNAME || !process.env.SAUCE_ACCESS_KEY)
   ) {
     throw new Error(
-      "NO_CREDENTIALS: The SAUCE_USERNAME or SAUCE_ACCESS_KEY environmental variable is missing."
+      "NO_CREDENTIALS: The SAUCE_USERNAME or SAUCE_ACCESS_KEY environmental variable is missing.",
     );
   }
 
@@ -82,7 +82,7 @@ off tests midway through execution even when the global timeout has not been hit
   let hasHostsEntry = false;
   if (mode !== "local") {
     const lines = hostile.get(false);
-    lines.forEach(line => {
+    lines.forEach((line) => {
       const ip = line[0];
       const hosts = line[1].split(" "); // Travis routes multiple hosts to 127.0.0.1 delimited by spaces
       if (ip === "127.0.0.1" && _.includes(hosts, "testinghost.com")) {
@@ -91,7 +91,7 @@ off tests midway through execution even when the global timeout has not been hit
     });
     if (!hasHostsEntry) {
       throw new Error(
-        "NO_HOSTS_ENTRY: You need to route testinghost.com to 127.0.0.1 in your hosts file in order to run the Sauce tests."
+        "NO_HOSTS_ENTRY: You need to route testinghost.com to 127.0.0.1 in your hosts file in order to run the Sauce tests.",
       );
     }
   }
@@ -240,7 +240,7 @@ off tests midway through execution even when the global timeout has not been hit
 
     // Sauce has Firefox 4+
     ["Linux", "Firefox", "22"],
-    ["Linux", "Firefox", "latest"]
+    ["Linux", "Firefox", "latest"],
   ];
 
   // The following platforms test successfully on sauce, judging by the video,
@@ -302,7 +302,7 @@ off tests midway through execution even when the global timeout has not been hit
     ["macOS 10.12", "Firefox", "latest"],
 
     ["macOS 10.12", "Safari", "10"],
-    ["macOS 10.12", "Safari", "11"]
+    ["macOS 10.12", "Safari", "11"],
   ];
 
   // Transpile and bundle the tests and drop in webroot
@@ -319,7 +319,7 @@ off tests midway through execution even when the global timeout has not been hit
             test: /\.js$/,
             exclude: [
               /\bnode_modules[\\/]{1}core-js\b/,
-              /\bnode_modules[\\/]{1}webpack\b/
+              /\bnode_modules[\\/]{1}webpack\b/,
             ],
             use: {
               loader: "babel-loader",
@@ -334,30 +334,30 @@ off tests midway through execution even when the global timeout has not been hit
                       useBuiltIns: "usage",
                       corejs: {
                         version: "3",
-                        proposals: true
+                        proposals: true,
                       },
-                      targets: targets.browsers
+                      targets: targets.browsers,
                       // debug: true
-                    }
-                  ]
-                ]
-              }
-            }
-          }
-        ]
+                    },
+                  ],
+                ],
+              },
+            },
+          },
+        ],
       },
       output: {
         filename: "tests.js",
-        path: path.resolve(__dirname, "webroot")
+        path: path.resolve(__dirname, "webroot"),
       },
       optimization: {
-        minimize: false
+        minimize: false,
       },
       devtool: "source-maps",
       performance: {
         maxAssetSize: 2000000,
-        maxEntrypointSize: 2000000
-      }
+        maxEntrypointSize: 2000000,
+      },
       // stats: "verbose"
     });
   } catch (e) {
@@ -379,18 +379,18 @@ off tests midway through execution even when the global timeout has not been hit
   // Note that Node 6 does not have fs.copyFile()
   console.log("Copying browser bundle and sourcemaps...");
   const bundle = await util.promisify(fs.readFile)(
-    `${__dirname}/../../build/browser.bundle.withmaps.js`
+    `${__dirname}/../../build/browser.bundle.withmaps.js`,
   );
   await util.promisify(fs.writeFile)(
     `${__dirname}/webroot/browser.bundle.withmaps.js`,
-    bundle
+    bundle,
   );
   const maps = await util.promisify(fs.readFile)(
-    `${__dirname}/../../build/browser.bundle.withmaps.js.map`
+    `${__dirname}/../../build/browser.bundle.withmaps.js.map`,
   );
   await util.promisify(fs.writeFile)(
     `${__dirname}/webroot/browser.bundle.withmaps.js.map`,
-    maps
+    maps,
   );
 
   // Start the local webserver (adapted from Jasmine-standalone)
@@ -415,7 +415,7 @@ off tests midway through execution even when the global timeout has not been hit
       tunnelIdentifier: sauceTunnelId,
       logFile: null,
       noSslBumpDomains: "all", // Needed to get WebSockets working: https://wiki.saucelabs.com/display/DOCS/Sauce+Connect+Proxy+and+SSL+Certificate+Bumping
-      verbose: true
+      verbose: true,
     });
     console.log("Sauce Connect proxy started.");
   }
@@ -429,12 +429,12 @@ off tests midway through execution even when the global timeout has not been hit
   const platforms =
     mode === "sauce-automatic-hanging" ? saucePlatformsHanging : saucePlatforms;
   const platformStatus = {};
-  platforms.forEach(platformArr => {
+  platforms.forEach((platformArr) => {
     platformStatus[platformArr.join(":")] = {
       platformArray: platformArr, // Passed to Sauce
       passed: false,
       attemptResults: [], // window.global_test_results for each attempt
-      attemptUrls: [] // Sauce URL for each attempt
+      attemptUrls: [], // Sauce URL for each attempt
     };
   });
 
@@ -471,7 +471,7 @@ off tests midway through execution even when the global timeout has not been hit
       method: "POST",
       auth: {
         username: process.env.SAUCE_USERNAME,
-        password: process.env.SAUCE_ACCESS_KEY
+        password: process.env.SAUCE_ACCESS_KEY,
       },
       json: true,
       body: {
@@ -479,8 +479,8 @@ off tests midway through execution even when the global timeout has not been hit
         framework: "custom",
         platforms: batchPlatforms,
         maxDuration: 1800, // Seconds/platform (doesn't appear to work beyond 5-6 min)
-        "tunnel-identifier": sauceTunnelId
-      }
+        "tunnel-identifier": sauceTunnelId,
+      },
     });
 
     // Process REST API results
@@ -503,10 +503,10 @@ off tests midway through execution even when the global timeout has not been hit
         method: "POST",
         auth: {
           username: process.env.SAUCE_USERNAME,
-          password: process.env.SAUCE_ACCESS_KEY
+          password: process.env.SAUCE_ACCESS_KEY,
         },
         json: true,
-        body: sauceTests // From the above API call
+        body: sauceTests, // From the above API call
       });
 
       if (response2.statusCode !== 200) {
@@ -514,14 +514,16 @@ off tests midway through execution even when the global timeout has not been hit
         throw response2.body; // Use body as error (printed)
       } else if (!response2.body.completed) {
         console.log(
-          "Sauce API indicated tests not completed. Polling again..."
+          "Sauce API indicated tests not completed. Polling again...",
         );
         // eslint-disable-next-line no-await-in-loop
-        await new Promise(resolve => setTimeout(resolve, POLLING_INTERVAL));
+        await new Promise((resolve) => {
+          setTimeout(resolve, POLLING_INTERVAL);
+        });
       } else {
         sauceResults = response2.body["js tests"];
       }
-    } while (!sauceResults); // eslint-disable-line no-constant-conditions
+    } while (!sauceResults);
 
     // Process and store the test results
     console.log("Got Sauce test results.");

@@ -74,7 +74,7 @@ export default function clientFactory(...args) {
       options.heartbeatIntervalMs < 0
     ) {
       throw new Error(
-        "INVALID_ARGUMENT: Invalid options.heartbeatIntervalMs argument."
+        "INVALID_ARGUMENT: Invalid options.heartbeatIntervalMs argument.",
       );
     }
   } else {
@@ -89,7 +89,7 @@ export default function clientFactory(...args) {
       options.heartbeatTimeoutMs >= options.heartbeatIntervalMs // Will fail if heartbeat disabled
     ) {
       throw new Error(
-        "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument."
+        "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument.",
       );
     }
   } else {
@@ -238,7 +238,7 @@ proto.connect = function connect() {
     this._wsClient = new this._wsConstructor(
       this._address,
       config.wsSubprotocol,
-      this._options
+      this._options,
     );
   } catch (e) {
     dbg("Failed to initialize ws client");
@@ -246,7 +246,7 @@ proto.connect = function connect() {
     // Update state and emit disconnect asynchronously
     this._state = "disconnected";
     const err = new Error(
-      "FAILURE: Could not initialize the WebSocket client."
+      "FAILURE: Could not initialize the WebSocket client.",
     );
     err.wsError = e;
     this._emitAsync("disconnect", err);
@@ -316,7 +316,7 @@ proto.send = function send(msg) {
   }
 
   // Try to send the message
-  this._wsClient.send(msg, err => {
+  this._wsClient.send(msg, (err) => {
     // The message has been written or has failed to write
     if (err) {
       dbg("Error writing message");
@@ -355,12 +355,12 @@ proto._processWsOpen = function _processWsOpen() {
       }, this._options.heartbeatTimeoutMs);
 
       // Ping the server - ws automatically replies with pong
-      this._wsClient.ping(err => {
+      this._wsClient.ping((err) => {
         // The ping frame has been written or has failed to write - pong not yet received
         if (err) {
           dbg("Error writing ping frame");
           const transportErr = new Error(
-            "FAILURE: The WebSocket heartbeat failed."
+            "FAILURE: The WebSocket heartbeat failed.",
           );
           transportErr.wsError = err;
           this._disconnect(transportErr);
@@ -392,7 +392,9 @@ proto._processWsMessage = function _processWsMessage(data) {
     dbg("Unexpected WebSocket message type");
     dbg(data);
     this._disconnect(
-      new Error("FAILURE: Received non-string message on WebSocket connection.")
+      new Error(
+        "FAILURE: Received non-string message on WebSocket connection.",
+      ),
     );
     return; // Stop
   }

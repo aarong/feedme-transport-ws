@@ -83,7 +83,7 @@ export default function serverFactory(wsConstructor, options) {
     !("noServer" in tOptions)
   ) {
     throw new Error(
-      "INVALID_ARGUMENT: Must specify a valid port, server, or noServer option."
+      "INVALID_ARGUMENT: Must specify a valid port, server, or noServer option.",
     );
   }
 
@@ -91,7 +91,7 @@ export default function serverFactory(wsConstructor, options) {
   // which is used internally by the transport to validate client subprotocols
   if ("handleProtocols" in tOptions) {
     throw new Error(
-      "INVALID_ARGUMENT: Must not specify options.handleProtocols."
+      "INVALID_ARGUMENT: Must not specify options.handleProtocols.",
     );
   }
 
@@ -102,7 +102,7 @@ export default function serverFactory(wsConstructor, options) {
       tOptions.heartbeatIntervalMs < 0
     ) {
       throw new Error(
-        "INVALID_ARGUMENT: Invalid options.heartbeatIntervalMs argument."
+        "INVALID_ARGUMENT: Invalid options.heartbeatIntervalMs argument.",
       );
     }
   } else {
@@ -117,7 +117,7 @@ export default function serverFactory(wsConstructor, options) {
       tOptions.heartbeatTimeoutMs >= tOptions.heartbeatIntervalMs
     ) {
       throw new Error(
-        "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument."
+        "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument.",
       );
     }
   } else {
@@ -368,14 +368,14 @@ proto.start = function start() {
   // - If running in noServer mode, then there are no server status events to monitor
   if (this._options.port) {
     dbg("Listening for ws listening, close, and error events");
-    ["listening", "close", "error"].forEach(evt => {
+    ["listening", "close", "error"].forEach((evt) => {
       const listener = this[`_processServer${_.startCase(evt)}`].bind(this);
       this._wsServer.on(evt, listener);
     });
   } else if (this._options.server) {
     dbg("Listening for external http listening, close, and error events");
     this._httpHandlers = {};
-    ["listening", "close", "error"].forEach(evt => {
+    ["listening", "close", "error"].forEach((evt) => {
       const listener = this[`_processServer${_.startCase(evt)}`].bind(this);
       this._httpHandlers[evt] = listener;
       this._options.server.on(evt, listener);
@@ -409,8 +409,8 @@ proto.start = function start() {
       dbg("External HTTP server listening timeout expired");
       this._stop(
         new Error(
-          "FAILURE: The external http server did not start within the allocated time."
-        )
+          "FAILURE: The external http server did not start within the allocated time.",
+        ),
       );
     }, serverConfig.httpListeningMs);
   }
@@ -465,7 +465,7 @@ proto.send = function send(cid, msg) {
   }
 
   // Try to send the message
-  this._wsClients[cid].send(msg, err => {
+  this._wsClients[cid].send(msg, (err) => {
     if (err) {
       dbg("Error writing message to WebSocket");
       const transportErr = new Error("FAILURE: WebSocket transmission failed.");
@@ -553,7 +553,7 @@ proto.handleUpgrade = function handleUpgrade(request, socket, head) {
 
   // Success
   // The callback is only fired by ws if the upgrade is completed successfully
-  this._wsServer.handleUpgrade(request, socket, head, ws => {
+  this._wsServer.handleUpgrade(request, socket, head, (ws) => {
     dbg("Received callback from ws.handleUpgrade()");
     this._wsServer.emit("connection", ws, request);
   });
@@ -634,16 +634,16 @@ proto._processWsServerConnection = function _processWsServerConnection(ws) {
         dbg("Heartbeat timed out");
         this._disconnect(
           cid,
-          new Error("FAILURE: The WebSocket heartbeat failed.")
+          new Error("FAILURE: The WebSocket heartbeat failed."),
         );
       }, this._options.heartbeatTimeoutMs);
 
       // Ping the client - ws automatically responds with pong
-      this._wsClients[cid].ping(err => {
+      this._wsClients[cid].ping((err) => {
         if (err) {
           dbg("Error writing ping frame");
           const transportErr = new Error(
-            "FAILURE: The WebSocket heartbeat failed."
+            "FAILURE: The WebSocket heartbeat failed.",
           );
           transportErr.wsError = err;
           this._disconnect(cid, transportErr);
@@ -655,10 +655,10 @@ proto._processWsServerConnection = function _processWsServerConnection(ws) {
   }
 
   // Listen for ws client events
-  ["message", "pong", "close", "error"].forEach(evt => {
+  ["message", "pong", "close", "error"].forEach((evt) => {
     const listener = this[`_processWsClient${_.startCase(evt)}`].bind(
       this,
-      cid
+      cid,
     );
     ws.on(evt, listener);
   });
@@ -684,7 +684,9 @@ proto._processWsClientMessage = function _processWsClientMessage(cid, msg) {
     dbg("Non-string message received on WebSocket");
     this.disconnect(
       cid,
-      new Error("FAILURE: Received non-string message on WebSocket connection.")
+      new Error(
+        "FAILURE: Received non-string message on WebSocket connection.",
+      ),
     );
     return; // Stop
   }
@@ -730,7 +732,7 @@ proto._processWsClientPong = function _processWsClientPong(cid) {
 proto._processWsClientClose = function _processWsClientClose(
   cid,
   code,
-  reason
+  reason,
 ) {
   dbg("Observed ws client close event");
 
@@ -833,7 +835,7 @@ proto._start = function _start() {
       } else {
         dbg("External http server is no longer listening");
         this._stop(
-          new Error("FAILURE: The external http server stopped listening.")
+          new Error("FAILURE: The external http server stopped listening."),
         );
       }
     }, serverConfig.httpPollingMs);
@@ -879,24 +881,24 @@ proto._stop = function _stop(err) {
   this._httpPollingInterval = null;
 
   // Stop listening to all ws events (if applicable)
-  _.each(this._wsClients, ws => {
+  _.each(this._wsClients, (ws) => {
     ws.removeAllListeners();
   });
   this._wsServer.removeAllListeners();
 
   // Stop listening to all external http server events (if applicable)
   if (this._httpHandlers) {
-    ["listening", "close", "error"].forEach(evt => {
+    ["listening", "close", "error"].forEach((evt) => {
       this._options.server.removeListener(evt, this._httpHandlers[evt]);
     });
   }
   this._httpHandlers = null;
 
   // Stop any heartbeat intervals and timers
-  _.each(this._heartbeatIntervals, intervalId => {
+  _.each(this._heartbeatIntervals, (intervalId) => {
     clearInterval(intervalId);
   });
-  _.each(this._heartbeatTimeouts, timeoutId => {
+  _.each(this._heartbeatTimeouts, (timeoutId) => {
     clearTimeout(timeoutId);
   });
   this._heartbeatIntervals = {};
@@ -912,7 +914,7 @@ proto._stop = function _stop(err) {
   // Close or terminate any outstanding WebSocket connections
   // In external http server mode a call to httpServer.close() does not force
   // WebSocket connections closed
-  _.each(wsClients, ws => {
+  _.each(wsClients, (ws) => {
     if (err) {
       dbg("Terminating client connection");
       ws.terminate();

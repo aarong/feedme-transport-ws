@@ -28,7 +28,7 @@ export default function feedmeTransportWsClient(address) {
   // Throw if WebSockets are not supported
   if (!ws) {
     throw new Error(
-      "NO_WEBSOCKETS: The environment does not appear to support WebSockets."
+      "NO_WEBSOCKETS: The environment does not appear to support WebSockets.",
     );
   }
 

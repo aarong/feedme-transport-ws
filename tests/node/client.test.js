@@ -45,45 +45,45 @@ const getNextPortNumber = () => {
   return nextPortNumber - 1;
 };
 
-const createClientListener = transportClient => {
+const createClientListener = (transportClient) => {
   const evts = ["connecting", "connect", "disconnect", "message"];
   const l = {};
-  evts.forEach(evt => {
+  evts.forEach((evt) => {
     l[evt] = jest.fn();
     transportClient.on(evt, l[evt]);
   });
   l.mockClear = () => {
-    evts.forEach(evt => {
+    evts.forEach((evt) => {
       l[evt].mockClear();
     });
   };
   return l;
 };
 
-const createWsServerListener = wsServer => {
+const createWsServerListener = (wsServer) => {
   const evts = ["close", "connection", "error", "listening"];
   const l = {};
-  evts.forEach(evt => {
+  evts.forEach((evt) => {
     l[evt] = jest.fn();
     wsServer.on(evt, l[evt]);
   });
   l.mockClear = () => {
-    evts.forEach(evt => {
+    evts.forEach((evt) => {
       l[evt].mockClear();
     });
   };
   return l;
 };
 
-const createWsServerClientListener = wsServerClient => {
+const createWsServerClientListener = (wsServerClient) => {
   const evts = ["close", "error", "message", "open", "ping", "pong"];
   const l = {};
-  evts.forEach(evt => {
+  evts.forEach((evt) => {
     l[evt] = jest.fn();
     wsServerClient.on(evt, l[evt]);
   });
   l.mockClear = () => {
-    evts.forEach(evt => {
+    evts.forEach((evt) => {
       l[evt].mockClear();
     });
   };
@@ -113,7 +113,7 @@ describe("The transport client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -121,7 +121,7 @@ describe("The transport client configuration options", () => {
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
-        heartbeatTimeoutMs
+        heartbeatTimeoutMs,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -147,7 +147,7 @@ describe("The transport client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -155,7 +155,7 @@ describe("The transport client configuration options", () => {
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
-        heartbeatTimeoutMs
+        heartbeatTimeoutMs,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -172,7 +172,7 @@ describe("The transport client configuration options", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket heartbeat failed."
+        "FAILURE: The WebSocket heartbeat failed.",
       );
       expect(listener.message.mock.calls.length).toBe(0);
 
@@ -189,7 +189,7 @@ describe("The transport client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -197,7 +197,7 @@ describe("The transport client configuration options", () => {
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
-        heartbeatTimeoutMs
+        heartbeatTimeoutMs,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -241,7 +241,7 @@ describe("The transport client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -249,7 +249,7 @@ describe("The transport client configuration options", () => {
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
-        heartbeatTimeoutMs
+        heartbeatTimeoutMs,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -280,7 +280,7 @@ describe("The transport client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -288,7 +288,7 @@ describe("The transport client configuration options", () => {
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
-        heartbeatTimeoutMs
+        heartbeatTimeoutMs,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -313,7 +313,7 @@ describe("The transport client configuration options", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket heartbeat failed."
+        "FAILURE: The WebSocket heartbeat failed.",
       );
       expect(listener.message.mock.calls.length).toBe(0);
 
@@ -330,7 +330,7 @@ describe("The transport client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -338,7 +338,7 @@ describe("The transport client configuration options", () => {
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
-        heartbeatTimeoutMs
+        heartbeatTimeoutMs,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -403,7 +403,7 @@ describe("The transport client configuration options", () => {
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
-        heartbeatTimeoutMs
+        heartbeatTimeoutMs,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -436,7 +436,7 @@ describe("The transport client configuration options", () => {
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
-        heartbeatTimeoutMs
+        heartbeatTimeoutMs,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -456,7 +456,7 @@ describe("The transport client configuration options", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket heartbeat failed."
+        "FAILURE: The WebSocket heartbeat failed.",
       );
       expect(listener.message.mock.calls.length).toBe(0);
 
@@ -483,7 +483,7 @@ describe("The transport client configuration options", () => {
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
-        heartbeatTimeoutMs
+        heartbeatTimeoutMs,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -521,7 +521,7 @@ describe("The transport client configuration options", () => {
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
-        heartbeatTimeoutMs
+        heartbeatTimeoutMs,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -549,7 +549,7 @@ describe("The transport client configuration options", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket heartbeat failed."
+        "FAILURE: The WebSocket heartbeat failed.",
       );
       expect(listener.message.mock.calls.length).toBe(0);
 
@@ -576,7 +576,7 @@ describe("The transport client configuration options", () => {
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
-        heartbeatTimeoutMs
+        heartbeatTimeoutMs,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -605,7 +605,7 @@ describe("The transport client configuration options", () => {
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
         heartbeatIntervalMs,
-        heartbeatTimeoutMs
+        heartbeatTimeoutMs,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -681,14 +681,14 @@ describe("The transport client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
-        heartbeatIntervalMs: 0
+        heartbeatIntervalMs: 0,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -720,14 +720,14 @@ describe("The transport client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
-        heartbeatIntervalMs: 0
+        heartbeatIntervalMs: 0,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -765,14 +765,14 @@ describe("The transport client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
-        heartbeatIntervalMs: 0
+        heartbeatIntervalMs: 0,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -815,14 +815,14 @@ describe("Key ws client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
-        maxPayload
+        maxPayload,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -854,14 +854,14 @@ describe("Key ws client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
-        maxPayload: 100
+        maxPayload: 100,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -891,7 +891,7 @@ describe("Key ws client configuration options", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly.",
       );
       expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1009); // Message too big
       expect(listener.message.mock.calls.length).toBe(0);
@@ -909,14 +909,14 @@ describe("Key ws client configuration options", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
 
       // Connect a transport client and wait for it to connect
       const transportClient = transportWsClient(`ws://localhost:${port}`, {
-        maxPayload: 100
+        maxPayload: 100,
       });
       transportClient.connect();
       await promisifyEvent(transportClient, "connect");
@@ -1038,7 +1038,7 @@ describe("The transport.connect() function", () => {
         // but an invalid ws option to make its constructor throw
         // State should become disconnected synchronously
         const transportClient = transportWsClient("ws://localhost", {
-          protocolVersion: "junk"
+          protocolVersion: "junk",
         });
         expect(transportClient.state()).toBe("disconnected");
         transportClient.connect();
@@ -1051,7 +1051,7 @@ describe("The transport.connect() function", () => {
         // Provide a valid URL so the transport constructor doesn't throw,
         // but an invalid ws option to make its constructor throw
         const transportClient = transportWsClient("ws://localhost", {
-          protocolVersion: "junk"
+          protocolVersion: "junk",
         });
 
         const listener = createClientListener(transportClient);
@@ -1066,7 +1066,7 @@ describe("The transport.connect() function", () => {
 
         // Track event order
         const eventOrder = [];
-        ["connecting", "disconnect"].forEach(evt => {
+        ["connecting", "disconnect"].forEach((evt) => {
           transportClient.on(evt, () => {
             eventOrder.push(evt);
           });
@@ -1082,10 +1082,10 @@ describe("The transport.connect() function", () => {
         expect(listener.disconnect.mock.calls[0].length).toBe(1);
         expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
         expect(listener.disconnect.mock.calls[0][0].message).toBe(
-          "FAILURE: Could not initialize the WebSocket client."
+          "FAILURE: Could not initialize the WebSocket client.",
         );
         expect(listener.disconnect.mock.calls[0][0].wsError).toBeInstanceOf(
-          Error
+          Error,
         );
         expect(listener.message.mock.calls.length).toBe(0);
         expect(eventOrder).toEqual(["connecting", "disconnect"]);
@@ -1500,7 +1500,7 @@ describe("The transport.disconnect() function", () => {
 
         let cListener;
         const sListener = createWsServerListener(wsServer);
-        wsServer.once("connection", ws => {
+        wsServer.once("connection", (ws) => {
           cListener = createWsServerClientListener(ws);
         });
 
@@ -1666,7 +1666,7 @@ describe("The transport.disconnect() function", () => {
         // Create client/server listeners
         let cListener;
         const sListener = createWsServerListener(wsServer);
-        wsServer.once("connection", ws => {
+        wsServer.once("connection", (ws) => {
           cListener = createWsServerClientListener(ws);
         });
 
@@ -1785,7 +1785,7 @@ describe("The transport.send() function", () => {
         // Create client/server listeners
         let cListener;
         const sListener = createWsServerListener(wsServer);
-        wsServer.once("connection", ws => {
+        wsServer.once("connection", (ws) => {
           cListener = createWsServerClientListener(ws);
         });
 
@@ -1894,10 +1894,10 @@ describe("The transport.send() function", () => {
         expect(listener.disconnect.mock.calls[0].length).toBe(1);
         expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
         expect(listener.disconnect.mock.calls[0][0].message).toBe(
-          "FAILURE: WebSocket transmission failed."
+          "FAILURE: WebSocket transmission failed.",
         );
         expect(listener.disconnect.mock.calls[0][0].wsError).toBeInstanceOf(
-          Error
+          Error,
         );
         expect(listener.message.mock.calls.length).toBe(0);
         listener.mockClear();
@@ -1989,7 +1989,7 @@ describe("The transport._processWsOpen() function", () => {
     // Create client/server listeners
     let cListener;
     const sListener = createWsServerListener(wsServer);
-    wsServer.once("connection", ws => {
+    wsServer.once("connection", (ws) => {
       cListener = createWsServerClientListener(ws);
     });
 
@@ -2029,7 +2029,7 @@ describe("The transport._processWsMessage() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.on("connection", ws => {
+      wsServer.on("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -2061,7 +2061,7 @@ describe("The transport._processWsMessage() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.on("connection", ws => {
+      wsServer.on("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -2083,7 +2083,7 @@ describe("The transport._processWsMessage() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: Received non-string message on WebSocket connection."
+        "FAILURE: Received non-string message on WebSocket connection.",
       );
       expect(listener.message.mock.calls.length).toBe(0);
 
@@ -2100,7 +2100,7 @@ describe("The transport._processWsMessage() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.on("connection", ws => {
+      wsServer.on("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -2144,7 +2144,7 @@ describe("The transport._processWsMessage() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.on("connection", ws => {
+      wsServer.on("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -2176,7 +2176,7 @@ describe("The transport._processWsMessage() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.on("connection", ws => {
+      wsServer.on("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -2212,7 +2212,7 @@ describe("The transport._processWsMessage() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.on("connection", ws => {
+      wsServer.on("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -2402,7 +2402,7 @@ describe("The transport._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly.",
       );
       expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1006);
 
@@ -2425,7 +2425,7 @@ describe("The transport._processWsClose() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -2456,7 +2456,7 @@ describe("The transport._processWsClose() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -2478,7 +2478,7 @@ describe("The transport._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly.",
       );
       expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1000);
 
@@ -2497,7 +2497,7 @@ describe("The transport._processWsClose() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -2533,7 +2533,7 @@ describe("The transport._processWsClose() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -2564,7 +2564,7 @@ describe("The transport._processWsClose() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -2586,7 +2586,7 @@ describe("The transport._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly.",
       );
       expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1006);
 
@@ -2605,7 +2605,7 @@ describe("The transport._processWsClose() function", () => {
 
       // Start a ws server and wait for it to start listening
       const wsServer = new WebSocket.Server({ port });
-      wsServer.once("connection", ws => {
+      wsServer.once("connection", (ws) => {
         wsServerClient = ws;
       });
       await promisifyEvent(wsServer, "listening");
@@ -2815,7 +2815,7 @@ describe("The transport should operate correctly through multiple connection cyc
 
     const sListener = createWsServerListener(wsServer);
 
-    wsServer.once("connection", ws => {
+    wsServer.once("connection", (ws) => {
       cListener = createWsServerClientListener(ws);
     });
 

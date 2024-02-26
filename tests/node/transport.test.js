@@ -20,7 +20,7 @@ const getNextPortNumber = () => {
   return nextPortNumber - 1;
 };
 
-const createServerListener = transportServer => {
+const createServerListener = (transportServer) => {
   const evts = [
     "starting",
     "start",
@@ -28,30 +28,30 @@ const createServerListener = transportServer => {
     "stop",
     "connect",
     "message",
-    "disconnect"
+    "disconnect",
   ];
   const l = {};
-  evts.forEach(evt => {
+  evts.forEach((evt) => {
     l[evt] = jest.fn();
     transportServer.on(evt, l[evt]);
   });
   l.mockClear = () => {
-    evts.forEach(evt => {
+    evts.forEach((evt) => {
       l[evt].mockClear();
     });
   };
   return l;
 };
 
-const createClientListener = transportClient => {
+const createClientListener = (transportClient) => {
   const evts = ["connecting", "connect", "disconnect", "message"];
   const l = {};
-  evts.forEach(evt => {
+  evts.forEach((evt) => {
     l[evt] = jest.fn();
     transportClient.on(evt, l[evt]);
   });
   l.mockClear = () => {
-    evts.forEach(evt => {
+    evts.forEach((evt) => {
       l[evt].mockClear();
     });
   };
@@ -313,7 +313,7 @@ describe("The client.disconnect() function", () => {
       // Start a transport server
       const server = transportWsServer({ port });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -340,7 +340,7 @@ describe("The client.disconnect() function", () => {
       expect(sListener.disconnect.mock.calls[0][0]).toBe(cid);
       expect(sListener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
       expect(sListener.disconnect.mock.calls[0][1].message).toBe(
-        "FAILURE: The WebSocket closed."
+        "FAILURE: The WebSocket closed.",
       );
 
       // Clean up
@@ -395,7 +395,7 @@ describe("The client.disconnect() function", () => {
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -422,7 +422,7 @@ describe("The client.disconnect() function", () => {
       expect(sListener.disconnect.mock.calls[0][0]).toBe(cid);
       expect(sListener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
       expect(sListener.disconnect.mock.calls[0][1].message).toBe(
-        "FAILURE: The WebSocket closed."
+        "FAILURE: The WebSocket closed.",
       );
 
       // Clean up
@@ -484,7 +484,7 @@ describe("The client.disconnect() function", () => {
       // Start a transport server
       const server = transportWsServer({ noServer: true });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -516,7 +516,7 @@ describe("The client.disconnect() function", () => {
       expect(sListener.disconnect.mock.calls[0][0]).toBe(cid);
       expect(sListener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
       expect(sListener.disconnect.mock.calls[0][1].message).toBe(
-        "FAILURE: The WebSocket closed."
+        "FAILURE: The WebSocket closed.",
       );
 
       // Clean up
@@ -565,7 +565,7 @@ describe("The client.send() function", () => {
       // Start a transport server
       const server = transportWsServer({ port });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -644,7 +644,7 @@ describe("The client.send() function", () => {
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -730,7 +730,7 @@ describe("The client.send() function", () => {
       // Start a transport server
       const server = transportWsServer({ noServer: true });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -828,7 +828,7 @@ describe("The server.stop() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly.",
       );
       expect(listener.message.mock.calls.length).toBe(0);
     });
@@ -898,7 +898,7 @@ describe("The server.stop() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly.",
       );
       expect(listener.message.mock.calls.length).toBe(0);
 
@@ -982,7 +982,7 @@ describe("The server.stop() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly.",
       );
       expect(listener.message.mock.calls.length).toBe(0);
 
@@ -1054,7 +1054,7 @@ describe("The httpServer.close() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly.",
       );
       expect(listener.message.mock.calls.length).toBe(0);
     });
@@ -1143,7 +1143,7 @@ describe("The httpServer.close() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly.",
       );
 
       expect(listener.message.mock.calls.length).toBe(0);
@@ -1161,7 +1161,7 @@ describe("The server.send() function", () => {
       // Start a transport server
       const server = transportWsServer({ port });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -1192,7 +1192,7 @@ describe("The server.send() function", () => {
       // Start a transport server
       const server = transportWsServer({ port });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -1235,7 +1235,7 @@ describe("The server.send() function", () => {
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -1271,7 +1271,7 @@ describe("The server.send() function", () => {
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -1314,7 +1314,7 @@ describe("The server.send() function", () => {
       // Start a transport server
       const server = transportWsServer({ noServer: true });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -1357,7 +1357,7 @@ describe("The server.send() function", () => {
       // Start a transport server
       const server = transportWsServer({ noServer: true });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -1404,7 +1404,7 @@ describe("The server.disconnect() function", () => {
       // Start a transport server
       const server = transportWsServer({ port });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -1435,7 +1435,7 @@ describe("The server.disconnect() function", () => {
       // Start a transport server
       const server = transportWsServer({ port });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -1457,7 +1457,7 @@ describe("The server.disconnect() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly.",
       );
       expect(listener.message.mock.calls.length).toBe(0);
 
@@ -1481,7 +1481,7 @@ describe("The server.disconnect() function", () => {
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -1517,7 +1517,7 @@ describe("The server.disconnect() function", () => {
       // Start a transport server
       const server = transportWsServer({ server: httpServer });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -1539,7 +1539,7 @@ describe("The server.disconnect() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly.",
       );
       expect(listener.message.mock.calls.length).toBe(0);
 
@@ -1563,7 +1563,7 @@ describe("The server.disconnect() function", () => {
       // Start a transport server
       const server = transportWsServer({ noServer: true });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -1604,7 +1604,7 @@ describe("The server.disconnect() function", () => {
       // Start a transport server
       const server = transportWsServer({ noServer: true });
       let cid;
-      server.on("connect", c => {
+      server.on("connect", (c) => {
         cid = c;
       });
       server.start();
@@ -1631,7 +1631,7 @@ describe("The server.disconnect() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly.",
       );
       expect(listener.message.mock.calls.length).toBe(0);
 
@@ -1655,7 +1655,7 @@ it("The transport should be able to exchange long messages", async () => {
   // Start a server
   const server = transportWsServer({ port });
   let cid;
-  server.on("connect", c => {
+  server.on("connect", (c) => {
     cid = c;
   });
   server.start();

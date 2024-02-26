@@ -21,7 +21,7 @@ it("should work through all major operations", async () => {
 
   // Start a Feedme server
   const fmServer = feedmeServerCore({
-    transport: transportWsServer({ port })
+    transport: transportWsServer({ port }),
   });
   fmServer.start();
   await promisifyEvent(fmServer, "start");
@@ -29,7 +29,7 @@ it("should work through all major operations", async () => {
   // Connect a Feedme client
   const fmClient = feedmeClient({
     transport: transportWsClient(`ws://localhost:${port}`),
-    reconnect: false
+    reconnect: false,
   });
   fmClient.connect();
   await promisifyEvent(fmClient, "connect");
@@ -40,7 +40,7 @@ it("should work through all major operations", async () => {
   });
   try {
     await fmClient.action("SomeAction", {
-      Action: "Args"
+      Action: "Args",
     });
   } catch (e) {
     expect(e).toBeInstanceOf(Error);
@@ -62,10 +62,10 @@ it("should work through all major operations", async () => {
   });
   const feed = fmClient.feed("SomeFeed", { Feed: "Args" });
   feed.desireOpen();
-  feed.once("close", err => {
+  feed.once("close", (err) => {
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toBe(
-      "REJECTED: Server rejected the feed open request."
+      "REJECTED: Server rejected the feed open request.",
     );
     expect(err.serverErrorCode).toBe("SOME_ERROR");
     expect(err.serverErrorData).toEqual({ Error: "Data" });
@@ -84,7 +84,7 @@ it("should work through all major operations", async () => {
   await promisifyEvent(feed, "open");
 
   // Try a feed closure
-  feed.once("close", err => {
+  feed.once("close", (err) => {
     expect(err).toBe(undefined);
   });
   feed.desireClosed();
@@ -104,7 +104,7 @@ it("should work through all major operations", async () => {
     actionData: { Action: "Data" },
     feedName: "SomeFeed",
     feedArgs: { Feed: "Args" },
-    feedDeltas: [{ Operation: "Append", Path: ["Feed"], Value: "New" }]
+    feedDeltas: [{ Operation: "Append", Path: ["Feed"], Value: "New" }],
   });
   feed.once("action", (an, ad, nfd, ofd) => {
     expect(an).toBe("SomeAction");
@@ -119,9 +119,9 @@ it("should work through all major operations", async () => {
     feedName: "SomeFeed",
     feedArgs: { Feed: "Args" },
     errorCode: "SOME_ERROR",
-    errorData: { Error: "Data" }
+    errorData: { Error: "Data" },
   });
-  feed.once("close", err => {
+  feed.once("close", (err) => {
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toBe("TERMINATED: The server terminated the feed.");
     expect(err.serverErrorCode).toBe("SOME_ERROR");
@@ -131,7 +131,7 @@ it("should work through all major operations", async () => {
 
   // Try a server disconnect
   fmServer.disconnect(fmClient.id());
-  fmClient.once("disconnect", err => {
+  fmClient.once("disconnect", (err) => {
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toBe("FAILURE: The WebSocket closed unexpectedly.");
   });
@@ -153,7 +153,7 @@ it("should work through all major operations", async () => {
   fmClient.connect();
   await promisifyEvent(fmClient, "connect");
   fmServer.stop();
-  fmClient.once("disconnect", err => {
+  fmClient.once("disconnect", (err) => {
     expect(err).toBeInstanceOf(Error);
     expect(err.message).toBe("FAILURE: The WebSocket closed unexpectedly.");
   });

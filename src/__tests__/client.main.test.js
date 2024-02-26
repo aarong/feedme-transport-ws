@@ -149,7 +149,7 @@ harnessProto.createClientListener = function createClientListener() {
     connecting: jest.fn(),
     connect: jest.fn(),
     message: jest.fn(),
-    disconnect: jest.fn()
+    disconnect: jest.fn(),
   };
   l.mockClear = () => {
     l.connecting.mockClear();
@@ -183,7 +183,7 @@ const toHaveState = function toHaveState(receivedClient, expectedState) {
       pass: false,
       message() {
         return "expected ._wsConstructor to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -200,7 +200,7 @@ const toHaveState = function toHaveState(receivedClient, expectedState) {
       pass: false,
       message() {
         return "expected ._wsClient to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -210,7 +210,7 @@ const toHaveState = function toHaveState(receivedClient, expectedState) {
       pass: false,
       message() {
         return "expected ._state to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -220,7 +220,7 @@ const toHaveState = function toHaveState(receivedClient, expectedState) {
       pass: false,
       message() {
         return "expected ._address to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -230,7 +230,7 @@ const toHaveState = function toHaveState(receivedClient, expectedState) {
       pass: false,
       message() {
         return "expected ._options to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -245,7 +245,7 @@ const toHaveState = function toHaveState(receivedClient, expectedState) {
       pass: false,
       message() {
         return "expected ._heartbeatInterval to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -260,7 +260,7 @@ const toHaveState = function toHaveState(receivedClient, expectedState) {
       pass: false,
       message() {
         return "expected ._heartbeatTimeout to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -277,11 +277,11 @@ describe("The toHaveState() function", () => {
     it("should fail if _wsConstructor don't match", () => {
       const result = toHaveState(
         { _wsConstructor: () => {} },
-        { _wsConstructor: () => {} }
+        { _wsConstructor: () => {} },
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._wsConstructor to match, but they didn't"
+        "expected ._wsConstructor to match, but they didn't",
       );
     });
 
@@ -289,7 +289,7 @@ describe("The toHaveState() function", () => {
       const result = toHaveState({ _wsClient: null }, { _wsClient: {} });
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._wsClient to match, but they didn't"
+        "expected ._wsClient to match, but they didn't",
       );
     });
 
@@ -297,7 +297,7 @@ describe("The toHaveState() function", () => {
       const result = toHaveState({ _wsClient: {} }, { _wsClient: null });
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._wsClient to match, but they didn't"
+        "expected ._wsClient to match, but they didn't",
       );
     });
 
@@ -305,7 +305,7 @@ describe("The toHaveState() function", () => {
       const result = toHaveState({ _state: "123" }, { _state: "456" });
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._state to match, but they didn't"
+        "expected ._state to match, but they didn't",
       );
     });
 
@@ -313,40 +313,40 @@ describe("The toHaveState() function", () => {
       const result = toHaveState({ _address: "123" }, { _address: "456" });
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._address to match, but they didn't"
+        "expected ._address to match, but they didn't",
       );
     });
 
     it("should fail if _options values don't match", () => {
       const result = toHaveState(
         { _options: {} },
-        { _options: { some: "thing" } }
+        { _options: { some: "thing" } },
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._options to match, but they didn't"
+        "expected ._options to match, but they didn't",
       );
     });
 
     it("should fail if _heartbeatInterval doesn't match", () => {
       const result = toHaveState(
         { _heartbeatInterval: 123 },
-        { _heartbeatInterval: false }
+        { _heartbeatInterval: false },
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._heartbeatInterval to match, but they didn't"
+        "expected ._heartbeatInterval to match, but they didn't",
       );
     });
 
     it("should fail if _heartbeatTimeout doesn't match", () => {
       const result = toHaveState(
         { _heartbeatTimeout: 123 },
-        { _heartbeatTimeout: false }
+        { _heartbeatTimeout: false },
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._heartbeatTimeout to match, but they didn't"
+        "expected ._heartbeatTimeout to match, but they didn't",
       );
     });
   });
@@ -371,7 +371,7 @@ describe("The toHaveState() function", () => {
     it("should pass if _state matches", () => {
       const result = toHaveState(
         { _state: "disconnected" },
-        { _state: "disconnected" }
+        { _state: "disconnected" },
       );
       expect(result.pass).toBe(true);
     });
@@ -379,7 +379,7 @@ describe("The toHaveState() function", () => {
     it("should pass if _address matches", () => {
       const result = toHaveState(
         { _state: "disconnected" },
-        { _state: "disconnected" }
+        { _state: "disconnected" },
       );
       expect(result.pass).toBe(true);
     });
@@ -387,7 +387,7 @@ describe("The toHaveState() function", () => {
     it("should pass if _options matches - array", () => {
       const result = toHaveState(
         { _options: { some: "thing" } },
-        { _options: { some: "thing" } }
+        { _options: { some: "thing" } },
       );
       expect(result.pass).toBe(true);
     });
@@ -395,7 +395,7 @@ describe("The toHaveState() function", () => {
     it("should pass if _heartbeatInterval matches", () => {
       const result = toHaveState(
         { _heartbeatInterval: 123 },
-        { _heartbeatInterval: true }
+        { _heartbeatInterval: true },
       );
       expect(result.pass).toBe(true);
     });
@@ -403,7 +403,7 @@ describe("The toHaveState() function", () => {
     it("should pass if _heartbeatTimeout matches", () => {
       const result = toHaveState(
         { _heartbeatTimeout: 123 },
-        { _heartbeatTimeout: true }
+        { _heartbeatTimeout: true },
       );
       expect(result.pass).toBe(true);
     });
@@ -418,7 +418,7 @@ describe("The client() factory function", () => {
       expect(() => {
         client("junk");
       }).toThrow(
-        new Error("INVALID_ARGUMENT: Invalid wsConstructor argument.")
+        new Error("INVALID_ARGUMENT: Invalid wsConstructor argument."),
       );
     });
 
@@ -443,48 +443,48 @@ describe("The client() factory function", () => {
     it("should throw on invalid options.heartbeatIntervalMs - type", () => {
       expect(() => {
         client(() => {}, "ws://localhost", {
-          heartbeatIntervalMs: "junk"
+          heartbeatIntervalMs: "junk",
         });
       }).toThrow(
         new Error(
-          "INVALID_ARGUMENT: Invalid options.heartbeatIntervalMs argument."
-        )
+          "INVALID_ARGUMENT: Invalid options.heartbeatIntervalMs argument.",
+        ),
       );
     });
 
     it("should throw on invalid options.heartbeatIntervalMs - range", () => {
       expect(() => {
         client(() => {}, "ws://localhost", {
-          heartbeatIntervalMs: -1
+          heartbeatIntervalMs: -1,
         });
       }).toThrow(
         new Error(
-          "INVALID_ARGUMENT: Invalid options.heartbeatIntervalMs argument."
-        )
+          "INVALID_ARGUMENT: Invalid options.heartbeatIntervalMs argument.",
+        ),
       );
     });
 
     it("should throw on invalid options.heartbeatTimeoutMs - type", () => {
       expect(() => {
         client(() => {}, "ws://localhost", {
-          heartbeatTimeoutMs: "junk"
+          heartbeatTimeoutMs: "junk",
         });
       }).toThrow(
         new Error(
-          "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument."
-        )
+          "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument.",
+        ),
       );
     });
 
     it("should throw on invalid options.heartbeatTimeoutMs - range low", () => {
       expect(() => {
         client(() => {}, "ws://localhost", {
-          heartbeatTimeoutMs: 0
+          heartbeatTimeoutMs: 0,
         });
       }).toThrow(
         new Error(
-          "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument."
-        )
+          "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument.",
+        ),
       );
     });
 
@@ -492,12 +492,12 @@ describe("The client() factory function", () => {
       expect(() => {
         client(() => {}, "ws://localhost", {
           heartbeatIntervalMs: 5,
-          heartbeatTimeoutMs: 5
+          heartbeatTimeoutMs: 5,
         });
       }).toThrow(
         new Error(
-          "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument."
-        )
+          "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument.",
+        ),
       );
     });
 
@@ -505,12 +505,12 @@ describe("The client() factory function", () => {
       expect(() => {
         client(() => {}, "ws://localhost", {
           heartbeatIntervalMs: 0,
-          heartbeatTimeoutMs: 5
+          heartbeatTimeoutMs: 5,
         });
       }).toThrow(
         new Error(
-          "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument."
-        )
+          "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument.",
+        ),
       );
     });
   });
@@ -529,17 +529,17 @@ describe("The client() factory function", () => {
         _address: "ws://localhost",
         _options: {
           heartbeatIntervalMs: clientConfig.defaults.heartbeatIntervalMs,
-          heartbeatTimeoutMs: clientConfig.defaults.heartbeatTimeoutMs
+          heartbeatTimeoutMs: clientConfig.defaults.heartbeatTimeoutMs,
         },
         _heartbeatInterval: null,
-        _heartbeatTimeout: null
+        _heartbeatTimeout: null,
       });
     });
 
     it("should initialize the state correctly - with options (no transport options)", () => {
       const f = () => {};
       const c = client(f, "ws://localhost", {
-        someWsOption: "someValue"
+        someWsOption: "someValue",
       });
       expect(c).toHaveState({
         _wsConstructor: f,
@@ -549,10 +549,10 @@ describe("The client() factory function", () => {
         _options: {
           heartbeatIntervalMs: clientConfig.defaults.heartbeatIntervalMs,
           heartbeatTimeoutMs: clientConfig.defaults.heartbeatTimeoutMs,
-          someWsOption: "someValue"
+          someWsOption: "someValue",
         },
         _heartbeatInterval: null,
-        _heartbeatTimeout: null
+        _heartbeatTimeout: null,
       });
     });
 
@@ -561,7 +561,7 @@ describe("The client() factory function", () => {
       const c = client(f, "ws://localhost", {
         someWsOption: "someValue",
         heartbeatIntervalMs: 2,
-        heartbeatTimeoutMs: 1
+        heartbeatTimeoutMs: 1,
       });
       expect(c).toHaveState({
         _wsConstructor: f,
@@ -571,10 +571,10 @@ describe("The client() factory function", () => {
         _options: {
           heartbeatIntervalMs: 2,
           heartbeatTimeoutMs: 1,
-          someWsOption: "someValue"
+          someWsOption: "someValue",
         },
         _heartbeatInterval: null,
-        _heartbeatTimeout: null
+        _heartbeatTimeout: null,
       });
     });
 
@@ -654,9 +654,9 @@ describe("The client.connect() function", () => {
         {
           heartbeatIntervalMs: 123,
           heartbeatTimeoutMs: 12,
-          otherOption: "value"
+          otherOption: "value",
         },
-        constructor
+        constructor,
       );
       harn.client.connect();
       expect(check.array(constructorArgs)).toBe(true);
@@ -665,7 +665,7 @@ describe("The client.connect() function", () => {
       expect(constructorArgs[2]).toEqual({
         heartbeatIntervalMs: 123,
         heartbeatTimeoutMs: 12,
-        otherOption: "value"
+        otherOption: "value",
       });
     });
 
@@ -960,7 +960,7 @@ describe("The client.send() function", () => {
         expect(listener.disconnect.mock.calls[0].length).toBe(1);
         expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
         expect(listener.disconnect.mock.calls[0][0].message).toBe(
-          "FAILURE: WebSocket transmission failed."
+          "FAILURE: WebSocket transmission failed.",
         );
         expect(listener.disconnect.mock.calls[0][0].wsError).toBe(err);
         expect(listener.message.mock.calls.length).toBe(0);
@@ -1421,7 +1421,7 @@ describe("The client._processWsOpen() function", () => {
         expect(listener.disconnect.mock.calls[0].length).toBe(1);
         expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
         expect(listener.disconnect.mock.calls[0][0].message).toBe(
-          "FAILURE: The WebSocket heartbeat failed."
+          "FAILURE: The WebSocket heartbeat failed.",
         );
         expect(listener.disconnect.mock.calls[0][0].wsError).toBe(err);
         expect(listener.message.mock.calls.length).toBe(0);
@@ -1602,7 +1602,7 @@ describe("The client._processWsOpen() function", () => {
         expect(listener.disconnect.mock.calls[0].length).toBe(1);
         expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
         expect(listener.disconnect.mock.calls[0][0].message).toBe(
-          "FAILURE: The WebSocket heartbeat failed."
+          "FAILURE: The WebSocket heartbeat failed.",
         );
         expect(listener.message.mock.calls.length).toBe(0);
       });
@@ -1694,7 +1694,7 @@ describe("The client._processWsMessage() function", () => {
     expect(listener.disconnect.mock.calls[0].length).toBe(1);
     expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
     expect(listener.disconnect.mock.calls[0][0].message).toBe(
-      "FAILURE: Received non-string message on WebSocket connection."
+      "FAILURE: Received non-string message on WebSocket connection.",
     );
     expect(listener.message.mock.calls.length).toBe(0);
   });
@@ -1848,11 +1848,11 @@ describe("The client._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket could not be opened."
+        "FAILURE: The WebSocket could not be opened.",
       );
       expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1234);
       expect(listener.disconnect.mock.calls[0][0].wsReason).toBe(
-        "close_reason"
+        "close_reason",
       );
       expect(listener.message.mock.calls.length).toBe(0);
     });
@@ -1920,11 +1920,11 @@ describe("The client._processWsClose() function", () => {
       expect(listener.disconnect.mock.calls[0].length).toBe(1);
       expect(listener.disconnect.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][0].message).toBe(
-        "FAILURE: The WebSocket closed unexpectedly."
+        "FAILURE: The WebSocket closed unexpectedly.",
       );
       expect(listener.disconnect.mock.calls[0][0].wsCode).toBe(1234);
       expect(listener.disconnect.mock.calls[0][0].wsReason).toBe(
-        "close_reason"
+        "close_reason",
       );
       expect(listener.message.mock.calls.length).toBe(0);
     });

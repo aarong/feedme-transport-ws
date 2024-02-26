@@ -5,6 +5,6 @@
 export default {
   defaults: {
     heartbeatIntervalMs: 5000,
-    heartbeatTimeoutMs: 4999
-  }
+    heartbeatTimeoutMs: 4999,
+  },
 };

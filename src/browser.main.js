@@ -165,7 +165,7 @@ proto.connect = function connect() {
   try {
     this._wsClient = new this._wsConstructor(
       this._address,
-      config.wsSubprotocol
+      config.wsSubprotocol,
     );
   } catch (e) {
     dbg("Failed to initialize WebSocket client");
@@ -173,7 +173,7 @@ proto.connect = function connect() {
     // Update state and emit disconnect asynchronously
     this._state = "disconnected";
     const err = new Error(
-      "FAILURE: Could not initialize the WebSocket client."
+      "FAILURE: Could not initialize the WebSocket client.",
     );
     err.wsError = e;
     this._emitAsync("disconnect", err);
@@ -287,7 +287,9 @@ proto._processWsMessage = function _processWsMessage(evt) {
     dbg("Unexpected WebSocket message type");
     dbg(evt.data);
     this._disconnect(
-      new Error("FAILURE: Received non-string message on WebSocket connection.")
+      new Error(
+        "FAILURE: Received non-string message on WebSocket connection.",
+      ),
     );
     return; // Stop
   }

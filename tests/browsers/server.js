@@ -116,8 +116,8 @@ export default async function testServer(port) {
   // Create the Feedme controller API and wait for it to start
   server._fmControllerServer = feedmeServerCore({
     transport: feedmeTransportWsServer({
-      server: server._httpServer
-    })
+      server: server._httpServer,
+    }),
   });
   server._fmControllerServer.on("action", (areq, ares) => {
     // Route actions to controller methods
@@ -155,8 +155,8 @@ proto._getNextPort = async function _getNextPort() {
     const wss = new WebSocket.Server({ port });
     wss.on("error", () => {}); // Don't die on uncaught exceptions
     // eslint-disable-next-line no-await-in-loop
-    const result = await new Promise(resolve => {
-      ["listening", "close"].forEach(evt => {
+    const result = await new Promise((resolve) => {
+      ["listening", "close"].forEach((evt) => {
         wss.on(evt, () => {
           wss.removeAllListeners("listening");
           wss.removeAllListeners("close");
@@ -187,7 +187,7 @@ proto._controllerActions = {};
 
 proto._controllerActions.EstablishWsPort = async function EstablishWsPort(
   areq,
-  ares
+  ares,
 ) {
   const port = await this._getNextPort();
   this._wsServers[`${port}`] = null;
@@ -205,20 +205,20 @@ proto._controllerActions.InitWsServer = function InitWsServer(areq, ares) {
 
   // Create a new WebSocket server on the specified port
   const wsServer = new WebSocket.Server({
-    port
+    port,
   });
   this._wsServers[`${port}`] = wsServer;
 
   // When the server emits a connection event, assign a client id, save the ws
   // client reference, and reveal ws client actions on WsEvents feed
-  wsServer.on("connection", ws => {
+  wsServer.on("connection", (ws) => {
     dbg("Observed WebSocket server connection event");
     // Assign a client id and store the WebSocket object
     const cid = uuid();
     this._wsServerClients[`${port}`][cid] = ws;
 
     // Listen for and reveal client socket events on the WsEvents feed
-    ["Message", "Close", "Error"].forEach(evt => {
+    ["Message", "Close", "Error"].forEach((evt) => {
       ws.on(evt.toLowerCase(), (...args) => {
         dbg(`Observed WebSocket server client ${evt.toLowerCase()} event`);
         this._fmControllerServer.actionRevelation({
@@ -228,9 +228,9 @@ proto._controllerActions.InitWsServer = function InitWsServer(areq, ares) {
           actionData: {
             Name: `client${evt}`,
             ClientId: cid,
-            Arguments: args.map(val => this._getJsonExpressible(val))
+            Arguments: args.map((val) => this._getJsonExpressible(val)),
           },
-          feedDeltas: []
+          feedDeltas: [],
         });
       });
     });
@@ -243,14 +243,14 @@ proto._controllerActions.InitWsServer = function InitWsServer(areq, ares) {
       actionData: {
         Name: "connection",
         ClientId: cid,
-        Arguments: []
+        Arguments: [],
       },
-      feedDeltas: []
+      feedDeltas: [],
     });
   });
 
   // When the server emits any other event, reveal it on the WsEvents feed
-  ["listening", "close", "error"].forEach(evt => {
+  ["listening", "close", "error"].forEach((evt) => {
     wsServer.on(evt, (...args) => {
       dbg(`Observed WebSocket server ${evt} event`);
       this._fmControllerServer.actionRevelation({
@@ -259,9 +259,9 @@ proto._controllerActions.InitWsServer = function InitWsServer(areq, ares) {
         actionName: "Event",
         actionData: {
           Name: evt,
-          Arguments: args.map(val => this._getJsonExpressible(val))
+          Arguments: args.map((val) => this._getJsonExpressible(val)),
         },
-        feedDeltas: []
+        feedDeltas: [],
       });
     });
   });
@@ -304,7 +304,7 @@ proto._controllerActions.InvokeWsMethod = function InvokeWsMethod(areq, ares) {
 
 proto._controllerActions.InvokeWsClientMethod = function InvokeWsClientMethod(
   areq,
-  ares
+  ares,
 ) {
   // Make sure the port reference is valid
   const wsServer = this._wsServers[`${areq.actionArgs.Port}`];
@@ -314,9 +314,8 @@ proto._controllerActions.InvokeWsClientMethod = function InvokeWsClientMethod(
   }
 
   // Make sure the client is valid
-  const wsClient = this._wsServerClients[`${areq.actionArgs.Port}`][
-    areq.actionArgs.ClientId
-  ];
+  const wsClient =
+    this._wsServerClients[`${areq.actionArgs.Port}`][areq.actionArgs.ClientId];
   if (!wsClient) {
     ares.failure("INVALID_CLIENT", {});
     return;
@@ -330,8 +329,8 @@ proto._controllerActions.InvokeWsClientMethod = function InvokeWsClientMethod(
   }
 
   // Allow passing a binary argument using "binary"
-  const args = areq.actionArgs.Arguments.map(arg =>
-    arg === "binary" ? new Float32Array(5) : arg
+  const args = areq.actionArgs.Arguments.map((arg) =>
+    arg === "binary" ? new Float32Array(5) : arg,
   );
 
   // Run the method and get the result
@@ -353,7 +352,7 @@ proto._controllerActions.InvokeWsClientMethod = function InvokeWsClientMethod(
 
 proto._controllerActions.DestroyWsServer = async function DestroyWsServer(
   areq,
-  ares
+  ares,
 ) {
   // Make sure the port reference is valid
   const wsServer = this._wsServers[`${areq.actionArgs.Port}`];
@@ -370,7 +369,7 @@ proto._controllerActions.DestroyWsServer = async function DestroyWsServer(
   }
 
   // Remove server reference and server/client listeners
-  _.each(this._wsServerClients[`${areq.actionArgs.Port}`], ws => {
+  _.each(this._wsServerClients[`${areq.actionArgs.Port}`], (ws) => {
     ws.removeAllListeners();
   });
   wsServer.removeAllListeners();
@@ -383,47 +382,45 @@ proto._controllerActions.DestroyWsServer = async function DestroyWsServer(
 
 // Transport server actions
 
-proto._controllerActions.InitTransportServer = async function InitTransportServer(
-  areq,
-  ares
-) {
-  // Create a new transport server on an available port
-  const port = await this._getNextPort();
-  const transportServer = feedmeTransportWsServer({ port });
-  this._transportServers[`${port}`] = transportServer;
+proto._controllerActions.InitTransportServer =
+  async function InitTransportServer(areq, ares) {
+    // Create a new transport server on an available port
+    const port = await this._getNextPort();
+    const transportServer = feedmeTransportWsServer({ port });
+    this._transportServers[`${port}`] = transportServer;
 
-  // When the server emits an event, reveal it on the TransportEvents feed
-  [
-    "starting",
-    "start",
-    "stopping",
-    "stop",
-    "connect",
-    "message",
-    "disconnect"
-  ].forEach(evt => {
-    transportServer.on(evt, (...args) => {
-      dbg(`Observed Transport server ${evt} event`);
-      this._fmControllerServer.actionRevelation({
-        feedName: "TransportEvents",
-        feedArgs: { Port: `${port}` },
-        actionName: "Event",
-        actionData: {
-          Name: evt,
-          Arguments: args.map(val => this._getJsonExpressible(val))
-        },
-        feedDeltas: []
+    // When the server emits an event, reveal it on the TransportEvents feed
+    [
+      "starting",
+      "start",
+      "stopping",
+      "stop",
+      "connect",
+      "message",
+      "disconnect",
+    ].forEach((evt) => {
+      transportServer.on(evt, (...args) => {
+        dbg(`Observed Transport server ${evt} event`);
+        this._fmControllerServer.actionRevelation({
+          feedName: "TransportEvents",
+          feedArgs: { Port: `${port}` },
+          actionName: "Event",
+          actionData: {
+            Name: evt,
+            Arguments: args.map((val) => this._getJsonExpressible(val)),
+          },
+          feedDeltas: [],
+        });
       });
     });
-  });
 
-  // Return port to the browser
-  ares.success({ Port: port });
-};
+    // Return port to the browser
+    ares.success({ Port: port });
+  };
 
 proto._controllerActions.InvokeTransportMethod = function InvokeTransportMethod(
   areq,
-  ares
+  ares,
 ) {
   // Make sure the port reference is valid
   const transportServer = this._transportServers[`${areq.actionArgs.Port}`];
@@ -456,43 +453,41 @@ proto._controllerActions.InvokeTransportMethod = function InvokeTransportMethod(
   }
 };
 
-proto._controllerActions.DestroyTransportServer = async function DestroyTransportServer(
-  areq,
-  ares
-) {
-  // Make sure the port reference is valid
-  const transportServer = this._transportServers[`${areq.actionArgs.Port}`];
-  if (!transportServer) {
-    ares.failure("INVALID_PORT", {});
-    return;
-  }
+proto._controllerActions.DestroyTransportServer =
+  async function DestroyTransportServer(areq, ares) {
+    // Make sure the port reference is valid
+    const transportServer = this._transportServers[`${areq.actionArgs.Port}`];
+    if (!transportServer) {
+      ares.failure("INVALID_PORT", {});
+      return;
+    }
 
-  // Stop the server if not already and remove reference
-  if (transportServer.state() === "started") {
-    transportServer.stop();
-  }
-  delete this._transportServers[`${areq.actionArgs.Port}`];
+    // Stop the server if not already and remove reference
+    if (transportServer.state() === "started") {
+      transportServer.stop();
+    }
+    delete this._transportServers[`${areq.actionArgs.Port}`];
 
-  // Return success
-  ares.success({});
-};
+    // Return success
+    ares.success({});
+  };
 
 // Feedme server actions
 
 proto._controllerActions.InitFeedmeServer = async function InitFeedmeServer(
   areq,
-  ares
+  ares,
 ) {
   // Create a new Feedme server on an available port
   const port = await this._getNextPort();
   const feedmeServer = feedmeServerCore({
-    transport: feedmeTransportWsServer({ port })
+    transport: feedmeTransportWsServer({ port }),
   });
   this._feedmeServers[`${port}`] = feedmeServer;
 
   // When the server emits a basic event, reveal it on the FeedmeEvents feed
   ["starting", "start", "stopping", "stop", "connect", "disconnect"].forEach(
-    evt => {
+    (evt) => {
       feedmeServer.on(evt, (...args) => {
         dbg(`Observed Feedme server ${evt} event`);
         this._fmControllerServer.actionRevelation({
@@ -501,12 +496,12 @@ proto._controllerActions.InitFeedmeServer = async function InitFeedmeServer(
           actionName: "Event",
           actionData: {
             Name: evt,
-            Arguments: args.map(val => this._getJsonExpressible(val))
+            Arguments: args.map((val) => this._getJsonExpressible(val)),
           },
-          feedDeltas: []
+          feedDeltas: [],
         });
       });
-    }
+    },
   );
 
   // Allow clients to run one action successfully and fail all others
@@ -533,7 +528,7 @@ proto._controllerActions.InitFeedmeServer = async function InitFeedmeServer(
 
 proto._controllerActions.InvokeFeedmeMethod = function InvokeFeedmeMethod(
   areq,
-  ares
+  ares,
 ) {
   // Make sure the port reference is valid
   const feedmeServer = this._feedmeServers[`${areq.actionArgs.Port}`];
@@ -566,23 +561,21 @@ proto._controllerActions.InvokeFeedmeMethod = function InvokeFeedmeMethod(
   }
 };
 
-proto._controllerActions.DestroyFeedmeServer = async function DestroyFeedmeServer(
-  areq,
-  ares
-) {
-  // Make sure the port reference is valid
-  const feedmeServer = this._feedmeServers[`${areq.actionArgs.Port}`];
-  if (!feedmeServer) {
-    ares.failure("INVALID_PORT", {});
-    return;
-  }
+proto._controllerActions.DestroyFeedmeServer =
+  async function DestroyFeedmeServer(areq, ares) {
+    // Make sure the port reference is valid
+    const feedmeServer = this._feedmeServers[`${areq.actionArgs.Port}`];
+    if (!feedmeServer) {
+      ares.failure("INVALID_PORT", {});
+      return;
+    }
 
-  // Stop the server if not already and remove reference
-  if (feedmeServer.state() === "started") {
-    feedmeServer.stop();
-  }
-  delete this._feedmeServers[`${areq.actionArgs.Port}`];
+    // Stop the server if not already and remove reference
+    if (feedmeServer.state() === "started") {
+      feedmeServer.stop();
+    }
+    delete this._feedmeServers[`${areq.actionArgs.Port}`];
 
-  // Return success
-  ares.success({});
-};
+    // Return success
+    ares.success({});
+  };

@@ -115,7 +115,7 @@ harnessProto.createServerListener = function createServerListener() {
     stop: jest.fn(),
     connect: jest.fn(),
     message: jest.fn(),
-    disconnect: jest.fn()
+    disconnect: jest.fn(),
   };
   l.mockClear = () => {
     l.starting.mockClear();
@@ -147,7 +147,7 @@ harnessProto.createMockWs = function createMockWs() {
     OPEN: 1,
     CLOSING: 2,
     CLOSED: 3,
-    readyState: 1 // connection event emitted when client is open
+    readyState: 1, // connection event emitted when client is open
   });
   ws.mockClear = () => {
     ws.ping.mockClear();
@@ -189,7 +189,7 @@ const toHaveState = function toHaveState(receivedServer, expectedState) {
       pass: false,
       message() {
         return "expected ._wsConstructor to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -206,7 +206,7 @@ const toHaveState = function toHaveState(receivedServer, expectedState) {
       pass: false,
       message() {
         return "expected ._wsServer to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -216,7 +216,7 @@ const toHaveState = function toHaveState(receivedServer, expectedState) {
       pass: false,
       message() {
         return "expected ._state to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -224,14 +224,14 @@ const toHaveState = function toHaveState(receivedServer, expectedState) {
   if (
     !_.isEqual(
       _.keys(receivedServer._wsClients).sort(),
-      _.keys(expectedState._wsClients).sort()
+      _.keys(expectedState._wsClients).sort(),
     )
   ) {
     return {
       pass: false,
       message() {
         return "expected ._wsClients to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -239,14 +239,14 @@ const toHaveState = function toHaveState(receivedServer, expectedState) {
   if (
     !_.isEqual(
       _.keys(receivedServer._heartbeatIntervals).sort(),
-      _.keys(expectedState._heartbeatIntervals).sort()
+      _.keys(expectedState._heartbeatIntervals).sort(),
     )
   ) {
     return {
       pass: false,
       message() {
         return "expected ._heartbeatIntervals to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -254,14 +254,14 @@ const toHaveState = function toHaveState(receivedServer, expectedState) {
   if (
     !_.isEqual(
       _.keys(receivedServer._heartbeatTimeouts).sort(),
-      _.keys(expectedState._heartbeatTimeouts).sort()
+      _.keys(expectedState._heartbeatTimeouts).sort(),
     )
   ) {
     return {
       pass: false,
       message() {
         return "expected ._heartbeatTimeouts to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -271,7 +271,7 @@ const toHaveState = function toHaveState(receivedServer, expectedState) {
       pass: false,
       message() {
         return "expected ._options to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -294,7 +294,7 @@ const toHaveState = function toHaveState(receivedServer, expectedState) {
       pass: false,
       message() {
         return "expected ._httpHandlers to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -311,7 +311,7 @@ const toHaveState = function toHaveState(receivedServer, expectedState) {
       pass: false,
       message() {
         return "expected ._httpListeningTimeout to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -327,7 +327,7 @@ const toHaveState = function toHaveState(receivedServer, expectedState) {
       pass: false,
       message() {
         return "expected ._httpPollingInterval to match, but they didn't";
-      }
+      },
     };
   }
 
@@ -342,11 +342,11 @@ describe("The toHaveState() function", () => {
     it("should fail if _wsConstructor don't match", () => {
       const result = toHaveState(
         { _wsConstructor: () => {} },
-        { _wsConstructor: () => {} }
+        { _wsConstructor: () => {} },
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._wsConstructor to match, but they didn't"
+        "expected ._wsConstructor to match, but they didn't",
       );
     });
 
@@ -354,7 +354,7 @@ describe("The toHaveState() function", () => {
       const result = toHaveState({ _wsServer: null }, { _wsServer: {} });
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._wsServer to match, but they didn't"
+        "expected ._wsServer to match, but they didn't",
       );
     });
 
@@ -362,7 +362,7 @@ describe("The toHaveState() function", () => {
       const result = toHaveState({ _wsServer: {} }, { _wsServer: null });
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._wsServer to match, but they didn't"
+        "expected ._wsServer to match, but they didn't",
       );
     });
 
@@ -370,73 +370,73 @@ describe("The toHaveState() function", () => {
       const result = toHaveState({ _state: "123" }, { _state: "456" });
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._state to match, but they didn't"
+        "expected ._state to match, but they didn't",
       );
     });
 
     it("should fail if _wsClients keys don't match", () => {
       const result = toHaveState(
         { _wsClients: { one: 123 } },
-        { _wsClients: {} }
+        { _wsClients: {} },
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._wsClients to match, but they didn't"
+        "expected ._wsClients to match, but they didn't",
       );
     });
 
     it("should fail if _heartbeatIntervals keys don't match", () => {
       const result = toHaveState(
         { _heartbeatIntervals: { one: 123 } },
-        { _heartbeatIntervals: {} }
+        { _heartbeatIntervals: {} },
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._heartbeatIntervals to match, but they didn't"
+        "expected ._heartbeatIntervals to match, but they didn't",
       );
     });
 
     it("should fail if _heartbeatTimeouts keys don't match", () => {
       const result = toHaveState(
         { _heartbeatTimeouts: { one: 123 } },
-        { _heartbeatTimeouts: {} }
+        { _heartbeatTimeouts: {} },
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._heartbeatTimeouts to match, but they didn't"
+        "expected ._heartbeatTimeouts to match, but they didn't",
       );
     });
 
     it("should fail if _options don't match", () => {
       const result = toHaveState(
         { _options: { _heartbeatIntervalMs: 123 } },
-        { _options: {} }
+        { _options: {} },
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._options to match, but they didn't"
+        "expected ._options to match, but they didn't",
       );
     });
 
     it("should fail if _httpHandlers values don't match - case 1", () => {
       const result = toHaveState(
         { _httpHandlers: null },
-        { _httpHandlers: {} }
+        { _httpHandlers: {} },
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._httpHandlers to match, but they didn't"
+        "expected ._httpHandlers to match, but they didn't",
       );
     });
 
     it("should fail if _httpHandlers values don't match - case 2", () => {
       const result = toHaveState(
         { _httpHandlers: {} },
-        { _httpHandlers: null }
+        { _httpHandlers: null },
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._httpHandlers to match, but they didn't"
+        "expected ._httpHandlers to match, but they didn't",
       );
     });
 
@@ -444,51 +444,51 @@ describe("The toHaveState() function", () => {
       const result = toHaveState({ _httpHandlers: {} }, { _httpHandlers: {} });
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._httpHandlers to match, but they didn't"
+        "expected ._httpHandlers to match, but they didn't",
       );
     });
 
     it("should fail if _httpListeningTimeout values don't match - case 1", () => {
       const result = toHaveState(
         { _httpListeningTimeout: 123 },
-        { _httpListeningTimeout: null }
+        { _httpListeningTimeout: null },
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._httpListeningTimeout to match, but they didn't"
+        "expected ._httpListeningTimeout to match, but they didn't",
       );
     });
 
     it("should fail if _httpListeningTimeout values don't match - case 2", () => {
       const result = toHaveState(
         { _httpListeningTimeout: null },
-        { _httpListeningTimeout: 123 }
+        { _httpListeningTimeout: 123 },
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._httpListeningTimeout to match, but they didn't"
+        "expected ._httpListeningTimeout to match, but they didn't",
       );
     });
 
     it("should fail if _httpPollingInterval values don't match - case 1", () => {
       const result = toHaveState(
         { _httpPollingInterval: 123 },
-        { _httpPollingInterval: null }
+        { _httpPollingInterval: null },
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._httpPollingInterval to match, but they didn't"
+        "expected ._httpPollingInterval to match, but they didn't",
       );
     });
 
     it("should fail if _httpPollingInterval values don't match - case 2", () => {
       const result = toHaveState(
         { _httpPollingInterval: null },
-        { _httpPollingInterval: 123 }
+        { _httpPollingInterval: 123 },
       );
       expect(result.pass).toBe(false);
       expect(result.message()).toBe(
-        "expected ._httpPollingInterval to match, but they didn't"
+        "expected ._httpPollingInterval to match, but they didn't",
       );
     });
   });
@@ -518,7 +518,7 @@ describe("The toHaveState() function", () => {
     it("should pass if _wsClients match", () => {
       const result = toHaveState(
         { _wsClients: { cid: {} } },
-        { _wsClients: { cid: {} } }
+        { _wsClients: { cid: {} } },
       );
       expect(result.pass).toBe(true);
     });
@@ -526,7 +526,7 @@ describe("The toHaveState() function", () => {
     it("should pass if _heartbeatIntervals match", () => {
       const result = toHaveState(
         { _heartbeatIntervals: { cid: {} } },
-        { _heartbeatIntervals: { cid: {} } }
+        { _heartbeatIntervals: { cid: {} } },
       );
       expect(result.pass).toBe(true);
     });
@@ -534,7 +534,7 @@ describe("The toHaveState() function", () => {
     it("should pass if _heartbeatTimeouts match", () => {
       const result = toHaveState(
         { _heartbeatTimeouts: { cid: {} } },
-        { _heartbeatTimeouts: { cid: {} } }
+        { _heartbeatTimeouts: { cid: {} } },
       );
       expect(result.pass).toBe(true);
     });
@@ -542,7 +542,7 @@ describe("The toHaveState() function", () => {
     it("should pass if _options match", () => {
       const result = toHaveState(
         { _options: { someOption: "val" } },
-        { _options: { someOption: "val" } }
+        { _options: { someOption: "val" } },
       );
       expect(result.pass).toBe(true);
     });
@@ -553,16 +553,16 @@ describe("The toHaveState() function", () => {
           _httpHandlers: {
             listening: () => {},
             close: () => {},
-            error: () => {}
-          }
+            error: () => {},
+          },
         },
         {
           _httpHandlers: {
             listening: () => {},
             close: () => {},
-            error: () => {}
-          }
-        }
+            error: () => {},
+          },
+        },
       );
       expect(result.pass).toBe(true);
     });
@@ -570,7 +570,7 @@ describe("The toHaveState() function", () => {
     it("should pass if _httpHandlers matches - case 2", () => {
       const result = toHaveState(
         { _httpHandlers: null },
-        { _httpHandlers: null }
+        { _httpHandlers: null },
       );
       expect(result.pass).toBe(true);
     });
@@ -578,7 +578,7 @@ describe("The toHaveState() function", () => {
     it("should pass if _httpListeningTimeout matches - case 1", () => {
       const result = toHaveState(
         { _httpListeningTimeout: 123 },
-        { _httpListeningTimeout: 123 }
+        { _httpListeningTimeout: 123 },
       );
       expect(result.pass).toBe(true);
     });
@@ -586,7 +586,7 @@ describe("The toHaveState() function", () => {
     it("should pass if _httpListeningTimeout matches - case 2", () => {
       const result = toHaveState(
         { _httpListeningTimeout: null },
-        { _httpListeningTimeout: null }
+        { _httpListeningTimeout: null },
       );
       expect(result.pass).toBe(true);
     });
@@ -594,7 +594,7 @@ describe("The toHaveState() function", () => {
     it("should pass if _httpPollingInterval matches - case 1", () => {
       const result = toHaveState(
         { _httpPollingInterval: 123 },
-        { _httpPollingInterval: 123 }
+        { _httpPollingInterval: 123 },
       );
       expect(result.pass).toBe(true);
     });
@@ -602,7 +602,7 @@ describe("The toHaveState() function", () => {
     it("should pass if _httpPollingInterval matches - case 2", () => {
       const result = toHaveState(
         { _httpPollingInterval: null },
-        { _httpPollingInterval: null }
+        { _httpPollingInterval: null },
       );
       expect(result.pass).toBe(true);
     });
@@ -617,7 +617,7 @@ describe("The server() function", () => {
       expect(() => {
         server();
       }).toThrow(
-        new Error("INVALID_ARGUMENT: Invalid wsConstructor argument.")
+        new Error("INVALID_ARGUMENT: Invalid wsConstructor argument."),
       );
     });
 
@@ -625,7 +625,7 @@ describe("The server() function", () => {
       expect(() => {
         server("junk");
       }).toThrow(
-        new Error("INVALID_ARGUMENT: Invalid wsConstructor argument.")
+        new Error("INVALID_ARGUMENT: Invalid wsConstructor argument."),
       );
     });
 
@@ -664,8 +664,8 @@ describe("The server() function", () => {
         harness({});
       }).toThrow(
         new Error(
-          "INVALID_ARGUMENT: Must specify a valid port, server, or noServer option."
-        )
+          "INVALID_ARGUMENT: Must specify a valid port, server, or noServer option.",
+        ),
       );
     });
 
@@ -673,7 +673,7 @@ describe("The server() function", () => {
       expect(() => {
         harness({ server: 123 });
       }).toThrow(
-        new Error("INVALID_ARGUMENT: Invalid options.server argument.")
+        new Error("INVALID_ARGUMENT: Invalid options.server argument."),
       );
     });
 
@@ -681,7 +681,7 @@ describe("The server() function", () => {
       expect(() => {
         harness({ noServer: 123 });
       }).toThrow(
-        new Error("INVALID_ARGUMENT: Invalid options.noServer argument.")
+        new Error("INVALID_ARGUMENT: Invalid options.noServer argument."),
       );
     });
 
@@ -689,7 +689,9 @@ describe("The server() function", () => {
       expect(() => {
         harness({ port: 123, handleProtocols: () => {} });
       }).toThrow(
-        new Error("INVALID_ARGUMENT: Must not specify options.handleProtocols.")
+        new Error(
+          "INVALID_ARGUMENT: Must not specify options.handleProtocols.",
+        ),
       );
     });
 
@@ -698,8 +700,8 @@ describe("The server() function", () => {
         harness({ port: PORT, heartbeatIntervalMs: "junk" });
       }).toThrow(
         new Error(
-          "INVALID_ARGUMENT: Invalid options.heartbeatIntervalMs argument."
-        )
+          "INVALID_ARGUMENT: Invalid options.heartbeatIntervalMs argument.",
+        ),
       );
     });
 
@@ -708,8 +710,8 @@ describe("The server() function", () => {
         harness({ port: PORT, heartbeatIntervalMs: -1 });
       }).toThrow(
         new Error(
-          "INVALID_ARGUMENT: Invalid options.heartbeatIntervalMs argument."
-        )
+          "INVALID_ARGUMENT: Invalid options.heartbeatIntervalMs argument.",
+        ),
       );
     });
 
@@ -718,8 +720,8 @@ describe("The server() function", () => {
         harness({ port: PORT, heartbeatTimeoutMs: "junk" });
       }).toThrow(
         new Error(
-          "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument."
-        )
+          "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument.",
+        ),
       );
     });
 
@@ -728,8 +730,8 @@ describe("The server() function", () => {
         harness({ port: PORT, heartbeatTimeoutMs: 0 });
       }).toThrow(
         new Error(
-          "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument."
-        )
+          "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument.",
+        ),
       );
     });
 
@@ -738,8 +740,8 @@ describe("The server() function", () => {
         harness({ port: PORT, heartbeatIntervalMs: 1, heartbeatTimeoutMs: 1 });
       }).toThrow(
         new Error(
-          "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument."
-        )
+          "INVALID_ARGUMENT: Invalid options.heartbeatTimeoutMs argument.",
+        ),
       );
     });
   });
@@ -751,7 +753,7 @@ describe("The server() function", () => {
 
     it("should have the correct state - default options", () => {
       const harn = harness({
-        port: PORT
+        port: PORT,
       });
       expect(harn.getServerState()).toHaveState({
         _wsConstructor: harn.server._wsConstructor,
@@ -763,11 +765,11 @@ describe("The server() function", () => {
         _options: {
           port: PORT,
           heartbeatIntervalMs: serverConfig.defaults.heartbeatIntervalMs,
-          heartbeatTimeoutMs: serverConfig.defaults.heartbeatTimeoutMs
+          heartbeatTimeoutMs: serverConfig.defaults.heartbeatTimeoutMs,
         },
         _httpHandlers: null,
         _httpListeningTimeout: null,
-        _httpPollingInterval: null
+        _httpPollingInterval: null,
       });
     });
 
@@ -775,7 +777,7 @@ describe("The server() function", () => {
       const harn = harness({
         port: PORT,
         heartbeatIntervalMs: 456,
-        heartbeatTimeoutMs: 123
+        heartbeatTimeoutMs: 123,
       });
       expect(harn.getServerState()).toHaveState({
         _wsConstructor: harn.server._wsConstructor,
@@ -787,11 +789,11 @@ describe("The server() function", () => {
         _options: {
           port: PORT,
           heartbeatIntervalMs: 456,
-          heartbeatTimeoutMs: 123
+          heartbeatTimeoutMs: 123,
         },
         _httpHandlers: null,
         _httpListeningTimeout: null,
-        _httpPollingInterval: null
+        _httpPollingInterval: null,
       });
     });
 
@@ -869,7 +871,7 @@ describe("The server.start() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
       const eventOrder = [];
-      ["starting", "stopping", "stop"].forEach(evt => {
+      ["starting", "stopping", "stop"].forEach((evt) => {
         harn.server.on(evt, () => {
           eventOrder.push(evt);
         });
@@ -884,14 +886,14 @@ describe("The server.start() function", () => {
       expect(listener.stopping.mock.calls[0].length).toBe(1);
       expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stopping.mock.calls[0][0].message).toBe(
-        "FAILURE: Could not initialize WebSocket server."
+        "FAILURE: Could not initialize WebSocket server.",
       );
       expect(listener.stopping.mock.calls[0][0].wsError).toBe(err);
       expect(listener.stop.mock.calls.length).toBe(1);
       expect(listener.stop.mock.calls[0].length).toBe(1);
       expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stop.mock.calls[0][0].message).toBe(
-        "FAILURE: Could not initialize WebSocket server."
+        "FAILURE: Could not initialize WebSocket server.",
       );
       expect(listener.stop.mock.calls[0][0].wsError).toBe(err);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -934,7 +936,7 @@ describe("The server.start() function", () => {
       const listener = harn.createServerListener();
 
       const eventOrder = [];
-      ["starting", "stopping", "stop"].forEach(evt => {
+      ["starting", "stopping", "stop"].forEach((evt) => {
         harn.server.on(evt, () => {
           eventOrder.push(evt);
         });
@@ -959,14 +961,14 @@ describe("The server.start() function", () => {
       expect(listener.stopping.mock.calls[0].length).toBe(1);
       expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stopping.mock.calls[0][0].message).toBe(
-        "FAILURE: Could not initialize WebSocket server."
+        "FAILURE: Could not initialize WebSocket server.",
       );
       expect(listener.stopping.mock.calls[0][0].wsError).toBe(err);
       expect(listener.stop.mock.calls.length).toBe(1);
       expect(listener.stop.mock.calls[0].length).toBe(1);
       expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stop.mock.calls[0][0].message).toBe(
-        "FAILURE: Could not initialize WebSocket server."
+        "FAILURE: Could not initialize WebSocket server.",
       );
       expect(listener.stop.mock.calls[0][0].wsError).toBe(err);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -988,7 +990,7 @@ describe("The server.start() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
       const eventOrder = [];
-      ["starting", "start"].forEach(evt => {
+      ["starting", "start"].forEach((evt) => {
         harn.server.on(evt, () => {
           eventOrder.push(evt);
         });
@@ -1017,7 +1019,7 @@ describe("The server.start() function", () => {
       const listener = harn.createServerListener();
 
       const eventOrder = [];
-      ["starting", "stopping", "stop"].forEach(evt => {
+      ["starting", "stopping", "stop"].forEach((evt) => {
         harn.server.on(evt, () => {
           eventOrder.push(evt);
         });
@@ -1042,14 +1044,14 @@ describe("The server.start() function", () => {
       expect(listener.stopping.mock.calls[0].length).toBe(1);
       expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stopping.mock.calls[0][0].message).toBe(
-        "FAILURE: Could not initialize WebSocket server."
+        "FAILURE: Could not initialize WebSocket server.",
       );
       expect(listener.stopping.mock.calls[0][0].wsError).toBe(err);
       expect(listener.stop.mock.calls.length).toBe(1);
       expect(listener.stop.mock.calls[0].length).toBe(1);
       expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stop.mock.calls[0][0].message).toBe(
-        "FAILURE: Could not initialize WebSocket server."
+        "FAILURE: Could not initialize WebSocket server.",
       );
       expect(listener.stop.mock.calls[0][0].wsError).toBe(err);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -1072,7 +1074,7 @@ describe("The server.start() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
       const eventOrder = [];
-      ["starting", "start"].forEach(evt => {
+      ["starting", "start"].forEach((evt) => {
         harn.server.on(evt, () => {
           eventOrder.push(evt);
         });
@@ -1101,7 +1103,7 @@ describe("The server.start() function", () => {
       const listener = harn.createServerListener();
 
       const eventOrder = [];
-      ["starting", "stopping", "stop"].forEach(evt => {
+      ["starting", "stopping", "stop"].forEach((evt) => {
         harn.server.on(evt, () => {
           eventOrder.push(evt);
         });
@@ -1126,14 +1128,14 @@ describe("The server.start() function", () => {
       expect(listener.stopping.mock.calls[0].length).toBe(1);
       expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stopping.mock.calls[0][0].message).toBe(
-        "FAILURE: Could not initialize WebSocket server."
+        "FAILURE: Could not initialize WebSocket server.",
       );
       expect(listener.stopping.mock.calls[0][0].wsError).toBe(err);
       expect(listener.stop.mock.calls.length).toBe(1);
       expect(listener.stop.mock.calls[0].length).toBe(1);
       expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stop.mock.calls[0][0].message).toBe(
-        "FAILURE: Could not initialize WebSocket server."
+        "FAILURE: Could not initialize WebSocket server.",
       );
       expect(listener.stop.mock.calls[0][0].wsError).toBe(err);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -1170,7 +1172,7 @@ describe("The server.start() function", () => {
       newState._httpHandlers = {
         listening: () => {},
         close: () => {},
-        error: () => {}
+        error: () => {},
       };
       newState._httpListeningTimeout = 123;
       harn.server.start();
@@ -1196,7 +1198,7 @@ describe("The server.start() function", () => {
       newState._httpHandlers = {
         listening: () => {},
         close: () => {},
-        error: () => {}
+        error: () => {},
       };
       newState._httpPollingInterval = 123;
       harn.server.start();
@@ -1291,7 +1293,7 @@ describe("The server.start() function", () => {
       expect(calledOpts).toBeInstanceOf(Object);
       expect(_.keys(calledOpts).sort()).toEqual([
         "handleProtocols",
-        "noServer"
+        "noServer",
       ]);
       expect(calledOpts.handleProtocols).toBeInstanceOf(Function);
       expect(calledOpts.noServer).toBe(true);
@@ -1331,7 +1333,7 @@ describe("The server.start() function", () => {
         expect(listener.stopping.mock.calls[0].length).toBe(1);
         expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
         expect(listener.stopping.mock.calls[0][0].message).toBe(
-          "FAILURE: The external http server did not start within the allocated time."
+          "FAILURE: The external http server did not start within the allocated time.",
         );
         expect(listener.stop.mock.calls.length).toBe(0);
         expect(listener.connect.mock.calls.length).toBe(0);
@@ -1350,7 +1352,7 @@ describe("The server.start() function", () => {
         expect(listener.stop.mock.calls[0].length).toBe(1);
         expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
         expect(listener.stop.mock.calls[0][0].message).toBe(
-          "FAILURE: The external http server did not start within the allocated time."
+          "FAILURE: The external http server did not start within the allocated time.",
         );
         expect(listener.connect.mock.calls.length).toBe(0);
         expect(listener.message.mock.calls.length).toBe(0);
@@ -1442,7 +1444,7 @@ describe("The server.stop() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
       const eventOrder = [];
-      ["stopping", "disconnect"].forEach(evt => {
+      ["stopping", "disconnect"].forEach((evt) => {
         harn.server.on(evt, () => {
           eventOrder.push(evt);
         });
@@ -1462,13 +1464,13 @@ describe("The server.stop() function", () => {
       expect(check.string(listener.disconnect.mock.calls[0][0])).toBe(true);
       expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][1].message).toBe(
-        "STOPPING: The server is stopping."
+        "STOPPING: The server is stopping.",
       );
       expect(listener.disconnect.mock.calls[1].length).toBe(2);
       expect(check.string(listener.disconnect.mock.calls[0][0])).toBe(true);
       expect(listener.disconnect.mock.calls[1][1]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[1][1].message).toBe(
-        "STOPPING: The server is stopping."
+        "STOPPING: The server is stopping.",
       );
       expect(eventOrder).toEqual(["disconnect", "disconnect", "stopping"]);
 
@@ -1513,7 +1515,7 @@ describe("The server.stop() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
       const eventOrder = [];
-      ["stopping", "disconnect"].forEach(evt => {
+      ["stopping", "disconnect"].forEach((evt) => {
         harn.server.on(evt, () => {
           eventOrder.push(evt);
         });
@@ -1533,13 +1535,13 @@ describe("The server.stop() function", () => {
       expect(check.string(listener.disconnect.mock.calls[0][0])).toBe(true);
       expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][1].message).toBe(
-        "STOPPING: The server is stopping."
+        "STOPPING: The server is stopping.",
       );
       expect(listener.disconnect.mock.calls[1].length).toBe(2);
       expect(check.string(listener.disconnect.mock.calls[0][0])).toBe(true);
       expect(listener.disconnect.mock.calls[1][1]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[1][1].message).toBe(
-        "STOPPING: The server is stopping."
+        "STOPPING: The server is stopping.",
       );
       expect(eventOrder).toEqual(["disconnect", "disconnect", "stopping"]);
     });
@@ -1568,7 +1570,7 @@ describe("The server.stop() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
       const eventOrder = [];
-      ["stopping", "disconnect"].forEach(evt => {
+      ["stopping", "disconnect"].forEach((evt) => {
         harn.server.on(evt, () => {
           eventOrder.push(evt);
         });
@@ -1588,13 +1590,13 @@ describe("The server.stop() function", () => {
       expect(check.string(listener.disconnect.mock.calls[0][0])).toBe(true);
       expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][1].message).toBe(
-        "STOPPING: The server is stopping."
+        "STOPPING: The server is stopping.",
       );
       expect(listener.disconnect.mock.calls[1].length).toBe(2);
       expect(check.string(listener.disconnect.mock.calls[0][0])).toBe(true);
       expect(listener.disconnect.mock.calls[1][1]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[1][1].message).toBe(
-        "STOPPING: The server is stopping."
+        "STOPPING: The server is stopping.",
       );
       expect(eventOrder).toEqual(["disconnect", "disconnect", "stopping"]);
     });
@@ -2011,7 +2013,7 @@ describe("The server.send() function", () => {
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
-        harn.server.once("connect", c => {
+        harn.server.once("connect", (c) => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
@@ -2042,7 +2044,7 @@ describe("The server.send() function", () => {
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
-        harn.server.once("connect", c => {
+        harn.server.once("connect", (c) => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
@@ -2066,7 +2068,7 @@ describe("The server.send() function", () => {
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
-        harn.server.once("connect", c => {
+        harn.server.once("connect", (c) => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
@@ -2099,7 +2101,7 @@ describe("The server.send() function", () => {
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
-        harn.server.once("connect", c => {
+        harn.server.once("connect", (c) => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
@@ -2119,7 +2121,7 @@ describe("The server.send() function", () => {
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
-        harn.server.once("connect", c => {
+        harn.server.once("connect", (c) => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
@@ -2153,7 +2155,7 @@ describe("The server.send() function", () => {
         expect(listener.disconnect.mock.calls[0][0]).toBe(cid);
         expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
         expect(listener.disconnect.mock.calls[0][1].message).toBe(
-          "FAILURE: WebSocket transmission failed."
+          "FAILURE: WebSocket transmission failed.",
         );
         expect(listener.disconnect.mock.calls[0][1].wsError).toBe(err);
       });
@@ -2166,7 +2168,7 @@ describe("The server.send() function", () => {
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
-        harn.server.once("connect", c => {
+        harn.server.once("connect", (c) => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
@@ -2192,7 +2194,7 @@ describe("The server.send() function", () => {
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
-        harn.server.once("connect", c => {
+        harn.server.once("connect", (c) => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
@@ -2225,7 +2227,7 @@ describe("The server.send() function", () => {
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
-        harn.server.once("connect", c => {
+        harn.server.once("connect", (c) => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
@@ -2245,7 +2247,7 @@ describe("The server.send() function", () => {
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
-        harn.server.once("connect", c => {
+        harn.server.once("connect", (c) => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
@@ -2283,7 +2285,7 @@ describe("The server.send() function", () => {
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
-        harn.server.once("connect", c => {
+        harn.server.once("connect", (c) => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
@@ -2311,7 +2313,7 @@ describe("The server.send() function", () => {
         harn.getWs().emit("listening");
         const ws = harn.createMockWs();
         let cid;
-        harn.server.once("connect", c => {
+        harn.server.once("connect", (c) => {
           cid = c;
         });
         harn.getWs().emit("connection", ws);
@@ -2386,7 +2388,7 @@ describe("The server.disconnect() function", () => {
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
-      harn.server.once("connect", c => {
+      harn.server.once("connect", (c) => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
@@ -2423,7 +2425,7 @@ describe("The server.disconnect() function", () => {
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
-      harn.server.once("connect", c => {
+      harn.server.once("connect", (c) => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
@@ -2463,7 +2465,7 @@ describe("The server.disconnect() function", () => {
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
-      harn.server.once("connect", c => {
+      harn.server.once("connect", (c) => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
@@ -2487,7 +2489,7 @@ describe("The server.disconnect() function", () => {
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
-      harn.server.once("connect", c => {
+      harn.server.once("connect", (c) => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
@@ -2514,7 +2516,7 @@ describe("The server.disconnect() function", () => {
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
-      harn.server.once("connect", c => {
+      harn.server.once("connect", (c) => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
@@ -2543,7 +2545,7 @@ describe("The server.disconnect() function", () => {
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
-      harn.server.once("connect", c => {
+      harn.server.once("connect", (c) => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
@@ -2562,7 +2564,7 @@ describe("The server.handleUpgrade() function", () => {
       expect(() => {
         harn.server.handleUpgrade(123, new stream.Duplex(), Buffer.from("abc"));
       }).toThrow(
-        new Error("INVALID_ARGUMENT: Invalid request, socket, or head.")
+        new Error("INVALID_ARGUMENT: Invalid request, socket, or head."),
       );
     });
 
@@ -2572,10 +2574,10 @@ describe("The server.handleUpgrade() function", () => {
         harn.server.handleUpgrade(
           new http.IncomingMessage(),
           123,
-          Buffer.from("abc")
+          Buffer.from("abc"),
         );
       }).toThrow(
-        new Error("INVALID_ARGUMENT: Invalid request, socket, or head.")
+        new Error("INVALID_ARGUMENT: Invalid request, socket, or head."),
       );
     });
 
@@ -2585,10 +2587,10 @@ describe("The server.handleUpgrade() function", () => {
         harn.server.handleUpgrade(
           new http.IncomingMessage(),
           new stream.Duplex(),
-          123
+          123,
         );
       }).toThrow(
-        new Error("INVALID_ARGUMENT: Invalid request, socket, or head.")
+        new Error("INVALID_ARGUMENT: Invalid request, socket, or head."),
       );
     });
 
@@ -2598,10 +2600,10 @@ describe("The server.handleUpgrade() function", () => {
         harn.server.handleUpgrade(
           new http.IncomingMessage(),
           new stream.Duplex(),
-          Buffer.from("abc")
+          Buffer.from("abc"),
         );
       }).toThrow(
-        new Error("INVALID_STATE: The transport server is not started.")
+        new Error("INVALID_STATE: The transport server is not started."),
       );
     });
 
@@ -2613,10 +2615,10 @@ describe("The server.handleUpgrade() function", () => {
         harn.server.handleUpgrade(
           new http.IncomingMessage(),
           new stream.Duplex(),
-          Buffer.from("abc")
+          Buffer.from("abc"),
         );
       }).toThrow(
-        new Error("INVALID_STATE: The transport is not in noServer mode.")
+        new Error("INVALID_STATE: The transport is not in noServer mode."),
       );
     });
   });
@@ -2634,7 +2636,7 @@ describe("The server.handleUpgrade() function", () => {
       harn.server.handleUpgrade(
         new http.IncomingMessage(),
         new stream.Duplex(),
-        Buffer.from("abc")
+        Buffer.from("abc"),
       );
 
       await promisify(process.nextTick)();
@@ -2658,7 +2660,7 @@ describe("The server.handleUpgrade() function", () => {
       harn.server.handleUpgrade(
         new http.IncomingMessage(),
         new stream.Duplex(),
-        Buffer.from("abc")
+        Buffer.from("abc"),
       );
       expect(harn.server).toHaveState(newState);
     });
@@ -2683,7 +2685,7 @@ describe("The server.handleUpgrade() function", () => {
       expect(harn.getWs().handleUpgrade.mock.calls[0][1]).toBe(socket);
       expect(harn.getWs().handleUpgrade.mock.calls[0][2]).toBe(head);
       expect(check.function(harn.getWs().handleUpgrade.mock.calls[0][3])).toBe(
-        true
+        true,
       );
     });
 
@@ -2699,7 +2701,7 @@ describe("The server.handleUpgrade() function", () => {
         harn.server.handleUpgrade(
           new http.IncomingMessage(),
           new stream.Duplex(),
-          Buffer.from("abc")
+          Buffer.from("abc"),
         );
         const cb = harn.getWs().handleUpgrade.mock.calls[0][3];
 
@@ -2732,7 +2734,7 @@ describe("The server.handleUpgrade() function", () => {
       it("should update the state appropriately", async () => {
         const harn = harness({ noServer: true });
         let cid;
-        harn.server.once("connect", c => {
+        harn.server.once("connect", (c) => {
           cid = c;
         });
         harn.server.start();
@@ -2740,7 +2742,7 @@ describe("The server.handleUpgrade() function", () => {
         harn.server.handleUpgrade(
           new http.IncomingMessage(),
           new stream.Duplex(),
-          Buffer.from("abc")
+          Buffer.from("abc"),
         );
         const cb = harn.getWs().handleUpgrade.mock.calls[0][3];
         const newState = harn.getServerState();
@@ -2760,7 +2762,7 @@ describe("The server.handleUpgrade() function", () => {
         harn.server.handleUpgrade(
           new http.IncomingMessage(),
           new stream.Duplex(),
-          Buffer.from("abc")
+          Buffer.from("abc"),
         );
         const cb = harn.getWs().handleUpgrade.mock.calls[0][3];
 
@@ -3046,7 +3048,7 @@ describe("The server._processServerListening() function", () => {
       expect(listener.stopping.mock.calls[0].length).toBe(1);
       expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stopping.mock.calls[0][0].message).toBe(
-        "FAILURE: The external http server stopped listening."
+        "FAILURE: The external http server stopped listening.",
       );
       expect(listener.stop.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -3074,7 +3076,7 @@ describe("The server._processServerListening() function", () => {
       expect(listener.stop.mock.calls[0].length).toBe(1);
       expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stop.mock.calls[0][0].message).toBe(
-        "FAILURE: The external http server stopped listening."
+        "FAILURE: The external http server stopped listening.",
       );
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.message.mock.calls.length).toBe(0);
@@ -3146,7 +3148,7 @@ describe("The server._processServerClose() function", () => {
 
     const mockWs1 = harn.createMockWs();
     let cid1;
-    harn.server.once("connect", c => {
+    harn.server.once("connect", (c) => {
       cid1 = c;
     });
     harn.getWs().emit("connection", mockWs1);
@@ -3155,7 +3157,7 @@ describe("The server._processServerClose() function", () => {
 
     const mockWs2 = harn.createMockWs();
     let cid2;
-    harn.server.once("connect", c => {
+    harn.server.once("connect", (c) => {
       cid2 = c;
     });
     harn.getWs().emit("connection", mockWs2);
@@ -3163,7 +3165,7 @@ describe("The server._processServerClose() function", () => {
     await promisify(process.nextTick)(); // Move past queued events
 
     const eventOrder = [];
-    ["stopping", "stop", "disconnect"].forEach(evt => {
+    ["stopping", "stop", "disconnect"].forEach((evt) => {
       harn.server.on(evt, () => {
         eventOrder.push(evt);
       });
@@ -3188,13 +3190,13 @@ describe("The server._processServerClose() function", () => {
     expect(listener.stopping.mock.calls[0].length).toBe(1);
     expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
     expect(listener.stopping.mock.calls[0][0].message).toBe(
-      "FAILURE: The server stopped unexpectedly."
+      "FAILURE: The server stopped unexpectedly.",
     );
     expect(listener.stop.mock.calls.length).toBe(1);
     expect(listener.stop.mock.calls[0].length).toBe(1);
     expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
     expect(listener.stop.mock.calls[0][0].message).toBe(
-      "FAILURE: The server stopped unexpectedly."
+      "FAILURE: The server stopped unexpectedly.",
     );
     expect(listener.connect.mock.calls.length).toBe(0);
     expect(listener.message.mock.calls.length).toBe(0);
@@ -3205,21 +3207,21 @@ describe("The server._processServerClose() function", () => {
       (cid1 === listener.disconnect.mock.calls[0][0] &&
         cid2 === listener.disconnect.mock.calls[1][0]) ||
         (cid1 === listener.disconnect.mock.calls[1][0] &&
-          cid2 === listener.disconnect.mock.calls[0][0])
+          cid2 === listener.disconnect.mock.calls[0][0]),
     ).toBe(true);
     expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
     expect(listener.disconnect.mock.calls[0][1].message).toBe(
-      "STOPPING: The server is stopping."
+      "STOPPING: The server is stopping.",
     );
     expect(listener.disconnect.mock.calls[1][1]).toBeInstanceOf(Error);
     expect(listener.disconnect.mock.calls[1][1].message).toBe(
-      "STOPPING: The server is stopping."
+      "STOPPING: The server is stopping.",
     );
     expect(eventOrder).toEqual([
       "disconnect",
       "disconnect",
       "stopping",
-      "stop"
+      "stop",
     ]);
   });
 
@@ -3235,7 +3237,7 @@ describe("The server._processServerClose() function", () => {
 
     const mockWs1 = harn.createMockWs();
     let cid1;
-    harn.server.once("connect", c => {
+    harn.server.once("connect", (c) => {
       cid1 = c;
     });
     harn.getWs().emit("connection", mockWs1);
@@ -3244,7 +3246,7 @@ describe("The server._processServerClose() function", () => {
 
     const mockWs2 = harn.createMockWs();
     let cid2;
-    harn.server.once("connect", c => {
+    harn.server.once("connect", (c) => {
       cid2 = c;
     });
     harn.getWs().emit("connection", mockWs2);
@@ -3252,7 +3254,7 @@ describe("The server._processServerClose() function", () => {
     await promisify(process.nextTick)(); // Move past queued events
 
     const eventOrder = [];
-    ["stopping", "stop", "disconnect"].forEach(evt => {
+    ["stopping", "stop", "disconnect"].forEach((evt) => {
       harn.server.on(evt, () => {
         eventOrder.push(evt);
       });
@@ -3279,7 +3281,7 @@ describe("The server._processServerClose() function", () => {
     expect(listener.stopping.mock.calls[0].length).toBe(1);
     expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
     expect(listener.stopping.mock.calls[0][0].message).toBe(
-      "FAILURE: The server stopped unexpectedly."
+      "FAILURE: The server stopped unexpectedly.",
     );
     expect(listener.stop.mock.calls.length).toBe(0);
     expect(listener.connect.mock.calls.length).toBe(0);
@@ -3291,15 +3293,15 @@ describe("The server._processServerClose() function", () => {
       (cid1 === listener.disconnect.mock.calls[0][0] &&
         cid2 === listener.disconnect.mock.calls[1][0]) ||
         (cid1 === listener.disconnect.mock.calls[1][0] &&
-          cid2 === listener.disconnect.mock.calls[0][0])
+          cid2 === listener.disconnect.mock.calls[0][0]),
     ).toBe(true);
     expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
     expect(listener.disconnect.mock.calls[0][1].message).toBe(
-      "STOPPING: The server is stopping."
+      "STOPPING: The server is stopping.",
     );
     expect(listener.disconnect.mock.calls[1][1]).toBeInstanceOf(Error);
     expect(listener.disconnect.mock.calls[1][1].message).toBe(
-      "STOPPING: The server is stopping."
+      "STOPPING: The server is stopping.",
     );
     expect(eventOrder).toEqual(["disconnect", "disconnect", "stopping"]);
 
@@ -3322,7 +3324,7 @@ describe("The server._processServerClose() function", () => {
     expect(listener.stop.mock.calls[0].length).toBe(1);
     expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
     expect(listener.stop.mock.calls[0][0].message).toBe(
-      "FAILURE: The server stopped unexpectedly."
+      "FAILURE: The server stopped unexpectedly.",
     );
     expect(listener.connect.mock.calls.length).toBe(0);
     expect(listener.message.mock.calls.length).toBe(0);
@@ -3459,7 +3461,7 @@ describe("The server._processServerError() function", () => {
       expect(listener.disconnect.mock.calls.length).toBe(0);
 
       const eventOrder = [];
-      ["stopping", "stop"].forEach(evt => {
+      ["stopping", "stop"].forEach((evt) => {
         eventOrder.push(evt);
       });
 
@@ -3472,14 +3474,14 @@ describe("The server._processServerError() function", () => {
       expect(listener.stopping.mock.calls[0].length).toBe(1);
       expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stopping.mock.calls[0][0].message).toBe(
-        "FAILURE: Failed to listen for connections."
+        "FAILURE: Failed to listen for connections.",
       );
       expect(listener.stopping.mock.calls[0][0].wsError).toBe(err);
       expect(listener.stop.mock.calls.length).toBe(1);
       expect(listener.stop.mock.calls[0].length).toBe(1);
       expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stop.mock.calls[0][0].message).toBe(
-        "FAILURE: Failed to listen for connections."
+        "FAILURE: Failed to listen for connections.",
       );
       expect(listener.stop.mock.calls[0][0].wsError).toBe(err);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -3520,7 +3522,7 @@ describe("The server._processServerError() function", () => {
       expect(listener.stopping.mock.calls[0].length).toBe(1);
       expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stopping.mock.calls[0][0].message).toBe(
-        "FAILURE: Failed to listen for connections."
+        "FAILURE: Failed to listen for connections.",
       );
       expect(listener.stopping.mock.calls[0][0].wsError).toBe(err);
       expect(listener.stop.mock.calls.length).toBe(0);
@@ -3551,7 +3553,7 @@ describe("The server._processServerError() function", () => {
       expect(listener.stop.mock.calls[0].length).toBe(1);
       expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stop.mock.calls[0][0].message).toBe(
-        "FAILURE: Failed to listen for connections."
+        "FAILURE: Failed to listen for connections.",
       );
       expect(listener.stop.mock.calls[0][0].wsError).toBe(err);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -3798,7 +3800,7 @@ describe("The server._processServerError() function", () => {
       const listener = harn.createServerListener();
 
       const eventOrder = [];
-      ["stopping", "stop"].forEach(evt => {
+      ["stopping", "stop"].forEach((evt) => {
         harn.server.on(evt, () => {
           eventOrder.push(evt);
         });
@@ -3822,13 +3824,13 @@ describe("The server._processServerError() function", () => {
       expect(listener.stopping.mock.calls[0].length).toBe(1);
       expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stopping.mock.calls[0][0].message).toBe(
-        "FAILURE: Failed to listen for connections."
+        "FAILURE: Failed to listen for connections.",
       );
       expect(listener.stop.mock.calls.length).toBe(1);
       expect(listener.stop.mock.calls[0].length).toBe(1);
       expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stop.mock.calls[0][0].message).toBe(
-        "FAILURE: Failed to listen for connections."
+        "FAILURE: Failed to listen for connections.",
       );
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.message.mock.calls.length).toBe(0);
@@ -3865,7 +3867,7 @@ describe("The server._processServerError() function", () => {
       expect(listener.stopping.mock.calls[0].length).toBe(1);
       expect(listener.stopping.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stopping.mock.calls[0][0].message).toBe(
-        "FAILURE: Failed to listen for connections."
+        "FAILURE: Failed to listen for connections.",
       );
       expect(listener.stop.mock.calls.length).toBe(0);
       expect(listener.connect.mock.calls.length).toBe(0);
@@ -3893,7 +3895,7 @@ describe("The server._processServerError() function", () => {
       expect(listener.stop.mock.calls[0].length).toBe(1);
       expect(listener.stop.mock.calls[0][0]).toBeInstanceOf(Error);
       expect(listener.stop.mock.calls[0][0].message).toBe(
-        "FAILURE: Failed to listen for connections."
+        "FAILURE: Failed to listen for connections.",
       );
       expect(listener.connect.mock.calls.length).toBe(0);
       expect(listener.message.mock.calls.length).toBe(0);
@@ -4031,7 +4033,7 @@ describe("The server._processWsServerConnection() function", () => {
       const newState = harn.getServerState();
       const mockWs = harn.createMockWs();
       let cid;
-      harn.server.once("connect", c => {
+      harn.server.once("connect", (c) => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
@@ -4081,7 +4083,7 @@ describe("The server._processWsServerConnection() function", () => {
         harn.getWs().emit("listening");
         const mockWs = harn.createMockWs();
         let cid;
-        harn.server.once("connect", c => {
+        harn.server.once("connect", (c) => {
           cid = c;
         });
         harn.getWs().emit("connection", mockWs);
@@ -4193,7 +4195,7 @@ describe("The server._processWsServerConnection() function", () => {
             harn.server.start();
             harn.getWs().emit("listening");
             let clientId;
-            harn.server.once("connect", cid => {
+            harn.server.once("connect", (cid) => {
               clientId = cid;
             });
             const mockWs = harn.createMockWs();
@@ -4229,7 +4231,7 @@ describe("The server._processWsServerConnection() function", () => {
             expect(listener.disconnect.mock.calls[0][0]).toBe(clientId);
             expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
             expect(listener.disconnect.mock.calls[0][1].message).toBe(
-              "FAILURE: The WebSocket heartbeat failed."
+              "FAILURE: The WebSocket heartbeat failed.",
             );
             expect(listener.disconnect.mock.calls[0][1].wsError).toBe(err);
           });
@@ -4239,7 +4241,7 @@ describe("The server._processWsServerConnection() function", () => {
             harn.server.start();
             harn.getWs().emit("listening");
             let clientId;
-            harn.server.once("connect", cid => {
+            harn.server.once("connect", (cid) => {
               clientId = cid;
             });
             const mockWs = harn.createMockWs();
@@ -4394,7 +4396,7 @@ describe("The server._processWsServerConnection() function", () => {
       const newState = harn.getServerState();
       const mockWs = harn.createMockWs();
       let cid;
-      harn.server.once("connect", c => {
+      harn.server.once("connect", (c) => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
@@ -4425,7 +4427,7 @@ describe("The server._processWsClientMessage() function", () => {
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
-      harn.server.once("connect", c => {
+      harn.server.once("connect", (c) => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
@@ -4489,7 +4491,7 @@ describe("The server._processWsClientMessage() function", () => {
       harn.getWs().emit("listening");
       const mockWs = harn.createMockWs();
       let cid;
-      harn.server.once("connect", c => {
+      harn.server.once("connect", (c) => {
         cid = c;
       });
       harn.getWs().emit("connection", mockWs);
@@ -4520,7 +4522,7 @@ describe("The server._processWsClientMessage() function", () => {
       expect(listener.disconnect.mock.calls[0][0]).toBe(cid);
       expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
       expect(listener.disconnect.mock.calls[0][1].message).toBe(
-        "FAILURE: Received non-string message on WebSocket connection."
+        "FAILURE: Received non-string message on WebSocket connection.",
       );
     });
 
@@ -4586,7 +4588,7 @@ describe("The server._processWsClientPong() function", () => {
     harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
     let cid;
-    harn.server.once("connect", c => {
+    harn.server.once("connect", (c) => {
       cid = c;
     });
     harn.getWs().emit("connection", mockWs);
@@ -4648,7 +4650,7 @@ describe("The server._processWsClientClose() function", () => {
     harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
     let cid;
-    harn.server.once("connect", c => {
+    harn.server.once("connect", (c) => {
       cid = c;
     });
     harn.getWs().emit("connection", mockWs);
@@ -4680,7 +4682,7 @@ describe("The server._processWsClientClose() function", () => {
     expect(listener.disconnect.mock.calls[0][0]).toBe(cid);
     expect(listener.disconnect.mock.calls[0][1]).toBeInstanceOf(Error);
     expect(listener.disconnect.mock.calls[0][1].message).toBe(
-      "FAILURE: The WebSocket closed."
+      "FAILURE: The WebSocket closed.",
     );
   });
 
@@ -4692,7 +4694,7 @@ describe("The server._processWsClientClose() function", () => {
     harn.getWs().emit("listening");
     const mockWs = harn.createMockWs();
     let cid;
-    harn.server.once("connect", c => {
+    harn.server.once("connect", (c) => {
       cid = c;
     });
     harn.getWs().emit("connection", mockWs);
@@ -4846,14 +4848,14 @@ describe("The server._handleProtocols() function", () => {
   it("should return correctly if feedme is present - first", () => {
     const harn = harness({ port: PORT });
     expect(harn.server._processHandleProtocols(["feedme", "something"])).toBe(
-      "feedme"
+      "feedme",
     );
   });
 
   it("should return correctly if feedme is present - last", () => {
     const harn = harness({ port: PORT });
     expect(harn.server._processHandleProtocols(["something", "feedme"])).toBe(
-      "feedme"
+      "feedme",
     );
   });
 
@@ -4863,8 +4865,8 @@ describe("The server._handleProtocols() function", () => {
       harn.server._processHandleProtocols([
         "something",
         "feedme",
-        "somethingelse"
-      ])
+        "somethingelse",
+      ]),
     ).toBe("feedme");
   });
 
@@ -4876,7 +4878,7 @@ describe("The server._handleProtocols() function", () => {
   it("should return correctly if feedme is missing", () => {
     const harn = harness({ port: PORT });
     expect(
-      harn.server._processHandleProtocols(["something", "somethingelse"])
+      harn.server._processHandleProtocols(["something", "somethingelse"]),
     ).toBe(false);
   });
 
