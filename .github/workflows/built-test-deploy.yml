@@ -1,0 +1,28 @@
+name: CI-CD
+run-name: Build, Test, Deploy
+on:
+  - push
+  - workflow_dispatch # Permit manual initiation
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 'latest'
+
+      - run: npm ci
+      - run: npm run build
+
+      # - run: npm run test-build-browsers
+      
+      - run: npm run coverage
+      - uses: coverallsapp/github-action@v2
+
+      # Publish if tagged v* 
+      - uses: JS-DevTools/npm-publish@v3        
+        if: startsWith(github.event.ref, 'refs/tags/v')
+        with:
+          package: build # Path
+          token: ${{ secrets.NPM_TOKEN }}

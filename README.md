@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/aarong/feedme-transport-ws.svg?branch=master)](https://travis-ci.com/github/aarong/feedme-transport-ws)
+[![CI-CD](https://github.com/aarong/feedme-transport-ws/actions/workflows/built-test-deploy.yml/badge.svg)](https://github.com/aarong/feedme-transport-ws/actions/workflows/built-test-deploy.yml)
 [![Coverage Status](https://coveralls.io/repos/github/aarong/feedme-transport-ws/badge.svg?branch=master)](https://coveralls.io/github/aarong/feedme-transport-ws?branch=master)
 
 [![Feedme](https://raw.githubusercontent.com/aarong/feedme-transport-ws/master/logo.svg?sanitize=true)](https://feedme.global)
@@ -18,22 +18,23 @@ project.
 
 <!-- TOC depthFrom:2 -->
 
-- [Server](#server)
-  - [Installation](#installation)
-  - [Initialization](#initialization)
-  - [Usage: Feedme API on a Stand-Alone WebSocket Server](#usage-feedme-api-on-a-stand-alone-websocket-server)
-  - [Usage: Feedme API on an Existing HTTP/S Server](#usage-feedme-api-on-an-existing-https-server)
-  - [Usage: Multiple Feedme APIs on a Single HTTP/S Server](#usage-multiple-feedme-apis-on-a-single-https-server)
-  - [WebSocket Errors](#websocket-errors)
-- [Node.js Client](#nodejs-client)
-  - [Installation](#installation-1)
-  - [Initialization](#initialization-1)
-  - [WebSocket Errors](#websocket-errors-1)
-- [Browser Client](#browser-client)
-  - [Installation](#installation-2)
-  - [Initialization](#initialization-2)
-  - [WebSocket Errors](#websocket-errors-2)
-- [Compatibility](#compatibility)
+- [Feedme Javascript WebSocket Transport](#feedme-javascript-websocket-transport)
+  - [Server](#server)
+    - [Installation](#installation)
+    - [Initialization](#initialization)
+    - [Usage: Feedme API on a Stand-Alone WebSocket Server](#usage-feedme-api-on-a-stand-alone-websocket-server)
+    - [Usage: Feedme API on an Existing HTTP/S Server](#usage-feedme-api-on-an-existing-https-server)
+    - [Usage: Multiple Feedme APIs on a Single HTTP/S Server](#usage-multiple-feedme-apis-on-a-single-https-server)
+    - [WebSocket Errors](#websocket-errors)
+  - [Node.js Client](#nodejs-client)
+    - [Installation](#installation-1)
+    - [Initialization](#initialization-1)
+    - [WebSocket Errors](#websocket-errors-1)
+  - [Browser Client](#browser-client)
+    - [Installation](#installation-2)
+    - [Initialization](#initialization-2)
+    - [WebSocket Errors](#websocket-errors-2)
+  - [Compatibility](#compatibility)
 
 <!-- /TOC -->
 
