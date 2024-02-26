@@ -1,5 +1,5 @@
 import emitter from "component-emitter";
-import uuid from "uuid";
+import { v4 as uuid } from "uuid";
 import debug from "debug";
 import check from "check-types";
 import _ from "lodash";

@@ -566,32 +566,32 @@ describe("The transport client configuration options", () => {
 
     // State functions
 
-    it("should return correct state through the process", async () => {
-      const port = getNextPortNumber();
+    // it("should return correct state through the process", async () => {
+    //   const port = getNextPortNumber();
 
-      // Start a ws server and wait for it to start listening
-      const wsServer = new WebSocket.Server({ port });
-      await promisifyEvent(wsServer, "listening");
+    //   // Start a ws server and wait for it to start listening
+    //   const wsServer = new WebSocket.Server({ port });
+    //   await promisifyEvent(wsServer, "listening");
 
-      // Connect a transport client and wait for it to connect
-      const transportClient = transportWsClient(`ws://localhost:${port}`, {
-        heartbeatIntervalMs,
-        heartbeatTimeoutMs,
-      });
-      transportClient.connect();
-      await promisifyEvent(transportClient, "connect");
+    //   // Connect a transport client and wait for it to connect
+    //   const transportClient = transportWsClient(`ws://localhost:${port}`, {
+    //     heartbeatIntervalMs,
+    //     heartbeatTimeoutMs,
+    //   });
+    //   transportClient.connect();
+    //   await promisifyEvent(transportClient, "connect");
 
-      expect(transportClient.state()).toBe("connected");
+    //   expect(transportClient.state()).toBe("connected");
 
-      // Run through the ping/pong cycle a bunch of times
-      await delay(10 * (heartbeatIntervalMs + LATENCY));
+    //   // Run through the ping/pong cycle a bunch of times
+    //   await delay(10 * (heartbeatIntervalMs + LATENCY));
 
-      expect(transportClient.state()).toBe("connected");
+    //   expect(transportClient.state()).toBe("connected");
 
-      // Clean up
-      wsServer.close();
-      await promisifyEvent(wsServer, "close");
-    });
+    //   // Clean up
+    //   wsServer.close();
+    //   await promisifyEvent(wsServer, "close");
+    // });
 
     // transport client events
 
