@@ -80,7 +80,7 @@
   },
   "jest": {
     "collectCoverageFrom": [
-      "src/**/*.{js}"
+      "src/**/*.js"
     ],
     "testMatch": [
       "**/*.test.js"
