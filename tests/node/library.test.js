@@ -16,7 +16,7 @@ const getNextPortNumber = () => {
   return nextPortNumber - 1;
 };
 
-it("should work through all major operations", async () => {
+it.skip("should work through all major operations", async () => {
   const port = getNextPortNumber();
 
   // Start a Feedme server

@@ -30,7 +30,7 @@ client is established for each test.
 */
 
 // Jasmine configuration
-jasmine.DEFAULT_TIMEOUT_INTERVAL = 120000; // Per test - including any retries
+jasmine.DEFAULT_TIMEOUT_INTERVAL = 10000; // Per test - including any retries
 
 // Test configuration
 const PORT = 3000; // Port for controller Feedme API
@@ -274,7 +274,7 @@ describe("The transport.connect() function", () => {
           expect(clientListener.disconnect.calls.count()).toBe(0);
           expect(clientListener.message.calls.count()).toBe(0);
 
-          await promisify(process.nextTick)();
+          await promisify(queueMicrotask)();
 
           // Emit connecting asynchronously
           expect(clientListener.connecting.calls.count()).toBe(1);
@@ -421,7 +421,7 @@ describe("The transport.connect() function", () => {
             });
           });
 
-          await promisify(process.nextTick)();
+          await promisify(queueMicrotask)();
 
           // Emit connecting asynchronously
           expect(clientListener.connecting.calls.count()).toBe(1);
@@ -534,7 +534,7 @@ describe("The transport.disconnect() function", () => {
 
           expect(transportClient.state()).toBe("connecting");
 
-          await promisify(process.nextTick)(); // Move past connecting event
+          await promisify(queueMicrotask)(); // Move past connecting event
 
           const clientListener = createClientListener(transportClient);
 
@@ -546,7 +546,7 @@ describe("The transport.disconnect() function", () => {
           expect(clientListener.disconnect.calls.count()).toBe(0);
           expect(clientListener.message.calls.count()).toBe(0);
 
-          await promisify(process.nextTick)();
+          await promisify(queueMicrotask)();
 
           // Emit disconnect asynchronously
           expect(clientListener.connecting.calls.count()).toBe(0);
@@ -643,7 +643,7 @@ describe("The transport.disconnect() function", () => {
 
           expect(transportClient.state()).toBe("connecting");
 
-          await promisify(process.nextTick)(); // Move past connecting event
+          await promisify(queueMicrotask)(); // Move past connecting event
 
           const clientListener = createClientListener(transportClient);
 
@@ -656,7 +656,7 @@ describe("The transport.disconnect() function", () => {
           expect(clientListener.disconnect.calls.count()).toBe(0);
           expect(clientListener.message.calls.count()).toBe(0);
 
-          await promisify(process.nextTick)();
+          await promisify(queueMicrotask)();
 
           // Emit disconnect asynchronously
           expect(clientListener.connecting.calls.count()).toBe(0);
@@ -758,7 +758,7 @@ describe("The transport.disconnect() function", () => {
 
           expect(transportClient.state()).toBe("connected");
 
-          await promisify(process.nextTick)(); // Move past connecting/connected events
+          await promisify(queueMicrotask)(); // Move past connecting/connected events
 
           const clientListener = createClientListener(transportClient);
 
@@ -770,7 +770,7 @@ describe("The transport.disconnect() function", () => {
           expect(clientListener.disconnect.calls.count()).toBe(0);
           expect(clientListener.message.calls.count()).toBe(0);
 
-          await promisify(process.nextTick)();
+          await promisify(queueMicrotask)();
 
           // Emit disconnect asynchronously
           expect(clientListener.connecting.calls.count()).toBe(0);
@@ -916,7 +916,7 @@ describe("The transport.disconnect() function", () => {
 
           expect(transportClient.state()).toBe("connected");
 
-          await promisify(process.nextTick)(); // Move past connecting/connected events
+          await promisify(queueMicrotask)(); // Move past connecting/connected events
 
           const clientListener = createClientListener(transportClient);
 
@@ -929,7 +929,7 @@ describe("The transport.disconnect() function", () => {
           expect(clientListener.disconnect.calls.count()).toBe(0);
           expect(clientListener.message.calls.count()).toBe(0);
 
-          await promisify(process.nextTick)();
+          await promisify(queueMicrotask)();
 
           // Emit disconnect asynchronously
           expect(clientListener.connecting.calls.count()).toBe(0);
@@ -1081,7 +1081,7 @@ describe("The transport.send() function", () => {
 
         expect(transportClient.state()).toBe("connected");
 
-        await promisify(process.nextTick)();
+        await promisify(queueMicrotask)();
 
         expect(transportClient.state()).toBe("connected");
 
@@ -1123,7 +1123,7 @@ describe("The transport.send() function", () => {
 
         expect(transportClient.state()).toBe("connected");
 
-        await promisify(process.nextTick)(); // Move past connecting/connected events
+        await promisify(queueMicrotask)(); // Move past connecting/connected events
 
         const clientListener = createClientListener(transportClient);
 
@@ -1135,7 +1135,7 @@ describe("The transport.send() function", () => {
         expect(clientListener.disconnect.calls.count()).toBe(0);
         expect(clientListener.message.calls.count()).toBe(0);
 
-        await promisify(process.nextTick)();
+        await promisify(queueMicrotask)();
 
         // Emit nothing asynchronously
         expect(clientListener.connecting.calls.count()).toBe(0);
@@ -1230,7 +1230,7 @@ describe("The transport._processWsOpen() function", () => {
 
       expect(transportClient.state()).toBe("connected");
 
-      await promisify(process.nextTick)();
+      await promisify(queueMicrotask)();
 
       expect(transportClient.state()).toBe("connected");
 
@@ -1268,7 +1268,7 @@ describe("The transport._processWsOpen() function", () => {
 
       expect(transportClient.state()).toBe("connecting");
 
-      await promisify(process.nextTick)(); // Move past connecting event
+      await promisify(queueMicrotask)(); // Move past connecting event
 
       const clientListener = createClientListener(transportClient);
 
@@ -1515,7 +1515,7 @@ describe("The transport._processWsMessage() function", () => {
 
         expect(transportClient.state()).toBe("connected");
 
-        await promisify(process.nextTick)();
+        await promisify(queueMicrotask)();
 
         expect(transportClient.state()).toBe("connected");
 
@@ -1616,7 +1616,7 @@ describe("The transport._processWsClose() function", () => {
         const transportClient = feedmeTransportWsClient(BAD_URL);
         transportClient.connect();
 
-        await promisify(process.nextTick)(); // Move past connecting event
+        await promisify(queueMicrotask)(); // Move past connecting event
 
         const clientListener = createClientListener(transportClient);
 
@@ -2102,7 +2102,7 @@ describe("The transport should operate correctly through multiple connection cyc
       expect(clientListener.disconnect.calls.count()).toBe(0);
       expect(clientListener.message.calls.count()).toBe(0);
 
-      await promisify(process.nextTick)();
+      await promisify(queueMicrotask)();
 
       // Emit connecting asynchronously
       expect(clientListener.connecting.calls.count()).toBe(1);
@@ -2130,7 +2130,7 @@ describe("The transport should operate correctly through multiple connection cyc
       expect(clientListener.disconnect.calls.count()).toBe(0);
       expect(clientListener.message.calls.count()).toBe(0);
 
-      await promisify(process.nextTick)();
+      await promisify(queueMicrotask)();
 
       // Emit disconnect asynchronously
       expect(clientListener.connecting.calls.count()).toBe(0);
@@ -2148,7 +2148,7 @@ describe("The transport should operate correctly through multiple connection cyc
       expect(clientListener.disconnect.calls.count()).toBe(0);
       expect(clientListener.message.calls.count()).toBe(0);
 
-      await promisify(process.nextTick)();
+      await promisify(queueMicrotask)();
 
       // Emit connecting asynchronously
       expect(clientListener.connecting.calls.count()).toBe(1);
@@ -2176,7 +2176,7 @@ describe("The transport should operate correctly through multiple connection cyc
       expect(clientListener.disconnect.calls.count()).toBe(0);
       expect(clientListener.message.calls.count()).toBe(0);
 
-      await promisify(process.nextTick)();
+      await promisify(queueMicrotask)();
 
       // Emit disconnect asynchronously
       expect(clientListener.connecting.calls.count()).toBe(0);

@@ -43,8 +43,8 @@
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-prettier": "^5.1.3",
     "express": "^4.16.4",
-    "feedme-client": "^0.0.39",
-    "feedme-server-core": "^0.0.8",
+    "feedme-client": "0.0.35",
+    "feedme-server-core": "0.0.4",
     "fs-copy-file-sync": "^1.1.1",
     "ghooks": "^2.0.4",
     "glob": "^10.3.10",
@@ -59,6 +59,14 @@
     "request": "^2.88.2",
     "sauce-connect-launcher": "^1.2.4",
     "webpack": "^5.90.3"
+  },
+  "overrides": {
+    "feedme-client": {
+      "feedme-util": "0.2.1"
+    },
+    "feedme-server-core": {
+      "feedme-util": "0.2.1"
+    }
   },
   "repository": {
     "type": "git",

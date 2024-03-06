@@ -78,22 +78,20 @@ off tests midway through execution even when the global timeout has not been hit
     );
   }
 
-  // If the tests are to be run on Sauce, make sure the hosts file has the required entry
+  // Make sure the hosts file has the required entry
   let hasHostsEntry = false;
-  if (mode !== "local") {
-    const lines = hostile.get(false);
-    lines.forEach((line) => {
-      const ip = line[0];
-      const hosts = line[1].split(" "); // Travis routes multiple hosts to 127.0.0.1 delimited by spaces
-      if (ip === "127.0.0.1" && _.includes(hosts, "testinghost.com")) {
-        hasHostsEntry = true;
-      }
-    });
-    if (!hasHostsEntry) {
-      throw new Error(
-        "NO_HOSTS_ENTRY: You need to route testinghost.com to 127.0.0.1 in your hosts file in order to run the Sauce tests.",
-      );
+  const lines = hostile.get(false);
+  lines.forEach((line) => {
+    const ip = line[0];
+    const hosts = line[1].split(" "); // Travis routes multiple hosts to 127.0.0.1 delimited by spaces
+    if (ip === "127.0.0.1" && _.includes(hosts, "testinghost.com")) {
+      hasHostsEntry = true;
     }
+  });
+  if (!hasHostsEntry) {
+    throw new Error(
+      "NO_HOSTS_ENTRY: You need to route testinghost.com to 127.0.0.1 in your hosts file in order to run the Sauce tests.",
+    );
   }
 
   // The following platforms test and return successfully on Sauce
@@ -337,7 +335,7 @@ off tests midway through execution even when the global timeout has not been hit
                         proposals: true,
                       },
                       targets: targets.browsers,
-                      // debug: true
+                      debug: true,
                     },
                   ],
                 ],
@@ -353,7 +351,7 @@ off tests midway through execution even when the global timeout has not been hit
       optimization: {
         minimize: false,
       },
-      devtool: "source-maps",
+      devtool: "eval-source-map",
       performance: {
         maxAssetSize: 2000000,
         maxEntrypointSize: 2000000,
@@ -385,13 +383,13 @@ off tests midway through execution even when the global timeout has not been hit
     `${__dirname}/webroot/browser.bundle.withmaps.js`,
     bundle,
   );
-  const maps = await util.promisify(fs.readFile)(
-    `${__dirname}/../../build/browser.bundle.withmaps.js.map`,
-  );
-  await util.promisify(fs.writeFile)(
-    `${__dirname}/webroot/browser.bundle.withmaps.js.map`,
-    maps,
-  );
+  // const maps = await util.promisify(fs.readFile)(
+  //   `${__dirname}/../../build/browser.bundle.withmaps.js.map`,
+  // );
+  // await util.promisify(fs.writeFile)(
+  //   `${__dirname}/webroot/browser.bundle.withmaps.js.map`,
+  //   maps,
+  // );
 
   // Start the local webserver (adapted from Jasmine-standalone)
   const webserver = await testServer(PORT);

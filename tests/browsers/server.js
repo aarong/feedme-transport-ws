@@ -1,5 +1,5 @@
 /* eslint-disable import/no-extraneous-dependencies */
-import uuid from "uuid";
+import { v4 as uuid } from "uuid";
 import _ from "lodash";
 import express from "express";
 import feedmeServerCore from "feedme-server-core";

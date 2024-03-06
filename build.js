@@ -14,9 +14,9 @@ import targets from "./targets";
 
   // Copy files to build folder
   await Promise.all(
-    ["package.json", "LICENSE", "README.md"].map(file =>
-      fs.copyFile(file, `build/${file}`)
-    )
+    ["package.json", "LICENSE", "README.md"].map((file) =>
+      fs.copyFile(file, `build/${file}`),
+    ),
   );
 
   // Transpile for Node (except the browser entrypoint)
@@ -29,7 +29,7 @@ import targets from "./targets";
   // the maps to file myself and append a reference in the transpiled source
   const srcFiles = await glob("*.js", { cwd: "src" });
   await Promise.all(
-    srcFiles.map(file =>
+    srcFiles.map((file) =>
       (async () => {
         console.log(`Transpiling ${file}`);
 
@@ -38,28 +38,28 @@ import targets from "./targets";
           presets: [["@babel/preset-env", { targets: targets.node }]],
           plugins: ["add-module-exports"], // No .default()
           sourceMaps: true,
-          sourceRoot: "../src"
+          sourceRoot: "../src",
         });
 
         // Write transpiled source
         await fs.writeFile(
           `build/${file}`,
-          `${transpile.code}\n//# sourceMappingURL=${file}.map\n`
+          `${transpile.code}\n//# sourceMappingURL=${file}.map\n`,
         );
 
         // Write source maps
         await fs.writeFile(
           `build/${file}.map`,
-          JSON.stringify(Object.assign(transpile.map, { file }))
+          JSON.stringify(Object.assign(transpile.map, { file })),
         );
-      })()
-    )
+      })(),
+    ),
   );
 
   // Create browser bundles
   console.log("Bundling for the browser");
-  const createWebpackConfig = sourceMaps => ({
-    entry: "./src/browser.main.js",
+  const createWebpackConfig = (sourceMaps) => ({
+    entry: "./src/browser.js",
     mode: "production",
 
     module: {
@@ -72,7 +72,7 @@ import targets from "./targets";
           // https://github.com/zloirock/core-js/issues/743
           exclude: [
             /\bnode_modules[\\/]{1}core-js\b/, // Allow slash or backslash
-            /\bnode_modules[\\/]{1}webpack\b/
+            /\bnode_modules[\\/]{1}webpack\b/,
           ],
 
           use: {
@@ -98,20 +98,20 @@ import targets from "./targets";
                     useBuiltIns: "usage",
                     corejs: {
                       version: "3",
-                      proposals: true
+                      proposals: true,
                     },
 
-                    targets: targets.browsers
+                    targets: targets.browsers,
 
                     // Verbose preset-env output
                     // debug: true
-                  }
-                ]
-              ]
-            }
-          }
-        }
-      ]
+                  },
+                ],
+              ],
+            },
+          },
+        },
+      ],
     },
 
     output: {
@@ -119,11 +119,11 @@ import targets from "./targets";
       path: path.resolve(__dirname, "build"),
       library: "feedmeTransportWsClient",
       libraryExport: "default", // No .default()
-      libraryTarget: "umd"
+      libraryTarget: "umd",
     },
 
     optimization: {
-      minimize: true
+      minimize: true,
     },
 
     // If you use the "source-map" option you get correct line number references
@@ -135,8 +135,8 @@ import targets from "./targets";
     // Suppress file size warnings
     performance: {
       maxAssetSize: sourceMaps ? 800000 : 80000,
-      maxEntrypointSize: sourceMaps ? 800000 : 80000
-    }
+      maxEntrypointSize: sourceMaps ? 800000 : 80000,
+    },
 
     // Detailed Webpack info
     // stats: "verbose"
