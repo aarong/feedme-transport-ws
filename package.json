@@ -23,7 +23,7 @@
     "lodash": "^4.17.21",
     "source-map-support": "^0.5.11",
     "uuid": "^9.0.1",
-    "ws": "^6.2.1"
+    "ws": "^6.2.2"
   },
   "devDependencies": {
     "@babel/cli": "^7.23.9",
