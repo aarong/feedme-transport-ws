@@ -1,7 +1,7 @@
 import check from "check-types";
 import http from "http";
 import promisifyEvent from "promisify-event";
-import delay from "delay";
+import { setTimeout as delay } from "node:timers/promises";
 import transportWsServer from "../../build/server";
 import transportWsClient from "../../build/client";
 

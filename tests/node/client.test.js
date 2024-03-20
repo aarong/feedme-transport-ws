@@ -1,6 +1,6 @@
 import WebSocket from "ws";
 import promisifyEvent from "promisify-event";
-import delay from "delay";
+import { setTimeout as delay } from "node:timers/promises";
 import promisify from "promisify-function"; // Need to be able to run build tests in Node 6
 import transportWsClient from "../../build/client";
 
