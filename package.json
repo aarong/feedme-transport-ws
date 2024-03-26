@@ -41,7 +41,7 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",
     "eslint-plugin-prettier": "^5.1.3",
-    "express": "^4.16.4",
+    "express": "^4.19.2",
     "feedme-client": "0.0.35",
     "feedme-server-core": "0.0.4",
     "fs-copy-file-sync": "^1.1.1",
